@@ -1,0 +1,7 @@
+name: "aci_bench"
+description: |
+ ACI Bench is a dataset of patient-doctor conversations paired with structured clinical notes. The task is extract and structure information from patient doctor conversations.
+
+dataset_path: "data/medhelm/aci_bench.jsonl"
+dataset_type: "qa"
+prompt_column: "prompt"

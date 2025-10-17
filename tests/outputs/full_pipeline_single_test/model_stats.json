@@ -1,0 +1,1499 @@
+{
+  "claude-3-5-sonnet-20240620": {
+    "fine": [
+      {
+        "property_description": "Clearly states when information is unavailable or incomplete, rather than providing unverifiable or speculative answers.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.5887850467289721,
+        "size": 5,
+        "proportion": 0.22727272727272727,
+        "examples": [
+          "1b4b49ca-76b0-4380-9a03-b9d7c731a945",
+          "7fa45f13-c1f5-40c2-8807-1a523ea80d22",
+          "be8579f6-d6ae-409a-b277-943e28914a03"
+        ],
+        "metadata": {
+          "cluster_id": 13,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Declines or modifies responses to adhere to ethical, legal, or platform guidelines.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.25,
+        "size": 5,
+        "proportion": 0.22727272727272727,
+        "examples": [
+          "567eb317-1501-48f3-867c-34103cec8995",
+          "ba0efd3e-01d3-45ba-89de-f5969449ba78",
+          "adcfe30a-202e-4e44-bbb1-c81c65b60d68"
+        ],
+        "metadata": {
+          "cluster_id": 6,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Provides historical and contextual comparisons to help users relate past and present situations.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.2142857142857144,
+        "size": 2,
+        "proportion": 0.09090909090909091,
+        "examples": [
+          "2d750282-7425-4149-9480-a193969b8e23",
+          "ea8049c4-b114-4c9d-aca6-697451cf8645",
+          "0166da87-d139-42c9-80e5-ab98732f3b19"
+        ],
+        "metadata": {
+          "cluster_id": 0,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Offers practical guidance, relevant lists, and cautionary advice when unable to provide specific requested data.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.2142857142857144,
+        "size": 4,
+        "proportion": 0.18181818181818182,
+        "examples": [
+          "0ed38c85-d7d8-46b4-8f77-6adfccf62e4f",
+          "72dc7347-8baa-42b3-bd72-8377a2ea871e",
+          "9ecb9261-3bc4-4596-ac86-e18622e8bb5d"
+        ],
+        "metadata": {
+          "cluster_id": 12,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Outlines a personalized, process-oriented roadmap for shifting from mechanical engineering to AI without naming specific applications or courses.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.0,
+        "size": 1,
+        "proportion": 0.045454545454545456,
+        "examples": [
+          "f923293c-0675-4359-8f38-2552639353fc",
+          "95a69f43-60c5-4ccd-9e8e-2cce49602af2",
+          "0cefc9c0-7efb-42d6-b287-ae0654ae32e1"
+        ],
+        "metadata": {
+          "cluster_id": 1,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Summarizes complex topics clearly, highlighting key findings and their practical implications in accessible language.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.0,
+        "size": 2,
+        "proportion": 0.09090909090909091,
+        "examples": [
+          "d3fa1724-4035-47d4-8140-33b2682ac336",
+          "fe5abbd5-9155-47e3-96be-ef1619b061cf",
+          "52b3ed68-5d56-45f9-9356-477a0ec556d9"
+        ],
+        "metadata": {
+          "cluster_id": 2,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Clarifies and interprets cultural references, metaphors, and context to enhance user understanding.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.0,
+        "size": 2,
+        "proportion": 0.09090909090909091,
+        "examples": [
+          "c907ffaa-25f9-4d51-b1bb-dc22f17e5a4b",
+          "27722917-4b01-4046-a608-61d65530a2dc",
+          "dbdc59ec-33ff-4edc-950a-00b50e27b995"
+        ],
+        "metadata": {
+          "cluster_id": 3,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Provides responses that lack requested world-specific detail or contextually relevant references.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.0,
+        "size": 2,
+        "proportion": 0.09090909090909091,
+        "examples": [
+          "73c1a1b6-edac-4b6c-8759-dbad8543c3ad",
+          "7f90c58a-3827-41cf-8b5f-9c7e225e6113",
+          "e906e419-f9f4-42dd-9ddb-38b915ce20a6"
+        ],
+        "metadata": {
+          "cluster_id": 5,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Presents a modular, end-to-end code solution using SQLite with clear justifications tailored to user constraints.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.0,
+        "size": 1,
+        "proportion": 0.045454545454545456,
+        "examples": [
+          "7ddb3b4d-2a4d-44fa-91c3-77dc0cf2c247",
+          "ac417ec7-a1ad-4c22-a492-5c8fffaaa153",
+          "8e4a3ddc-5bf1-4f73-a797-9aa9e8f085a7"
+        ],
+        "metadata": {
+          "cluster_id": 8,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Hedges responses with uncertainty and avoids making definitive claims.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.0,
+        "size": 5,
+        "proportion": 0.22727272727272727,
+        "examples": [
+          "3e7900cf-27dc-46ed-b8ff-223504b7689d",
+          "1dea0bf8-85e6-4f7b-b469-fac8071fcc42",
+          "7ccca808-54bc-43f9-925a-f4d254ae5fa2"
+        ],
+        "metadata": {
+          "cluster_id": 9,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Uses 'any' repetitively and unnaturally, leading to ungrammatical or awkward sentences.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.0,
+        "size": 1,
+        "proportion": 0.045454545454545456,
+        "examples": [
+          "9cece5d2-235b-48e3-8db4-027e580ece6b",
+          "3cd0a4e1-59c8-4379-aa9e-d0e80261c1f5",
+          "bbe3dffd-8405-4f1a-b5fb-1a1535695e22"
+        ],
+        "metadata": {
+          "cluster_id": 14,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Presents information in a clearly structured format using lists, headings, and labels for easy readability.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.0,
+        "size": 7,
+        "proportion": 0.3181818181818182,
+        "examples": [
+          "866bf5bb-b807-49dc-bdd7-91fa17673de6",
+          "948c5b73-3565-4b8b-83fe-fa7a8d4e6afb",
+          "24d6fb0d-02a9-48d2-824f-e3be16a34ca8"
+        ],
+        "metadata": {
+          "cluster_id": 15,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Returns a superficially correct but fundamentally incorrect formula by using a fixed unit offset instead of solving for the unknown variable.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.0,
+        "size": 1,
+        "proportion": 0.045454545454545456,
+        "examples": [
+          "aece0bfd-9fbf-4017-aca2-d407bdb7cb97",
+          "befc2c6f-ba22-4f59-b40d-8eb5415631c0",
+          "8bfaeac6-e28c-45ce-b04c-428398027d5c"
+        ],
+        "metadata": {
+          "cluster_id": 19,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Outliers",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 0.9166666666666667,
+        "size": 11,
+        "proportion": 0.5,
+        "examples": [
+          "f90139ef-2789-4282-8bf4-8687f1e55887",
+          "1a4f6eb1-f90a-40db-9d26-15fe7ec0c761",
+          "296edfa2-ba9d-49eb-84ef-a2a159ef6f6a"
+        ],
+        "metadata": {
+          "cluster_id": -1,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Depicts characters with exaggerated negative traits that undermine professionalism and productive interaction.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 0.8717948717948718,
+        "size": 1,
+        "proportion": 0.045454545454545456,
+        "examples": [
+          "4977d2d1-6d67-4916-a464-7ba192c51dcc"
+        ],
+        "metadata": {
+          "cluster_id": 10,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Offers clear, practical explanations and advice but omits recent advancements or specialized tools relevant to the topic.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 0.7727272727272727,
+        "size": 1,
+        "proportion": 0.045454545454545456,
+        "examples": [
+          "50cfbcb6-380e-4d73-947a-3ba006836390"
+        ],
+        "metadata": {
+          "cluster_id": 7,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Generates concise, hypothetical practical examples applying learned rules or functions to predict outcomes.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 0.7727272727272727,
+        "size": 1,
+        "proportion": 0.045454545454545456,
+        "examples": [
+          "33203cfc-fb6b-4cd0-a4b1-0432a19d0b38"
+        ],
+        "metadata": {
+          "cluster_id": 16,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Adopts a distinctively conversational, personable, and user-engaging tone.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 0.6666666666666667,
+        "size": 4,
+        "proportion": 0.18181818181818182,
+        "examples": [
+          "091bf5f5-682d-41c5-a374-6e270f9a55af",
+          "e24e02fa-f487-4e4f-8598-fcca3509885b",
+          "b021adcd-21c4-4304-a7a4-1730b652442f"
+        ],
+        "metadata": {
+          "cluster_id": 11,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Generates creative narrative expansions and character dialogues that extend or reinterpret canon events and character behaviors.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 0.5,
+        "size": 2,
+        "proportion": 0.09090909090909091,
+        "examples": [
+          "e69829c1-e563-4b40-bab4-4e5a1bdbf3fe",
+          "5d9b9fb5-5d52-46a4-8c50-9b74124281a9"
+        ],
+        "metadata": {
+          "cluster_id": 4,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Explains solutions using a clear, explicit step-by-step rationale.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 0.5,
+        "size": 1,
+        "proportion": 0.045454545454545456,
+        "examples": [
+          "f5caf422-6049-4a76-bcf4-37bf993308e8"
+        ],
+        "metadata": {
+          "cluster_id": 18,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Explains the underlying concepts or effects behind statistical metrics in model evaluation.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 17,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Fails to correctly follow detailed instructions in prompt execution.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 20,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Provides incorrect counts or miscalculates quantities in response.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 21,
+          "level": "fine"
+        }
+      }
+    ],
+    "coarse": [
+      {
+        "property_description": "Clearly states when information is unavailable or incomplete and hedges with uncertainty to avoid speculation.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.4782608695652173,
+        "size": 11,
+        "proportion": 0.5,
+        "examples": [
+          "1b4b49ca-76b0-4380-9a03-b9d7c731a945",
+          "3e7900cf-27dc-46ed-b8ff-223504b7689d",
+          "7fa45f13-c1f5-40c2-8807-1a523ea80d22"
+        ],
+        "metadata": {
+          "cluster_id": 0,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Declines or modifies responses to adhere to ethical, legal, or platform guidelines.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.25,
+        "size": 5,
+        "proportion": 0.22727272727272727,
+        "examples": [
+          "567eb317-1501-48f3-867c-34103cec8995",
+          "ba0efd3e-01d3-45ba-89de-f5969449ba78",
+          "adcfe30a-202e-4e44-bbb1-c81c65b60d68"
+        ],
+        "metadata": {
+          "cluster_id": 1,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Explains solutions using an explicit, logical step-by-step rationale.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.0,
+        "size": 9,
+        "proportion": 0.4090909090909091,
+        "examples": [
+          "d3fa1724-4035-47d4-8140-33b2682ac336",
+          "866bf5bb-b807-49dc-bdd7-91fa17673de6",
+          "948c5b73-3565-4b8b-83fe-fa7a8d4e6afb"
+        ],
+        "metadata": {
+          "cluster_id": 2,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Occasionally makes subtle but critical errors\u2014wrong formulas, miscounts, or failure to follow detailed instructions.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.0,
+        "size": 2,
+        "proportion": 0.09090909090909091,
+        "examples": [
+          "aece0bfd-9fbf-4017-aca2-d407bdb7cb97",
+          "befc2c6f-ba22-4f59-b40d-8eb5415631c0",
+          "8bfaeac6-e28c-45ce-b04c-428398027d5c"
+        ],
+        "metadata": {
+          "cluster_id": 4,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Generates concise hypothetical examples applying learned principles to predict outcomes.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.0,
+        "size": 2,
+        "proportion": 0.09090909090909091,
+        "examples": [
+          "33203cfc-fb6b-4cd0-a4b1-0432a19d0b38",
+          "f923293c-0675-4359-8f38-2552639353fc",
+          "95a69f43-60c5-4ccd-9e8e-2cce49602af2"
+        ],
+        "metadata": {
+          "cluster_id": 5,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Provides cultural and historical context through clarifications, metaphors, and comparisons.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.0,
+        "size": 3,
+        "proportion": 0.13636363636363635,
+        "examples": [
+          "c907ffaa-25f9-4d51-b1bb-dc22f17e5a4b",
+          "27722917-4b01-4046-a608-61d65530a2dc",
+          "2d750282-7425-4149-9480-a193969b8e23"
+        ],
+        "metadata": {
+          "cluster_id": 6,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Presents modular, end-to-end code solutions with clear justifications tailored to user constraints.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 1.0,
+        "size": 1,
+        "proportion": 0.045454545454545456,
+        "examples": [
+          "7ddb3b4d-2a4d-44fa-91c3-77dc0cf2c247",
+          "ac417ec7-a1ad-4c22-a492-5c8fffaaa153",
+          "8e4a3ddc-5bf1-4f73-a797-9aa9e8f085a7"
+        ],
+        "metadata": {
+          "cluster_id": 9,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Depicts characters with exaggerated negative traits that undermine professionalism.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 0.8717948717948718,
+        "size": 1,
+        "proportion": 0.045454545454545456,
+        "examples": [
+          "4977d2d1-6d67-4916-a464-7ba192c51dcc"
+        ],
+        "metadata": {
+          "cluster_id": 8,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Omits contextually relevant or up-to-date information, such as specialized tools or recent advances.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 0.7727272727272726,
+        "size": 3,
+        "proportion": 0.13636363636363635,
+        "examples": [
+          "73c1a1b6-edac-4b6c-8759-dbad8543c3ad",
+          "7f90c58a-3827-41cf-8b5f-9c7e225e6113",
+          "50cfbcb6-380e-4d73-947a-3ba006836390"
+        ],
+        "metadata": {
+          "cluster_id": 3,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Produces creative narrative expansions and character dialogues that extend or reinterpret canon.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 0.7499999999999999,
+        "size": 6,
+        "proportion": 0.2727272727272727,
+        "examples": [
+          "091bf5f5-682d-41c5-a374-6e270f9a55af",
+          "e24e02fa-f487-4e4f-8598-fcca3509885b",
+          "b021adcd-21c4-4304-a7a4-1730b652442f"
+        ],
+        "metadata": {
+          "cluster_id": 7,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Explains the underlying concepts and effects behind statistical evaluation metrics.",
+        "model_name": "claude-3-5-sonnet-20240620",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 10,
+          "level": "coarse"
+        }
+      }
+    ]
+  },
+  "gemini-1.5-pro-api-0514": {
+    "fine": [
+      {
+        "property_description": "Explains solutions using a clear, explicit step-by-step rationale.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 1.9411764705882353,
+        "size": 3,
+        "proportion": 0.17647058823529413,
+        "examples": [
+          "67172c75-c9be-483d-9675-7c673172e3a3",
+          "224f4933-fbff-4c9c-865a-bb13aa6c3b93",
+          "126b8115-b50b-4eb0-9935-f9b56a1341d4"
+        ],
+        "metadata": {
+          "cluster_id": 18,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Generates creative narrative expansions and character dialogues that extend or reinterpret canon events and character behaviors.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 1.2941176470588234,
+        "size": 4,
+        "proportion": 0.23529411764705882,
+        "examples": [
+          "ae271c52-c4b8-4b29-b26c-c75eb19f9544",
+          "a1b79f98-89f2-4bdb-af9b-b35f02a30c4d",
+          "5863ade2-4b6a-4084-8709-4b5a9e81b74f"
+        ],
+        "metadata": {
+          "cluster_id": 4,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Provides responses that lack requested world-specific detail or contextually relevant references.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 1.2941176470588234,
+        "size": 2,
+        "proportion": 0.11764705882352941,
+        "examples": [
+          "7998a578-d623-4e7b-91d3-1e6eb6b8fad3",
+          "8e2d1e34-452c-49e3-8576-331eee1ab39f"
+        ],
+        "metadata": {
+          "cluster_id": 5,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Outliers",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 1.1862745098039218,
+        "size": 11,
+        "proportion": 0.6470588235294118,
+        "examples": [
+          "bd8ebdf9-b64a-45d5-b026-ee4f9546403d",
+          "ca7ef27c-566c-4273-b104-90cea30bad14",
+          "3249ebc8-e358-4618-aba9-28570435ec73"
+        ],
+        "metadata": {
+          "cluster_id": -1,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Depicts characters with exaggerated negative traits that undermine professionalism and productive interaction.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 1.1282051282051282,
+        "size": 1,
+        "proportion": 0.058823529411764705,
+        "examples": [
+          "1ce1adc2-79b5-4023-96f3-bd77bd921985",
+          "dbaf2114-1b88-42f9-84a9-68ee79b0b583",
+          "d93d4b53-49ed-47dc-8a1e-254728a06f94"
+        ],
+        "metadata": {
+          "cluster_id": 10,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Presents information in a clearly structured format using lists, headings, and labels for easy readability.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 1.1092436974789917,
+        "size": 6,
+        "proportion": 0.35294117647058826,
+        "examples": [
+          "74d99ac2-1e01-44e4-a202-72d5b30ee8c7",
+          "1933a80f-0c32-4ce1-b836-f993b45249b1",
+          "78679f83-e545-4397-9c6f-50ab68d339b8"
+        ],
+        "metadata": {
+          "cluster_id": 15,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Adopts a distinctively conversational, personable, and user-engaging tone.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 1.0784313725490198,
+        "size": 5,
+        "proportion": 0.29411764705882354,
+        "examples": [
+          "c182d0d3-6aad-4358-8b73-0a6a4d6bff0d",
+          "341c0445-581e-43b9-b108-054decfc6c17",
+          "2f58ec30-755c-4f95-9c2e-3972091b6a2c"
+        ],
+        "metadata": {
+          "cluster_id": 11,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Offers clear, practical explanations and advice but omits recent advancements or specialized tools relevant to the topic.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 1.0,
+        "size": 1,
+        "proportion": 0.058823529411764705,
+        "examples": [
+          "43706527-6f97-4a02-a513-ec20d35b38c9",
+          "1d76e554-d7c2-4fbd-a175-b210106a8693",
+          "12e40e6f-5657-4630-8b8e-421ffdf7821f"
+        ],
+        "metadata": {
+          "cluster_id": 7,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Generates concise, hypothetical practical examples applying learned rules or functions to predict outcomes.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 1.0,
+        "size": 1,
+        "proportion": 0.058823529411764705,
+        "examples": [
+          "67a46df1-69b3-4391-87a8-5a97d0c384cf"
+        ],
+        "metadata": {
+          "cluster_id": 16,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Explains the underlying concepts or effects behind statistical metrics in model evaluation.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 1.0,
+        "size": 2,
+        "proportion": 0.11764705882352941,
+        "examples": [
+          "0bcaf51e-5ad0-4023-bb32-6d03cccbe722",
+          "d3836cf3-80c5-40de-8d39-199a9d708b64"
+        ],
+        "metadata": {
+          "cluster_id": 17,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Provides historical and contextual comparisons to help users relate past and present situations.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.7857142857142858,
+        "size": 1,
+        "proportion": 0.058823529411764705,
+        "examples": [
+          "df7ae7dc-5fc8-4b95-a4dd-05607cda4185"
+        ],
+        "metadata": {
+          "cluster_id": 0,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Offers practical guidance, relevant lists, and cautionary advice when unable to provide specific requested data.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.7857142857142858,
+        "size": 2,
+        "proportion": 0.11764705882352941,
+        "examples": [
+          "4f4ba4cd-4dbc-4457-a64c-b9a95d2a71c5",
+          "62b5121b-6050-4c23-bbb1-69ff8d13119a",
+          "c7063d68-87c4-4bad-94aa-a8139f701cce"
+        ],
+        "metadata": {
+          "cluster_id": 12,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Provides incorrect counts or miscalculates quantities in response.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.7857142857142858,
+        "size": 1,
+        "proportion": 0.058823529411764705,
+        "examples": [
+          "74e5a1cb-a8b0-47f2-a150-ec1806401ff4"
+        ],
+        "metadata": {
+          "cluster_id": 21,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Clarifies and interprets cultural references, metaphors, and context to enhance user understanding.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.6470588235294117,
+        "size": 1,
+        "proportion": 0.058823529411764705,
+        "examples": [
+          "0c9789dd-e2ff-4018-9e68-1e042110384a",
+          "88fd69ae-3854-4f66-84c6-95a66d4419d4",
+          "20de2ab7-9954-427c-b7c6-d14dc3de9569"
+        ],
+        "metadata": {
+          "cluster_id": 3,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Clearly states when information is unavailable or incomplete, rather than providing unverifiable or speculative answers.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.4112149532710281,
+        "size": 1,
+        "proportion": 0.058823529411764705,
+        "examples": [
+          "793121b8-bac2-47a7-93d7-c680819add83"
+        ],
+        "metadata": {
+          "cluster_id": 13,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Declines or modifies responses to adhere to ethical, legal, or platform guidelines.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.32352941176470584,
+        "size": 1,
+        "proportion": 0.058823529411764705,
+        "examples": [
+          "40c2f47b-b5cd-4802-96b0-7002c659c36e"
+        ],
+        "metadata": {
+          "cluster_id": 6,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Outlines a personalized, process-oriented roadmap for shifting from mechanical engineering to AI without naming specific applications or courses.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 1,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Summarizes complex topics clearly, highlighting key findings and their practical implications in accessible language.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 2,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Presents a modular, end-to-end code solution using SQLite with clear justifications tailored to user constraints.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 8,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Hedges responses with uncertainty and avoids making definitive claims.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 9,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Uses 'any' repetitively and unnaturally, leading to ungrammatical or awkward sentences.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 14,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Returns a superficially correct but fundamentally incorrect formula by using a fixed unit offset instead of solving for the unknown variable.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 19,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Fails to correctly follow detailed instructions in prompt execution.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 20,
+          "level": "fine"
+        }
+      }
+    ],
+    "coarse": [
+      {
+        "property_description": "Produces creative narrative expansions and character dialogues that extend or reinterpret canon.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 1.4558823529411764,
+        "size": 9,
+        "proportion": 0.5294117647058824,
+        "examples": [
+          "c182d0d3-6aad-4358-8b73-0a6a4d6bff0d",
+          "341c0445-581e-43b9-b108-054decfc6c17",
+          "ae271c52-c4b8-4b29-b26c-c75eb19f9544"
+        ],
+        "metadata": {
+          "cluster_id": 7,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Explains solutions using an explicit, logical step-by-step rationale.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 1.1503267973856208,
+        "size": 8,
+        "proportion": 0.47058823529411764,
+        "examples": [
+          "74d99ac2-1e01-44e4-a202-72d5b30ee8c7",
+          "1933a80f-0c32-4ce1-b836-f993b45249b1",
+          "78679f83-e545-4397-9c6f-50ab68d339b8"
+        ],
+        "metadata": {
+          "cluster_id": 2,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Depicts characters with exaggerated negative traits that undermine professionalism.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 1.1282051282051282,
+        "size": 1,
+        "proportion": 0.058823529411764705,
+        "examples": [
+          "1ce1adc2-79b5-4023-96f3-bd77bd921985",
+          "dbaf2114-1b88-42f9-84a9-68ee79b0b583",
+          "d93d4b53-49ed-47dc-8a1e-254728a06f94"
+        ],
+        "metadata": {
+          "cluster_id": 8,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Omits contextually relevant or up-to-date information, such as specialized tools or recent advances.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 1.0,
+        "size": 3,
+        "proportion": 0.17647058823529413,
+        "examples": [
+          "7998a578-d623-4e7b-91d3-1e6eb6b8fad3",
+          "43706527-6f97-4a02-a513-ec20d35b38c9",
+          "1d76e554-d7c2-4fbd-a175-b210106a8693"
+        ],
+        "metadata": {
+          "cluster_id": 3,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Explains the underlying concepts and effects behind statistical evaluation metrics.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 1.0,
+        "size": 2,
+        "proportion": 0.11764705882352941,
+        "examples": [
+          "0bcaf51e-5ad0-4023-bb32-6d03cccbe722",
+          "d3836cf3-80c5-40de-8d39-199a9d708b64"
+        ],
+        "metadata": {
+          "cluster_id": 10,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Provides cultural and historical context through clarifications, metaphors, and comparisons.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.8627450980392157,
+        "size": 2,
+        "proportion": 0.11764705882352941,
+        "examples": [
+          "df7ae7dc-5fc8-4b95-a4dd-05607cda4185",
+          "0c9789dd-e2ff-4018-9e68-1e042110384a",
+          "88fd69ae-3854-4f66-84c6-95a66d4419d4"
+        ],
+        "metadata": {
+          "cluster_id": 6,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Occasionally makes subtle but critical errors\u2014wrong formulas, miscounts, or failure to follow detailed instructions.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.6470588235294117,
+        "size": 1,
+        "proportion": 0.058823529411764705,
+        "examples": [
+          "74e5a1cb-a8b0-47f2-a150-ec1806401ff4"
+        ],
+        "metadata": {
+          "cluster_id": 4,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Generates concise hypothetical examples applying learned principles to predict outcomes.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.6470588235294117,
+        "size": 1,
+        "proportion": 0.058823529411764705,
+        "examples": [
+          "67a46df1-69b3-4391-87a8-5a97d0c384cf"
+        ],
+        "metadata": {
+          "cluster_id": 5,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Clearly states when information is unavailable or incomplete and hedges with uncertainty to avoid speculation.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.5217391304347826,
+        "size": 3,
+        "proportion": 0.17647058823529413,
+        "examples": [
+          "4f4ba4cd-4dbc-4457-a64c-b9a95d2a71c5",
+          "62b5121b-6050-4c23-bbb1-69ff8d13119a",
+          "c7063d68-87c4-4bad-94aa-a8139f701cce"
+        ],
+        "metadata": {
+          "cluster_id": 0,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Declines or modifies responses to adhere to ethical, legal, or platform guidelines.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.32352941176470584,
+        "size": 1,
+        "proportion": 0.058823529411764705,
+        "examples": [
+          "40c2f47b-b5cd-4802-96b0-7002c659c36e"
+        ],
+        "metadata": {
+          "cluster_id": 1,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Presents modular, end-to-end code solutions with clear justifications tailored to user constraints.",
+        "model_name": "gemini-1.5-pro-api-0514",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 9,
+          "level": "coarse"
+        }
+      }
+    ]
+  },
+  "llama-3-70b-instruct": {
+    "fine": [
+      {
+        "property_description": "Clarifies and interprets cultural references, metaphors, and context to enhance user understanding.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 2.0,
+        "size": 2,
+        "proportion": 0.18181818181818182,
+        "examples": [
+          "423e74d2-e747-4589-9421-531fbb2c5c89",
+          "25a8a3d2-e1de-4f3e-9f9b-aececd8e3cc9"
+        ],
+        "metadata": {
+          "cluster_id": 3,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Offers clear, practical explanations and advice but omits recent advancements or specialized tools relevant to the topic.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 1.5454545454545454,
+        "size": 1,
+        "proportion": 0.09090909090909091,
+        "examples": [
+          "8052c334-d507-4946-a342-34eb06c9047d",
+          "6784606a-3ea1-4bf8-a155-72690a4140dc",
+          "7bc72d8a-0985-403a-a811-40566753de89"
+        ],
+        "metadata": {
+          "cluster_id": 7,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Generates concise, hypothetical practical examples applying learned rules or functions to predict outcomes.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 1.5454545454545454,
+        "size": 1,
+        "proportion": 0.09090909090909091,
+        "examples": [
+          "8b72ea99-2e49-40aa-95be-c2701991a070"
+        ],
+        "metadata": {
+          "cluster_id": 16,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Provides incorrect counts or miscalculates quantities in response.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 1.2142857142857144,
+        "size": 1,
+        "proportion": 0.09090909090909091,
+        "examples": [
+          "fcc0739c-1ddc-4123-8faf-9422db7312f0"
+        ],
+        "metadata": {
+          "cluster_id": 21,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Outliers",
+        "model_name": "llama-3-70b-instruct",
+        "score": 1.0,
+        "size": 6,
+        "proportion": 0.5454545454545454,
+        "examples": [
+          "d343df99-a788-49b4-b539-9733ed6ff7c5",
+          "cc6d806d-5fb5-436b-8684-4e43e77477bc",
+          "9dc0a8c9-945f-456a-a593-dc63318ba1f2"
+        ],
+        "metadata": {
+          "cluster_id": -1,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Generates creative narrative expansions and character dialogues that extend or reinterpret canon events and character behaviors.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 1.0,
+        "size": 2,
+        "proportion": 0.18181818181818182,
+        "examples": [
+          "3d6cb97b-1ce0-4dc2-9355-491f2d363786",
+          "6d9bac5b-ed43-4c90-9ba5-582f2ffb6b95",
+          "e22a1243-9f2f-4b7f-b280-a26930e82a68"
+        ],
+        "metadata": {
+          "cluster_id": 4,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Provides responses that lack requested world-specific detail or contextually relevant references.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 1.0,
+        "size": 1,
+        "proportion": 0.09090909090909091,
+        "examples": [
+          "7fb49786-3ce2-4799-bdf3-a4ae51c26cd3"
+        ],
+        "metadata": {
+          "cluster_id": 5,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Declines or modifies responses to adhere to ethical, legal, or platform guidelines.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 1.0,
+        "size": 2,
+        "proportion": 0.18181818181818182,
+        "examples": [
+          "8d875d31-2051-42f1-90c5-3e4722871529",
+          "4e09a92a-7c5f-4364-8cb5-5cb013d6bb68"
+        ],
+        "metadata": {
+          "cluster_id": 6,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Adopts a distinctively conversational, personable, and user-engaging tone.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 1.0,
+        "size": 3,
+        "proportion": 0.2727272727272727,
+        "examples": [
+          "10e3ae86-f7a2-48a9-8e67-a9f24fd52cd6",
+          "82a025e3-771a-4f0c-b712-ca805a167870",
+          "2af688bd-17b0-46d2-8d76-ee8e9c9abc86"
+        ],
+        "metadata": {
+          "cluster_id": 11,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Explains solutions using a clear, explicit step-by-step rationale.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 1.0,
+        "size": 1,
+        "proportion": 0.09090909090909091,
+        "examples": [
+          "4ada7ee8-68c4-4daa-a7e8-eb5c00f12bab"
+        ],
+        "metadata": {
+          "cluster_id": 18,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Fails to correctly follow detailed instructions in prompt execution.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 1.0,
+        "size": 3,
+        "proportion": 0.2727272727272727,
+        "examples": [
+          "33769eee-557c-4237-9cbd-41a6de214acd",
+          "86a78ead-6761-4a3b-ad8e-54c8ea9447d7",
+          "ed0a076b-da7b-4f83-b509-9ae8f7ed51cc"
+        ],
+        "metadata": {
+          "cluster_id": 20,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Presents information in a clearly structured format using lists, headings, and labels for easy readability.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 0.5714285714285715,
+        "size": 2,
+        "proportion": 0.18181818181818182,
+        "examples": [
+          "42d1cf77-98f7-457e-948f-656c88b4d6d8",
+          "497ed9af-a30f-41e0-8e65-0d0f5dfee184"
+        ],
+        "metadata": {
+          "cluster_id": 15,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Provides historical and contextual comparisons to help users relate past and present situations.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 0,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Outlines a personalized, process-oriented roadmap for shifting from mechanical engineering to AI without naming specific applications or courses.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 1,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Summarizes complex topics clearly, highlighting key findings and their practical implications in accessible language.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 2,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Presents a modular, end-to-end code solution using SQLite with clear justifications tailored to user constraints.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 8,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Hedges responses with uncertainty and avoids making definitive claims.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 9,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Depicts characters with exaggerated negative traits that undermine professionalism and productive interaction.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 10,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Offers practical guidance, relevant lists, and cautionary advice when unable to provide specific requested data.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 12,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Clearly states when information is unavailable or incomplete, rather than providing unverifiable or speculative answers.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 13,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Uses 'any' repetitively and unnaturally, leading to ungrammatical or awkward sentences.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 14,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Explains the underlying concepts or effects behind statistical metrics in model evaluation.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 17,
+          "level": "fine"
+        }
+      },
+      {
+        "property_description": "Returns a superficially correct but fundamentally incorrect formula by using a fixed unit offset instead of solving for the unknown variable.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 19,
+          "level": "fine"
+        }
+      }
+    ],
+    "coarse": [
+      {
+        "property_description": "Occasionally makes subtle but critical errors\u2014wrong formulas, miscounts, or failure to follow detailed instructions.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 4.0,
+        "size": 4,
+        "proportion": 0.36363636363636365,
+        "examples": [
+          "33769eee-557c-4237-9cbd-41a6de214acd",
+          "86a78ead-6761-4a3b-ad8e-54c8ea9447d7",
+          "fcc0739c-1ddc-4123-8faf-9422db7312f0"
+        ],
+        "metadata": {
+          "cluster_id": 4,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Provides cultural and historical context through clarifications, metaphors, and comparisons.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 1.3333333333333335,
+        "size": 2,
+        "proportion": 0.18181818181818182,
+        "examples": [
+          "423e74d2-e747-4589-9421-531fbb2c5c89",
+          "25a8a3d2-e1de-4f3e-9f9b-aececd8e3cc9"
+        ],
+        "metadata": {
+          "cluster_id": 6,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Omits contextually relevant or up-to-date information, such as specialized tools or recent advances.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 1.0303030303030303,
+        "size": 2,
+        "proportion": 0.18181818181818182,
+        "examples": [
+          "7fb49786-3ce2-4799-bdf3-a4ae51c26cd3",
+          "8052c334-d507-4946-a342-34eb06c9047d",
+          "6784606a-3ea1-4bf8-a155-72690a4140dc"
+        ],
+        "metadata": {
+          "cluster_id": 3,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Declines or modifies responses to adhere to ethical, legal, or platform guidelines.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 1.0,
+        "size": 2,
+        "proportion": 0.18181818181818182,
+        "examples": [
+          "8d875d31-2051-42f1-90c5-3e4722871529",
+          "4e09a92a-7c5f-4364-8cb5-5cb013d6bb68"
+        ],
+        "metadata": {
+          "cluster_id": 1,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Generates concise hypothetical examples applying learned principles to predict outcomes.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 1.0,
+        "size": 1,
+        "proportion": 0.09090909090909091,
+        "examples": [
+          "8b72ea99-2e49-40aa-95be-c2701991a070"
+        ],
+        "metadata": {
+          "cluster_id": 5,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Produces creative narrative expansions and character dialogues that extend or reinterpret canon.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 1.0,
+        "size": 4,
+        "proportion": 0.36363636363636365,
+        "examples": [
+          "3d6cb97b-1ce0-4dc2-9355-491f2d363786",
+          "6d9bac5b-ed43-4c90-9ba5-582f2ffb6b95",
+          "10e3ae86-f7a2-48a9-8e67-a9f24fd52cd6"
+        ],
+        "metadata": {
+          "cluster_id": 7,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Explains solutions using an explicit, logical step-by-step rationale.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 0.6666666666666666,
+        "size": 3,
+        "proportion": 0.2727272727272727,
+        "examples": [
+          "42d1cf77-98f7-457e-948f-656c88b4d6d8",
+          "497ed9af-a30f-41e0-8e65-0d0f5dfee184",
+          "4ada7ee8-68c4-4daa-a7e8-eb5c00f12bab"
+        ],
+        "metadata": {
+          "cluster_id": 2,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Clearly states when information is unavailable or incomplete and hedges with uncertainty to avoid speculation.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 0,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Depicts characters with exaggerated negative traits that undermine professionalism.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 8,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Presents modular, end-to-end code solutions with clear justifications tailored to user constraints.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 9,
+          "level": "coarse"
+        }
+      },
+      {
+        "property_description": "Explains the underlying concepts and effects behind statistical evaluation metrics.",
+        "model_name": "llama-3-70b-instruct",
+        "score": 0.0,
+        "size": 0,
+        "proportion": 0.0,
+        "examples": [],
+        "metadata": {
+          "cluster_id": 10,
+          "level": "coarse"
+        }
+      }
+    ]
+  }
+}

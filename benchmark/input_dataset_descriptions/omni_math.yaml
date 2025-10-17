@@ -1,0 +1,7 @@
+name: "omni_math"
+description: |
+  Omnimath is the universal Olympiad level mathematic benchmark
+
+dataset_path: "data/helm_capabilities/omni_math.jsonl"
+dataset_type: "qa"
+prompt_column: "prompt"

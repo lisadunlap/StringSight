@@ -1,0 +1,99 @@
+site_name: StringSight Documentation
+site_description: Extract, cluster, and analyze behavioral properties from Large Language Models
+site_author: StringSight Team
+
+# Repository
+repo_name: stringsight
+repo_url: https://github.com/lisabdunlap/stringsight
+edit_uri: edit/main/docs/
+
+# Theme
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+
+# Navigation
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quick-start.md
+  - User Guide:
+    - Basic Usage: user-guide/basic-usage.md
+    - Data Formats: user-guide/data-formats.md
+    - Configuration Guide: user-guide/configuration-guide.md
+    - Output Files: user-guide/configuration.md
+    - Visualization: user-guide/visualization.md
+  - Advanced:
+    - Custom Pipelines: advanced/custom-pipelines.md
+    - Performance Tuning: advanced/performance.md
+  - Deployment:
+    - Production Setup: deployment/production.md
+  - Development:
+    - Contributing: development/contributing.md
+    - Testing: development/testing.md
+  - Troubleshooting: troubleshooting.md
+
+# Plugins
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            heading_level: 2
+
+# Markdown extensions
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+# Extra CSS and JS
+extra_css:
+  - stylesheets/extra.css
+
+# Copyright
+copyright: Copyright &copy; 2025 StringSight Team

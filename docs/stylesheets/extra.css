@@ -1,0 +1,102 @@
+/* Custom styles for StringSight documentation */
+
+/* Code block styling */
+.md-typeset code {
+    background-color: #f5f5f5;
+    border-radius: 3px;
+    padding: 2px 4px;
+    font-size: 0.85em;
+}
+
+/* Inline code styling */
+.md-typeset :not(pre) > code {
+    background-color: #f5f5f5;
+    border-radius: 3px;
+    padding: 2px 4px;
+    font-size: 0.85em;
+}
+
+/* Admonition styling */
+.md-typeset .admonition {
+    border-radius: 6px;
+    border-left: 4px solid;
+}
+
+/* Custom callout boxes */
+.callout {
+    background-color: #f8f9fa;
+    border-left: 4px solid #007bff;
+    padding: 1rem;
+    margin: 1rem 0;
+    border-radius: 0 6px 6px 0;
+}
+
+.callout-info {
+    border-left-color: #17a2b8;
+    background-color: #d1ecf1;
+}
+
+.callout-warning {
+    border-left-color: #ffc107;
+    background-color: #fff3cd;
+}
+
+.callout-danger {
+    border-left-color: #dc3545;
+    background-color: #f8d7da;
+}
+
+.callout-success {
+    border-left-color: #28a745;
+    background-color: #d4edda;
+}
+
+/* Table styling */
+.md-typeset table {
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.md-typeset table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+
+/* Button styling */
+.md-button {
+    border-radius: 4px;
+    font-weight: 500;
+    text-transform: none;
+}
+
+/* Navigation styling */
+.md-nav__link {
+    border-radius: 4px;
+}
+
+.md-nav__link:hover {
+    background-color: #f5f5f5;
+}
+
+/* Search styling */
+.md-search__input {
+    border-radius: 6px;
+}
+
+/* Footer styling */
+.md-footer {
+    border-top: 1px solid #e0e0e0;
+}
+
+/* Custom header styling */
+.md-header {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .callout {
+        margin: 0.5rem 0;
+        padding: 0.75rem;
+    }
+} 

@@ -1,0 +1,68 @@
+# Data directories - keep in main, exclude from prod
+data/
+results/
+benchmark/results/
+benchmark/evaluation_results/
+helm/
+
+# Large downloaded SDKs and archives
+google-cloud-sdk/
+*.tar.gz
+
+# Notebooks and experimental code
+notebooks/
+playground.ipynb
+
+# Generated output files
+*.html
+model_cluster_proportion_plot.html
+
+# Temporary/test files
+test_conversation_parsing.js
+config.yaml
+mast.json
+
+# Build artifacts
+**/cluster_results/
+**/random_data/
+**/wandb/
+**/differences/
+**/oai_batch_data/
+**/legacy/
+.cache/
+site/
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+*.egg
+stringsight.egg-info
+stringsight/web
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.pyc
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Package lock (only in frontend)
+/package-lock.json

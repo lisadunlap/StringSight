@@ -1,0 +1,22 @@
+data_path: data/helm_capabilities/omni_math.jsonl
+output_dir: results/omni_math_gpt
+method: single_model
+min_cluster_size: 8
+embedding_model: text-embedding-3-large
+max_workers: 64
+groupby_column: behavior_type
+assign_outliers: false
+models:
+  - openai/gpt-5-2025-08-07
+  - openai/gpt-oss-20b
+  - openai/o3-2025-04-16
+  - openai/gpt-4.1-2025-04-14
+task_description: |
+  This task is answering Olympiad level math questions.
+
+  When looking for interesting properties of responses, consider the following (note these are not exhaustive):
+  1. Factuality: correctness about math concepts, formulas, and problem-solving
+  2. Problem approach: how the model approaches the problem, what plans it makes, what theorems or lemmas it uses, etc
+  3. Errors: errors in reasoning, interpretation of the problem, computation, logical inconsistencies, etc
+  4. Layout: the structure of the response, formatting, notation
+  5. Reasoning: how the model reasons about each step of the problem, how it checks its work, etc

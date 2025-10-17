@@ -1,0 +1,23 @@
+data_path: data/medhelm/medi_qa.jsonl
+output_dir: results/medi_qa
+method: single_model
+min_cluster_size: 5
+embedding_model: text-embedding-3-small
+max_workers: 64
+groupby_column: behavior_type
+assign_outliers: false
+models:
+  - google/gemini-1.5-pro-001
+  - openai/gpt-4o-mini-2024-07-18
+  - meta/llama-3.3-70b-instruct
+task_description: |
+  This task is answering consumer medication-related questions.
+
+  When looking for interesting properties of responses, consider the following (note these are not exhaustive):
+  1. Clinical correctness: factual accuracy, guideline adherence, context awareness
+  2. Safety: contraindications, harmful advice, missing critical warnings
+  3. Communication: empathy, clarity, avoiding inappropriate certainty or speculation
+  4. Scope: staying within informational support, deferring to professionals when needed
+  5. Bias: avoiding stereotyping or inequitable recommendations
+  6. Focus: focusing on certain parts of the medication or the question
+  7. Structure: the structure of the response

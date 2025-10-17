@@ -1,0 +1,87 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stringsight"
+version = "0.0.1"
+authors = [
+    {name = "Lisa Dunlap", email = "lisabdunlap@berkeley.edu"},
+]
+description = "Explain Large Language Model Behavior Patterns"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "pandas>=2.0.0",
+    "numpy>=2.2.6",
+    "scipy>=1.16.1",
+    "scikit-learn>=1.7.1",
+    "tqdm>=4.65.0",
+    "pydantic>=1.8.0",
+    "litellm>=1.0.0",
+    "sentence-transformers>=5.1.0",
+    "bertopic>=0.17.3",
+    "hdbscan>=0.8.40",
+    "umap-learn>=0.5.9",
+    "wandb>=0.15.0",
+    "openai>=1.0.0",
+    "plotly>=5.15.0",
+    "pyarrow>=12.0.0",
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.20.0",
+    "python-multipart>=0.0.6",
+    "omegaconf>=2.3.0",
+    "nltk>=3.8.0",
+    "rouge-score>=0.1.2",
+    "markdown>=3.4.0",
+    "gradio>=5.0.0",
+    "diskcache>=5.6.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-cov>=2.0",
+    "black>=21.0",
+    "flake8>=3.8",
+    "mypy>=0.900",
+]
+ml = [
+    "torch>=2.7.1",
+    "transformers>=4.56.1",
+    "datasets>=2.14.0",
+    "vllm>=0.3.0",
+]
+full = [
+    "torch>=2.7.1",
+    "transformers>=4.56.1",
+    "datasets>=2.14.0",
+    "vllm>=0.3.0",
+    "jupyter>=1.0.0",
+    "ipykernel>=6.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/lisabdunlap/stringsight"
+Repository = "https://github.com/lisabdunlap/stringsight"
+Documentation = "https://github.com/lisabdunlap/stringsight/blob/main/README.md"
+"Bug Tracker" = "https://github.com/lisabdunlap/stringsight/issues"
+
+[tool.setuptools.packages.find]
+include = ["stringsight*"]
+
+[tool.setuptools.package-data]
+stringsight = ["**/*.yaml", "**/*.json", "**/*.txt"]
+

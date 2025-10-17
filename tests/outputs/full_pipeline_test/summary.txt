@@ -1,0 +1,18 @@
+StringSight Results Summary
+==================================================
+
+Total conversations: 50
+Total properties: 202
+Models analyzed: 3
+
+Files saved:
+  - clustered_results.parquet: Complete DataFrame with clusters
+  - full_dataset.json: Complete PropertyDataset object (JSON format)
+  - full_dataset.parquet: Complete PropertyDataset object (parquet format)
+  - model_stats.json: Model statistics and rankings
+  - summary.txt: This summary file
+
+Model Rankings (by average score):
+  1. llama-3-70b-instruct: 0.816
+  2. gemini-1.5-pro-api-0514: 0.808
+  3. claude-3-5-sonnet-20240620: 0.739

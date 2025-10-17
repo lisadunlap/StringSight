@@ -1,0 +1,17 @@
+min_cluster_size: 5
+data_path: data/arena/webdev_gpt_claude_gemini.jsonl
+output_dir: results/webdev_claude_gpt_gemini
+method: side_by_side
+task_description: |
+  Each model is given a user prompt to generate a web development project.
+
+  When looking for interesting properties of responses, consider the following (note these are not exhaustive):
+  1. **Code Quality**: Correctness, best practices, security vulnerabilities, and adherence to modern web standards
+  2. **Completeness**: Whether the implementation fully addresses the user's requirements and includes necessary dependencies
+  3. **User Experience**: UI/UX quality, accessibility, responsiveness, and visual appeal
+  4. **Maintainability**: Code organization, documentation, comments, and readability
+  5. **Functionality**: Whether the code would actually work as intended, proper error handling, and edge case coverage
+  6. **Performance**: Efficient implementations, loading times, and resource usage
+  7. **Stylistic Choices**: The model's choices in terms of language, formatting, layout, and style. For example, choosing things like specific color palettes, shape, font, or icon choices.
+  8. **User interpretation**: If given vauge instructions, what design choices does the model make to try to fulfill the user's requirements?
+  9. **Safety**: Whether the model's response contains vulernabilities or if it generates content that another model would consider unsafe or harmful.

@@ -1,0 +1,20 @@
+data_path: data/medhelm/aci_bench.jsonl
+output_dir: results/aci_bench
+method: single_model
+min_cluster_size: 12
+embedding_model: text-embedding-3-large
+max_workers: 64
+groupby_column: behavior_type
+assign_outliers: false
+task_description: |
+  This task is summarizing patient-doctor conversations.
+
+  When looking for interesting properties of responses, consider the following (note these are not exhaustive):
+  1. Correctness: misinterpretations of the conversations, misattributions of the conversations, etc.
+  2. Hallucinations: factual hallucinations, missing critical warnings
+  3. Communication: empathy, clarity, avoiding inappropriate certainty or speculation
+  4. Scope: staying within informational support, deferring to professionals when needed
+  5. Bias/Safety: unsafe or harmful content, inappropriate responses, bias, etc.
+  6. Focus: focusing on certain parts of the conversation
+  7. Style: the structure, formatting, and tone of the response
+  8. Instruction following: following the instructions given to the model
