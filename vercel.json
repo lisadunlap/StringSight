@@ -1,15 +1,11 @@
 {
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
-  "installCommand": "pip install -r api/requirements.txt && cd frontend && npm install",
+  "installCommand": "echo 'Skipping root install'",
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "/api/index.py"
-    },
-    {
       "source": "/(.*)",
-      "destination": "/frontend/$1"
+      "destination": "/$1"
     }
   ]
 }
