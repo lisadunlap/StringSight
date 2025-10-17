@@ -1,14 +1,7 @@
 {
-  "framework": null,
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
-  "installCommand": "echo 'No root dependencies needed'",
-  "devCommand": "cd frontend && npm run dev",
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/$1"
-    }
-  ]
+  "installCommand": "echo 'Skipping root install'",
+  "devCommand": "cd frontend && npm run dev"
 }
 

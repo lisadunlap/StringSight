@@ -5,17 +5,11 @@ import { dirname, resolve } from 'node:path'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
   const rootDir = dirname(fileURLToPath(import.meta.url))
-  
+  const env = loadEnv(mode, rootDir, '')
+
   return {
-    root: rootDir,
     plugins: [react()],
-    build: {
-      rollupOptions: {
-        input: resolve(rootDir, 'index.html'),
-      }
-    },
     server: {
       host: true,
       port: 5180,
