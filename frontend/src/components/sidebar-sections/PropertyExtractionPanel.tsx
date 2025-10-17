@@ -322,7 +322,7 @@ export default function PropertyExtractionPanel({
                   size="small"
                   variant="text"
                   onClick={() => {
-                    const def = selectedPromptMeta?.default_task_description || '';
+                    const def = method === 'side_by_side' ? (selectedPromptMeta?.default_task_description_sbs || '') : (selectedPromptMeta?.default_task_description_single || '');
                     setTaskDescription(def);
                     setUserEdited(false);
                     localStorage.setItem('stringsight.taskDescription', def);

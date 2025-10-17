@@ -63,6 +63,8 @@ const apiClient = {
  * Hook for loading metrics data with React Query
  */
 export function useMetricsData(resultsDir: string) {
+  // Demo mode flag (can be configured via env variable)
+  const useDemo = false;
 
   // Summary data
   const {
