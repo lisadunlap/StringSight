@@ -320,6 +320,7 @@ export async function extractJobStart(body: {
   top_p?: number;
   max_tokens?: number;
   max_workers?: number;
+  chunk_size?: number;
   include_scores_in_prompt?: boolean;
   use_wandb?: boolean;
   output_dir?: string | null;
