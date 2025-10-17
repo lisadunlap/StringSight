@@ -485,18 +485,18 @@ function ClustersTab({ clusters, totalConversationsByModel, totalUniqueConversat
                       return (
                         <Plot
                           data={[{
-                            type: 'bar', x, y,
+                            type: 'bar' as const, x, y,
                             marker: { color: '#3B82F6' },
                             hovertemplate: `%{x}: %{y:.${decimals}f}<extra></extra>`,
                             text: y.map(v => v.toFixed(decimals)),
-                            textposition: 'outside',
+                            textposition: 'outside' as const,
                             cliponaxis: false
                           }]}
                           layout={{
                             height: 320,
                             margin: { l: 50, r: 10, t: 10, b: 110 },
                             xaxis: { tickangle: -30, automargin: true },
-                            yaxis: { title: 'Proportion', rangemode: 'tozero', tickformat: `.${decimals}f` },
+                            yaxis: { title: { text: 'Proportion' }, rangemode: 'tozero', tickformat: `.${decimals}f` },
                             showlegend: false,
                             paper_bgcolor: '#FAFAFA',
                             plot_bgcolor: '#FAFAFA'
@@ -526,20 +526,20 @@ function ClustersTab({ clusters, totalConversationsByModel, totalUniqueConversat
                       return (
                         <Plot
                           data={[{
-                            type: 'bar',
+                            type: 'bar' as const,
                             x,
                             y,
                             marker: { color: colors },
                             hovertemplate: `%{x}: %{y:.${decimals}f}<extra></extra>`,
                             text: y.map(v => v.toFixed(decimals)),
-                            textposition: 'outside',
+                            textposition: 'outside' as const,
                             cliponaxis: false
                           }]}
                           layout={{
                             height: 320,
                             margin: { l: 50, r: 10, t: 10, b: 110 },
                             xaxis: { tickangle: -30, automargin: true },
-                            yaxis: { title: 'Quality Δ', zeroline: true, zerolinecolor: '#94A3B8', tickformat: `.${decimals}f` },
+                            yaxis: { title: { text: 'Quality Δ' }, zeroline: true, zerolinecolor: '#94A3B8', tickformat: `.${decimals}f` },
                             showlegend: false,
                             paper_bgcolor: '#FAFAFA',
                             plot_bgcolor: '#FAFAFA'
@@ -587,8 +587,8 @@ function ClustersTab({ clusters, totalConversationsByModel, totalUniqueConversat
                             barmode: 'group',
                             height: 360,
                             margin: { l: 50, r: 10, t: 10, b: 110 },
-                            xaxis: { title: 'Model', tickangle: -30, automargin: true },
-                            yaxis: { title: 'Quality Δ', tickformat: `.${decimals}f` },
+                            xaxis: { title: { text: 'Model' }, tickangle: -30, automargin: true },
+                            yaxis: { title: { text: 'Quality Δ' }, tickformat: `.${decimals}f` },
                             paper_bgcolor: '#FAFAFA',
                             plot_bgcolor: '#FAFAFA',
                             legend: { orientation: 'h', y: -0.3, x: 0.5, xanchor: 'center' }
@@ -618,14 +618,14 @@ function ClustersTab({ clusters, totalConversationsByModel, totalUniqueConversat
                       const metricKeys = Array.from(new Set(models.flatMap(m => Object.keys(qualitySource[m] || {}))));
                       const palette = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#14B8A6'];
                       const traces = models.map((m, i) => ({
-                        type: 'bar',
+                        type: 'bar' as const,
                         name: m,
                         x: metricKeys,
                         y: metricKeys.map(k => Number((qualitySource[m] || {})[k] || 0)),
                         marker: { color: palette[i % palette.length] },
                         hovertemplate: `${m} · %{x}: %{y:.${decimals}f}<extra></extra>`,
                         text: metricKeys.map(k => Number((qualitySource[m] || {})[k] || 0).toFixed(decimals)),
-                        textposition: 'outside',
+                        textposition: 'outside' as const,
                         cliponaxis: false
                       }));
                       return (
@@ -636,7 +636,7 @@ function ClustersTab({ clusters, totalConversationsByModel, totalUniqueConversat
                             height: 360,
                             margin: { l: 50, r: 10, t: 10, b: 110 },
                             xaxis: { tickangle: -30, automargin: true },
-                            yaxis: { title: mode === 'delta' ? 'Quality Δ' : 'Quality', rangemode: 'tozero', tickformat: `.${decimals}f` },
+                            yaxis: { title: { text: mode === 'delta' ? 'Quality Δ' : 'Quality' }, rangemode: 'tozero', tickformat: `.${decimals}f` },
                             paper_bgcolor: '#FAFAFA',
                             plot_bgcolor: '#FAFAFA'
                           }}

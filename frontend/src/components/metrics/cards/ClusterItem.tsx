@@ -196,7 +196,7 @@ export function ClusterItem({
                   height: 200,
                   margin: { l: 50, r: 10, t: 10, b: 60 },
                   xaxis: { tickangle: -30, automargin: true },
-                  yaxis: { title: 'Quality Δ', tickformat: '.3f', zeroline: true },
+                  yaxis: { title: { text: 'Quality Δ' }, tickformat: '.3f', zeroline: true },
                   showlegend: false,
                   paper_bgcolor: 'transparent',
                   plot_bgcolor: 'transparent'

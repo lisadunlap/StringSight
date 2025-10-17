@@ -32,12 +32,10 @@ export default function DataTabBenchmarkTable({ operationalRows, method }: DataT
         const accKey = `__acc_${k}`;
         const cntKey = `__cnt_${k}`;
         const sqKey = `__sq_${k}`;
-        // @ts-expect-error accumulate
-        row[accKey] = (row[accKey] || 0) + num;
-        // @ts-expect-error count
-        row[cntKey] = (row[cntKey] || 0) + 1;
-        // @ts-expect-error sum of squares for variance/CI
-        row[sqKey] = (row[sqKey] || 0) + num * num;
+        // Dynamic accumulation keys
+        (row as any)[accKey] = ((row as any)[accKey] || 0) + num;
+        (row as any)[cntKey] = ((row as any)[cntKey] || 0) + 1;
+        (row as any)[sqKey] = ((row as any)[sqKey] || 0) + num * num;
       }
     };
 

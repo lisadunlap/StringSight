@@ -51,12 +51,12 @@ export function flattenScores(rows: Record<string, any>[], method: Method) {
     }
   }
 
-  const columns = Array.from(
-    out.reduce((set, r) => {
-      Object.keys(r).forEach((k) => set.add(k));
-      return set;
-    }, new Set<string>())
-  );
+  const columnSet = out.reduce<Set<string>>((set, r) => {
+    Object.keys(r).forEach((k) => set.add(k));
+    return set;
+  }, new Set<string>());
+  
+  const columns = Array.from(columnSet);
 
   return { rows: out, columns };
 }

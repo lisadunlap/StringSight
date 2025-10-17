@@ -22,6 +22,11 @@ export interface ModelClusterRow {
   // Quality metrics (dynamic based on available data)
   // Pattern: quality_<metric_name>: number
   // Note: These will conflict with specific patterns below, but that's intentional for runtime flexibility
+  quality?: Record<string, number>;
+  quality_ci?: Record<string, { lower: number; upper: number; mean?: number }>;
+  quality_delta?: Record<string, number>;
+  quality_delta_ci?: Record<string, { lower: number; upper: number; mean?: number }>;
+  quality_delta_significant?: Record<string, boolean>;
   
   // Confidence intervals (optional)
   proportion_ci_lower?: number;

@@ -51,34 +51,30 @@ export function ClusterPlotsSection({
 
       <Stack spacing={4} sx={{ mt: 3, width: '100%' }}>
         {/* Frequency Chart Only */}
-        <Grid container spacing={3} sx={{ width: '100%' }}>
-          <Grid item xs={12} sx={{ width: '100%' }}>
-            <Paper elevation={1} sx={{ p: 3, height: 520, width: '100%' }}>
-              <FrequencyChart
-                data={data}
-                filters={filters}
-                topClusters={topClusters}
-                showCI={showCI}
-                height={470}
-              />
-            </Paper>
-          </Grid>
-        </Grid>
+        <Box sx={{ width: '100%' }}>
+          <Paper elevation={1} sx={{ p: 3, height: 520, width: '100%' }}>
+            <FrequencyChart
+              data={data}
+              filters={filters}
+              topClusters={topClusters}
+              showCI={showCI}
+              height={470}
+            />
+          </Paper>
+        </Box>
 
         {/* Quality Δ Chart Only */}
-        <Grid container spacing={3} sx={{ width: '100%' }}>
-          <Grid item xs={12} sx={{ width: '100%' }}>
-            <Paper elevation={1} sx={{ p: 3, height: 520, width: '100%' }}>
-              <QualityDeltaChart
-                data={data}
-                filters={filters}
+        <Box sx={{ width: '100%' }}>
+          <Paper elevation={1} sx={{ p: 3, height: 520, width: '100%' }}>
+            <QualityDeltaChart
+              data={data}
+              filters={filters}
                 topClusters={topClusters}
                 showCI={showCI}
                 height={470}
               />
             </Paper>
-          </Grid>
-        </Grid>
+        </Box>
       </Stack>
     </Box>
   );

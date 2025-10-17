@@ -1,4 +1,3 @@
-/// <reference types="node" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -11,9 +10,9 @@ export default defineConfig({
     proxy: {
       // Proxy API requests to the backend to avoid CORS and ad-blockers
       '/api': {
-        target: process.env.VITE_BACKEND || 'http://localhost:8000',
+        target: (process as any).env.VITE_BACKEND || 'http://localhost:8000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        rewrite: (path: string) => path.replace(/^\/api/, ''),
       },
     },
   },

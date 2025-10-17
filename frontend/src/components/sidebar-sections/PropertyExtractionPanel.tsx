@@ -118,7 +118,8 @@ export default function PropertyExtractionPanel({
     (async () => {
       try {
         const effectiveTaskDesc = canTaskDescribe && taskDescription.trim().length > 0 ? taskDescription : undefined;
-        const res = await getPromptText(selectedPrompt, effectiveTaskDesc, method);
+        const methodParam = method === 'unknown' ? undefined : method;
+        const res = await getPromptText(selectedPrompt, effectiveTaskDesc, methodParam);
         if (mounted) setResolvedPrompt(res.text);
       } catch (e: any) {
         if (mounted) {
