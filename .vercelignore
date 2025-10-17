@@ -1,0 +1,26 @@
+# Ignore Python project files - we're only deploying the frontend
+pyproject.toml
+requirements.txt
+setup.py
+*.py
+stringsight/
+api/
+tests/
+scripts/
+benchmark/
+
+# Ignore data and results
+data/
+results/
+wandb/
+
+# Ignore development files
+.git/
+.github/
+notebooks/
+docs/
+site/
+
+# Keep frontend
+!frontend/
+
