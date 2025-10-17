@@ -9,7 +9,12 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, rootDir, '')
 
   return {
+    root: rootDir,
     plugins: [react()],
+    build: {
+      outDir: resolve(rootDir, 'dist'),
+      emptyOutDir: true,
+    },
     server: {
       host: true,
       port: 5180,
