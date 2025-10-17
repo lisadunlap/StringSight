@@ -6,7 +6,13 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   
   return {
+    root: '.',
     plugins: [react()],
+    build: {
+      rollupOptions: {
+        input: 'index.html',
+      }
+    },
     server: {
       host: true,
       port: 5180,
