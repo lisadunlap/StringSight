@@ -1,4 +1,4 @@
-data_path: data/taubench/retail_data_oai_format.jsonl
+data_path: data/taubench/retail_data.jsonl
 output_dir: results/taubench_retail
 method: single_model
 min_cluster_size: 5

@@ -1,6 +1,7 @@
 data_path: data/medhelm/medi_qa.jsonl
 output_dir: results/medi_qa
 method: single_model
+extraction_model: gpt-4.1-mini
 min_cluster_size: 5
 embedding_model: text-embedding-3-small
 max_workers: 64

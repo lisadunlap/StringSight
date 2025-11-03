@@ -5,6 +5,29 @@ from typing import Optional, Dict, Union, List, Any
 import numpy as np
 
 
+def _cuda_available() -> bool:
+    """Check if CUDA is available for GPU acceleration.
+    
+    Returns:
+        True if CUDA is available, False otherwise
+    """
+    try:
+        import torch
+        return torch.cuda.is_available()
+    except ImportError:
+        pass
+    
+    try:
+        import cupy as cp
+        # Try to access a GPU device
+        cp.cuda.Device(0).compute_capability
+        return True
+    except (ImportError, Exception):
+        pass
+    
+    return False
+
+
 @dataclass
 class ClusterConfig:
     """Configuration for clustering operations.
@@ -13,23 +36,30 @@ class ClusterConfig:
     into a lightweight module to avoid importing heavy dependencies at import time.
     """
     # Core clustering
-    min_cluster_size: Optional[int] = None
+    min_cluster_size: Optional[int] = 5  # Smaller = fewer outliers, more clusters
     verbose: bool = True
-    include_embeddings: bool = True
+    include_embeddings: bool = False
     context: Optional[str] = None
     precomputed_embeddings: Optional[Union[np.ndarray, Dict, str]] = None
     disable_dim_reduction: bool = False
-    assign_outliers: bool = False
+    assign_outliers: bool = True
     input_model_name: Optional[str] = None
     min_samples: Optional[int] = None
-    cluster_selection_epsilon: float = 0.0
+    cluster_selection_epsilon: float = 0.05  # Small epsilon to merge very similar clusters
     cache_embeddings: bool = False
     groupby_column: Optional[str] = None # if not None, the data will be grouped by this column before clustering
+    parallel_clustering: bool = True  # if True, parallelize clustering when groupby_column is set
 
     # Model settings
-    embedding_model: str = "text-embedding-3-small"
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    
     summary_model: str = "gpt-4.1"
     cluster_assignment_model: str = "gpt-4.1-mini"
+    # Parallelism for LLM calls used during clustering (summaries, matching, prettify)
+    llm_max_workers: int = 10
+
+    # GPU acceleration (auto-detected by default)
+    use_gpu: Optional[bool] = None  # None means auto-detect; will be set in __post_init__
 
     # Dimension reduction settings
     dim_reduction_method: str = "adaptive"  # "adaptive", "umap", "pca", "none"
@@ -45,8 +75,10 @@ class ClusterConfig:
     wandb_run_name: Optional[str] = None
 
     def __post_init__(self) -> None:
+        # Auto-detect GPU availability if not explicitly set
+        if self.use_gpu is None:
+            self.use_gpu = _cuda_available()
         # Keep min_samples as provided (None means let HDBSCAN use its default = min_cluster_size)
-        pass
 
     @classmethod
     def from_args(cls, args: Any) -> "ClusterConfig":

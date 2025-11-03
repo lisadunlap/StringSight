@@ -25,22 +25,31 @@ def load_dataset(
     method: str = "single_model",
     tidy_side_by_side_models: Optional[Tuple[str, str]] = None,
 ):
-    """Load dataset from jsonl file.
+    """Load dataset from json, jsonl, or csv file.
 
     Args:
-        data_path: Path to input .jsonl file
+        data_path: Path to input file (.json, .jsonl, or .csv)
         method: "single_model" or "side_by_side"
         tidy_side_by_side_models: When provided and method=="side_by_side",
             indicates the input is tidy single-model-like data to be converted.
             Expects columns [question_id, prompt, model, model_response].
     """
     print(f"Loading dataset from: {data_path}")
-    
+
     if not os.path.exists(data_path):
         raise FileNotFoundError(f"Dataset not found: {data_path}")
-    
-    # Load the dataset
-    df = pd.read_json(data_path, lines=True)
+
+    # Determine file type and load accordingly
+    file_ext = os.path.splitext(data_path)[1].lower()
+
+    if file_ext == '.jsonl':
+        df = pd.read_json(data_path, lines=True)
+    elif file_ext == '.json':
+        df = pd.read_json(data_path)
+    elif file_ext == '.csv':
+        df = pd.read_csv(data_path)
+    else:
+        raise ValueError(f"Unsupported file format: {file_ext}. Supported formats: .json, .jsonl, .csv")
     
     # Attach the filename to the DataFrame for wandb naming
     df.name = os.path.basename(data_path)
@@ -79,6 +88,7 @@ def run_pipeline(
     clusterer="hdbscan",
     min_cluster_size=15,
     embedding_model="text-embedding-3-small",
+    extraction_model: Optional[str] = None,
     max_workers=64,
     use_wandb=True,
     verbose=False,
@@ -93,13 +103,19 @@ def run_pipeline(
     model_a: Optional[str] = None,
     model_b: Optional[str] = None,
     filter_models: Optional[List[str]] = None,
+    score_columns: Optional[List[str]] = None,
 ):
     """Run the complete pipeline on a dataset.
 
     Args:
+        extraction_model: Optional model name for property extraction (e.g., 'gpt-4o', 'claude-3-5-sonnet').
+            If not provided, uses the default model ('gpt-4.1').
         filter_models: Optional list of model names. When provided and the
             input is in long/tidy format with a 'model' column, the dataset is
             filtered to only these models before further processing.
+        score_columns: Optional list of column names containing score metrics.
+            Instead of providing scores as a dictionary in a single column,
+            you can specify separate columns for each metric.
     """
     
     # Create output directory
@@ -149,29 +165,32 @@ def run_pipeline(
     
     # Run the full pipeline
     print("Running full pipeline with explain()...")
-    clustered_df, model_stats = explain(
-        df,
-        method=method,
-        system_prompt=system_prompt,
-        task_description=task_description,
-        clusterer=clusterer,
-        min_cluster_size=min_cluster_size,
-        embedding_model=embedding_model,
-        assign_outliers=bool(assign_outliers) if assign_outliers is not None else False,
-        max_workers=max_workers,
-        use_wandb=use_wandb,
-        verbose=verbose,
-        output_dir=str(output_path),
-        extraction_cache_dir=extraction_cache_dir,
-        clustering_cache_dir=clustering_cache_dir,
-        metrics_cache_dir=metrics_cache_dir,
-        metrics_kwargs=metrics_kwargs,
-        # pass groupby to clusterer via kwargs; recognized by HDBSCANClusterer config
-        groupby_column=groupby_column,
-        track_costs=True,  # Enable cost tracking
-        model_a=model_a,
-        model_b=model_b,
-    )
+    explain_kwargs = {
+        "method": method,
+        "system_prompt": system_prompt,
+        "task_description": task_description,
+        "clusterer": clusterer,
+        "min_cluster_size": min_cluster_size,
+        "embedding_model": embedding_model,
+        "assign_outliers": bool(assign_outliers) if assign_outliers is not None else False,
+        "max_workers": max_workers,
+        "use_wandb": use_wandb,
+        "verbose": verbose,
+        "output_dir": str(output_path),
+        "extraction_cache_dir": extraction_cache_dir,
+        "clustering_cache_dir": clustering_cache_dir,
+        "metrics_cache_dir": metrics_cache_dir,
+        "metrics_kwargs": metrics_kwargs,
+        "groupby_column": groupby_column,
+        "track_costs": True,
+        "model_a": model_a,
+        "model_b": model_b,
+        "score_columns": score_columns,
+    }
+    if extraction_model is not None:
+        explain_kwargs["model_name"] = extraction_model
+
+    clustered_df, model_stats = explain(df, **explain_kwargs)
     
     # Calculate runtime
     runtime = time.time() - start_time
@@ -246,7 +265,7 @@ def main():
     
     # Dataset and output
     parser.add_argument("--data_path", type=str, required=True,
-                        help="Path to the input dataset (jsonl file)")
+                        help="Path to the input dataset (.json, .jsonl, or .csv file)")
     parser.add_argument("--output_dir", type=str, required=True,
                         help="Output directory for results")
     
@@ -295,7 +314,9 @@ def main():
                             "When method=side_by_side and the input is tidy single-model-like data, "
                             "select this model as model_b"
                         ))
-    
+    parser.add_argument("--score_columns", nargs="+", type=str, default=None,
+                        help="Optional list of column names containing score metrics (e.g., accuracy, helpfulness)")
+
     args = parser.parse_args()
     
     # Run pipeline
@@ -316,6 +337,7 @@ def main():
         assign_outliers=args.assign_outliers,
         model_a=args.model_a,
         model_b=args.model_b,
+        score_columns=args.score_columns,
     )
     
     print(f"\nResults saved to: {args.output_dir}")

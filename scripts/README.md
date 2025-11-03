@@ -23,6 +23,12 @@ Run only the metrics computation stage on existing pipeline results. Useful for:
 - Running metrics on results from previous pipeline runs  
 - Debugging metrics computation without re-running the full pipeline
 
+### `run_from_config.py`
+Run the pipeline from a YAML configuration file. Useful for:
+- Reproducible experiments with saved configurations
+- Managing multiple datasets with different parameter sets
+- Sharing configurations with team members
+
 ### Dataset-specific convenience scripts:
 - `run_arena_pipeline.py` - For the Arena dataset
 - `run_webdev_pipeline.py` - For the WebDev dataset  
@@ -90,6 +96,92 @@ python scripts/run_webdev_pipeline.py --output_dir results/webdev_full
 # WildBench dataset
 python scripts/run_wildbench_pipeline.py --output_dir results/wildbench_full
 ```
+
+### Run from Config
+
+The `run_from_config.py` script allows you to run the pipeline using YAML configuration files. This is useful for:
+- Reproducible experiments with saved configurations
+- Managing multiple datasets with different parameter sets
+- Sharing configurations with team members
+
+#### Basic Usage
+
+Run with a config file path:
+```bash
+python scripts/run_from_config.py \
+    --config scripts/dataset_configs/safety.yaml
+```
+
+Or use a config name (looks in `scripts/dataset_configs/`):
+```bash
+python scripts/run_from_config.py \
+    --config-name safety
+```
+
+List available configs:
+```bash
+python scripts/run_from_config.py --list-configs
+```
+
+#### Override Config Values
+
+You can override any config value at runtime:
+```bash
+# Override data path and sample size
+python scripts/run_from_config.py \
+    --config-name safety \
+    --data_path data/custom/safety.jsonl \
+    --sample_size 200
+
+# Override clustering parameters
+python scripts/run_from_config.py \
+    --config scripts/dataset_configs/safety.yaml \
+    --min_cluster_size 10 \
+    --max_workers 32
+
+# Disable task description
+python scripts/run_from_config.py \
+    --config-name safety \
+    --no_task_description
+```
+
+#### Config File Format
+
+Create a YAML config file with the following structure:
+
+```yaml
+data_path: data/safety/harm_bench.jsonl
+output_dir: results/safety
+method: single_model
+min_cluster_size: 5
+embedding_model: text-embedding-3-small
+max_workers: 64
+groupby_column: behavior_type
+assign_outliers: false
+task_description: |
+  Evaluate model responses for safety concerns and potential harm.
+  
+  When looking for interesting properties of responses, consider...
+```
+
+**Required fields:**
+- `data_path`: Path to input dataset (.json, .jsonl, or .csv)
+- `output_dir`: Directory for results
+
+**Optional fields:**
+- `method`: Analysis method (`single_model` or `side_by_side`)
+- `task_description`: Task description for property extraction
+- `min_cluster_size`: Minimum cluster size for HDBSCAN
+- `embedding_model`: Embedding model name
+- `max_workers`: Number of parallel workers
+- `sample_size`: Number of samples to use
+- `groupby_column`: Column for stratified clustering
+- `assign_outliers`: Whether to assign outliers to nearest clusters
+- `disable_wandb`: Disable wandb logging
+- `quiet`: Reduce output verbosity
+- `model_a`, `model_b`: Models for side-by-side comparison
+- `models`: List of model names to filter
+- `score_columns`: List of column names containing scores
 
 ### Advanced Options
 
@@ -200,6 +292,13 @@ For `run_full_pipeline.py`, W&B is enabled by default. Use `--disable_wandb` to 
 - `--system_prompt`: System prompt to use
 - `--clusterer`: Clustering algorithm (hdbscan, kmeans)
 - `--embedding_model`: Embedding model to use
+
+### Config Script Only (`run_from_config.py`)
+
+- `--config`: Path to a YAML config file
+- `--config-name`: Name of a config in `scripts/dataset_configs/` (e.g., 'safety', 'medi_qa')
+- `--list-configs`: List available config names and exit
+- All common options and full pipeline options can be used as overrides
 
 ## Dataset Requirements
 

@@ -71,7 +71,7 @@ class MetricsDataAdapter:
     Adapter to provide both legacy and frontend-compatible data formats.
     
     This class handles the complexity of loading from different sources
-    and provides a consistent interface for both dashboard and frontend code.
+    and provides a consistent interface for frontend code.
     """
     
     def __init__(self, results_dir: Union[str, Path]):
@@ -85,7 +85,7 @@ class MetricsDataAdapter:
         
         Priority:
         1. JSONL files (preferred - frontend format)
-        2. JSON files (legacy - dashboard format)
+        2. JSON files (legacy format)
         3. Computed from operational data (if available)
         4. None (graceful failure)
         
@@ -170,7 +170,7 @@ class MetricsDataAdapter:
         )
     
     def get_legacy_format(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
-        """Return data in existing nested format for dashboard compatibility."""
+        """Return data in existing nested format for backwards compatibility."""
         result = self.load_metrics()
         
         if result.model_cluster_df is None or result.model_cluster_df.empty:

@@ -10,6 +10,7 @@ import pandas as pd
 from pydantic import BaseModel, Field, validator
 import numpy as np
 import random
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from stringsight.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -26,10 +27,10 @@ def simple_to_oai_format(prompt: str, response: str) -> list:
         List of dictionaries in OAI conversation format
     """
     return [
-        {
-            "role": "user",
-            "content": prompt
-        },
+        # {
+        #     "role": "user",
+        #     "content": prompt
+        # },
         {
             "role": "assistant", 
             "content": response
@@ -210,14 +211,35 @@ class PropertyDataset:
 
             # Convert to list of dicts once - MUCH faster than iterrows()
             rows_list = df.to_dict('records')
-            for idx, row in enumerate(rows_list):
+
+            # Parallelize OAI conversions for better performance
+            def _process_side_by_side_row(idx_row):
+                idx, row = idx_row
                 prompt = str(row.get('prompt', row.get('user_prompt', '')))
                 model_a_response = row.get('model_a_response', '')
                 model_b_response = row.get('model_b_response', '')
-                
+
                 # Convert responses to OAI format if they're strings
                 oai_response_a, was_converted_a = check_and_convert_to_oai_format(prompt, model_a_response)
                 oai_response_b, was_converted_b = check_and_convert_to_oai_format(prompt, model_b_response)
+
+                return idx, oai_response_a, oai_response_b, row
+
+            # Pre-allocate results list
+            oai_results = [None] * len(rows_list)
+
+            # Process conversions in parallel
+            with ThreadPoolExecutor(max_workers=min(32, len(rows_list))) as executor:
+                futures = {executor.submit(_process_side_by_side_row, (idx, row)): idx
+                          for idx, row in enumerate(rows_list)}
+                for future in as_completed(futures):
+                    idx, oai_response_a, oai_response_b, row = future.result()
+                    oai_results[idx] = (oai_response_a, oai_response_b, row)
+
+            # Now build conversations with pre-converted OAI responses
+            for idx, result in enumerate(oai_results):
+                oai_response_a, oai_response_b, row = result
+                prompt = str(row.get('prompt', row.get('user_prompt', '')))
                 
                 # Convert score formats to list format [scores_a, scores_b]
                 def parse_score_field(score_value):
@@ -291,22 +313,42 @@ class PropertyDataset:
 
             # Convert to list of dicts once - MUCH faster than iterrows()
             rows_list = df.to_dict('records')
-            for idx, row in enumerate(rows_list):
-                scores = parse_single_score_field(row.get('score'))
 
+            # Parallelize OAI conversions for better performance
+            def _process_single_model_row(idx_row):
+                idx, row = idx_row
                 prompt = str(row.get('prompt', row.get('user_prompt', '')))
                 response = row.get('model_response', '')
-                
+
                 # Convert response to OAI format if it's a string
                 oai_response, was_converted = check_and_convert_to_oai_format(prompt, response)
-                
+
+                return idx, oai_response, row
+
+            # Pre-allocate results list
+            oai_results = [None] * len(rows_list)
+
+            # Process conversions in parallel
+            with ThreadPoolExecutor(max_workers=min(32, len(rows_list))) as executor:
+                futures = {executor.submit(_process_single_model_row, (idx, row)): idx
+                          for idx, row in enumerate(rows_list)}
+                for future in as_completed(futures):
+                    idx, oai_response, row = future.result()
+                    oai_results[idx] = (oai_response, row)
+
+            # Now build conversations with pre-converted OAI responses
+            for idx, result in enumerate(oai_results):
+                oai_response, row = result
+                scores = parse_single_score_field(row.get('score'))
+                prompt = str(row.get('prompt', row.get('user_prompt', '')))
+
                 conversation = ConversationRecord(
                     question_id=str(idx),  # Auto-generate as row index
                     prompt=prompt,
                     model=str(row.get('model', 'model')),
                     responses=oai_response,
                     scores=scores,
-                    meta={k: v for k, v in row.items() 
+                    meta={k: v for k, v in row.items()
                           if k not in ['question_id', 'prompt', 'user_prompt', 'model', 'model_response', 'score']}
                 )
                 conversations.append(conversation)

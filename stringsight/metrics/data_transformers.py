@@ -394,12 +394,12 @@ def save_flattened_jsonl(df: pd.DataFrame, output_path: Path) -> None:
     df.to_json(output_path, orient="records", lines=True)
 
 
-# Backwards compatibility functions for existing dashboard code
+# Backwards compatibility functions for legacy code
 
 def convert_flattened_to_nested(df: pd.DataFrame) -> Dict[str, Dict[str, Dict[str, Any]]]:
     """Convert flattened DataFrame back to nested JSON structure.
     
-    This function provides backwards compatibility for existing dashboard code
+    This function provides backwards compatibility for legacy code
     that expects the nested format.
     
     Args:

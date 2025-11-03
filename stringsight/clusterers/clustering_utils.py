@@ -51,14 +51,16 @@ _cache_dir, _cache_size = _get_cache_config()
 # Module-level logger (initialize early so we can use it)
 logger = logging.getLogger(__name__)
 
-# Allow disabling cache entirely for clustering via env
+# Clustering cache is disabled by default, can be enabled via STRINGSIGHT_ENABLE_CLUSTERING_CACHE=1
+# (This is separate from property extraction caching which remains enabled by default)
 import os as _os
-if _os.environ.get("STRINGSIGHT_DISABLE_CACHE", "0") in ("1", "true", "True"):
-    _cache = None
-    logger.info("Caching disabled for clustering")
-else:
+if _os.environ.get("STRINGSIGHT_ENABLE_CLUSTERING_CACHE", "0") in ("1", "true", "True"):
     _cache = Cache(cache_dir=_cache_dir, max_size=_cache_size)
-    logger.info(f"Caching enabled for clustering (cache_dir={_cache_dir})")
+    embedding_status = "disabled" if _os.environ.get("STRINGSIGHT_DISABLE_EMBEDDING_CACHE", "0") in ("1", "true", "True") else "enabled"
+    logger.info(f"Caching enabled for clustering (cache_dir={_cache_dir}, embeddings={embedding_status})")
+else:
+    _cache = None
+    logger.info("Clustering cache disabled by default (set STRINGSIGHT_ENABLE_CLUSTERING_CACHE=1 to enable)")
 
 # -----------------------------------------------------------------------------
 # Ensure deterministic behaviour in sampling helpers and downstream clustering
@@ -172,17 +174,30 @@ def _get_openai_embeddings(texts: List[str], *, model: str = "openai/text-embedd
 # Generic embedding helper
 # -----------------------------------------------------------------------------
 
-def _get_embeddings(texts: List[str], embedding_model: str, verbose: bool = False) -> List[List[float]]:
-    """Return embeddings for *texts* using either OpenAI or a SentenceTransformer."""
+def _get_embeddings(texts: List[str], embedding_model: str, verbose: bool = False, use_gpu: bool = False) -> List[List[float]]:
+    """Return embeddings for *texts* using either OpenAI or a SentenceTransformer.
+    
+    Args:
+        texts: List of strings to embed
+        embedding_model: Model name (OpenAI or HuggingFace)
+        verbose: Enable verbose logging
+        use_gpu: Use GPU acceleration for sentence transformers (default: False)
+    
+    Returns:
+        List of embeddings as lists of floats
+    """
 
     # Treat OpenAI models either as "openai" keyword or provider-prefixed names
     if embedding_model == "openai" or str(embedding_model).startswith("openai/") or embedding_model in {"text-embedding-3-large", "text-embedding-3-small", "e3-large", "e3-small"}:
         return _get_openai_embeddings(texts, model=_normalize_embedding_model_name(embedding_model))
 
     if verbose:
-        logger.info(f"Computing embeddings with {embedding_model}…")
+        device = "cuda" if use_gpu else "cpu"
+        logger.info(f"Computing embeddings with {embedding_model} on {device}…")
 
-    model = SentenceTransformer(embedding_model)
+    # Set device for sentence transformer
+    device = "cuda" if use_gpu else "cpu"
+    model = SentenceTransformer(embedding_model, device=device)
     # Always show a progress bar for local embedding computation
     return model.encode(texts, show_progress_bar=True).tolist()
 
@@ -308,6 +323,7 @@ def assign_fine_to_coarse(
     model: str = "gpt-4.1-mini",
     strategy: str = "llm",
     verbose: bool = True,
+    max_workers: int = 10,
 ) -> Dict[str, str]:
     """Assign each fine cluster name to one of the coarse cluster names.
 
@@ -320,7 +336,7 @@ def assign_fine_to_coarse(
     if strategy == "embedding":
         return embedding_match(cluster_names, coarse_cluster_names)
     elif strategy == "llm":
-        return llm_match(cluster_names, coarse_cluster_names, model=model)
+        return llm_match(cluster_names, coarse_cluster_names, max_workers=max_workers, model=model)
     else:
         raise ValueError(f"Unknown assignment strategy: {strategy}")
 
@@ -386,9 +402,9 @@ def match_label_names(label_name, label_options):
 def llm_match(cluster_names, coarse_cluster_names, max_workers=10, model="gpt-4.1-mini"):
     """Match fine-grained cluster names to coarse-grained cluster names using an LLM with parallel processing."""
     coarse_names_text = "\n".join(coarse_cluster_names)
-    
+
     system_prompt = "You are a machine learning expert specializing in the behavior of large language models. Given the following coarse grained properties of model behavior, match the given fine grained property to the coarse grained property that it most closely resembles. Respond with the name of the coarse grained property that the fine grained property most resembles. If it is okay if the match is not perfect, just respond with the property that is most similar. If the fine grained property has absolutely no relation to any of the coarse grained properties, respond with 'Outliers'. Do NOT include anything but the name of the coarse grained property in your response."
-    
+
     # Build user messages for each fine cluster name
     messages = []
     for fine_name in cluster_names:
@@ -426,8 +442,18 @@ def llm_match(cluster_names, coarse_cluster_names, max_workers=10, model="gpt-4.
     
     return fine_to_coarse
 
-def _setup_embeddings(texts, embedding_model, verbose=False):
-    """Setup embeddings based on model type. Uses DiskCache-based caching."""
+def _setup_embeddings(texts, embedding_model, verbose=False, use_gpu=False):
+    """Setup embeddings based on model type. Uses DiskCache-based caching.
+    
+    Args:
+        texts: List of strings to embed
+        embedding_model: Model name (OpenAI or HuggingFace)
+        verbose: Enable verbose logging
+        use_gpu: Use GPU acceleration for sentence transformers (default: False)
+    
+    Returns:
+        Tuple of (embeddings array or None, model or None)
+    """
     if embedding_model == "openai" or str(embedding_model).startswith("openai/") or embedding_model in {"text-embedding-3-large", "text-embedding-3-small", "e3-large", "e3-small"}:
         if verbose:
             logger.info("Using OpenAI embeddings (with disk caching)...")
@@ -449,8 +475,10 @@ def _setup_embeddings(texts, embedding_model, verbose=False):
         return embeddings, None
     else:
         if verbose:
-            logger.info(f"Using sentence transformer: {embedding_model}")
-        model = SentenceTransformer(embedding_model)
+            device = "cuda" if use_gpu else "cpu"
+            logger.info(f"Using sentence transformer: {embedding_model} on {device}")
+        device = "cuda" if use_gpu else "cpu"
+        model = SentenceTransformer(embedding_model, device=device)
         return None, model
 
 
@@ -819,6 +847,131 @@ def create_summary_table(df, config=None, **kwargs):
         'property_description',
         ]
     existing_cols = [c for c in cols if c in df.columns]
+    results = []
+    for label in labels.index:
+        df_label = df[df.property_description_cluster_label == label].drop_duplicates(subset=['question_id', 'model'])
+        global_model_counts = df.model.value_counts()
+        examples = {}
+        for model in df_label.model.unique():
+            examples[model] = df_label[df_label.model == model].head(3)[existing_cols].to_dict(orient='records')
+        model_percent_global = {
+            k: v / global_model_counts[k] for k, v in df_label.model.value_counts().to_dict().items()
+        }
+        res = {
+            "label": label,
+            "count": df_label.shape[0],
+            "percent": df_label.shape[0] / len(df),
+            "model_counts": df_label.model.value_counts().to_dict(),
+            "model_percent_global": model_percent_global,
+            "model_local_proportions": {
+                k: v / np.median(list(model_percent_global.values())) for k, v in model_percent_global.items()
+            },
+            "examples": examples,
+        }
+        results.append(res)
+
+    results = pd.DataFrame(results)
+    return results
+    results = []
+    for label in labels.index:
+        df_label = df[df.property_description_cluster_label == label].drop_duplicates(subset=['question_id', 'model'])
+        global_model_counts = df.model.value_counts()
+        examples = {}
+        for model in df_label.model.unique():
+            examples[model] = df_label[df_label.model == model].head(3)[existing_cols].to_dict(orient='records')
+        model_percent_global = {
+            k: v / global_model_counts[k] for k, v in df_label.model.value_counts().to_dict().items()
+        }
+        res = {
+            "label": label,
+            "count": df_label.shape[0],
+            "percent": df_label.shape[0] / len(df),
+            "model_counts": df_label.model.value_counts().to_dict(),
+            "model_percent_global": model_percent_global,
+            "model_local_proportions": {
+                k: v / np.median(list(model_percent_global.values())) for k, v in model_percent_global.items()
+            },
+            "examples": examples,
+        }
+        results.append(res)
+
+    results = pd.DataFrame(results)
+    return results
+    results = []
+    for label in labels.index:
+        df_label = df[df.property_description_cluster_label == label].drop_duplicates(subset=['question_id', 'model'])
+        global_model_counts = df.model.value_counts()
+        examples = {}
+        for model in df_label.model.unique():
+            examples[model] = df_label[df_label.model == model].head(3)[existing_cols].to_dict(orient='records')
+        model_percent_global = {
+            k: v / global_model_counts[k] for k, v in df_label.model.value_counts().to_dict().items()
+        }
+        res = {
+            "label": label,
+            "count": df_label.shape[0],
+            "percent": df_label.shape[0] / len(df),
+            "model_counts": df_label.model.value_counts().to_dict(),
+            "model_percent_global": model_percent_global,
+            "model_local_proportions": {
+                k: v / np.median(list(model_percent_global.values())) for k, v in model_percent_global.items()
+            },
+            "examples": examples,
+        }
+        results.append(res)
+
+    results = pd.DataFrame(results)
+    return results
+    results = []
+    for label in labels.index:
+        df_label = df[df.property_description_cluster_label == label].drop_duplicates(subset=['question_id', 'model'])
+        global_model_counts = df.model.value_counts()
+        examples = {}
+        for model in df_label.model.unique():
+            examples[model] = df_label[df_label.model == model].head(3)[existing_cols].to_dict(orient='records')
+        model_percent_global = {
+            k: v / global_model_counts[k] for k, v in df_label.model.value_counts().to_dict().items()
+        }
+        res = {
+            "label": label,
+            "count": df_label.shape[0],
+            "percent": df_label.shape[0] / len(df),
+            "model_counts": df_label.model.value_counts().to_dict(),
+            "model_percent_global": model_percent_global,
+            "model_local_proportions": {
+                k: v / np.median(list(model_percent_global.values())) for k, v in model_percent_global.items()
+            },
+            "examples": examples,
+        }
+        results.append(res)
+
+    results = pd.DataFrame(results)
+    return results
+    results = []
+    for label in labels.index:
+        df_label = df[df.property_description_cluster_label == label].drop_duplicates(subset=['question_id', 'model'])
+        global_model_counts = df.model.value_counts()
+        examples = {}
+        for model in df_label.model.unique():
+            examples[model] = df_label[df_label.model == model].head(3)[existing_cols].to_dict(orient='records')
+        model_percent_global = {
+            k: v / global_model_counts[k] for k, v in df_label.model.value_counts().to_dict().items()
+        }
+        res = {
+            "label": label,
+            "count": df_label.shape[0],
+            "percent": df_label.shape[0] / len(df),
+            "model_counts": df_label.model.value_counts().to_dict(),
+            "model_percent_global": model_percent_global,
+            "model_local_proportions": {
+                k: v / np.median(list(model_percent_global.values())) for k, v in model_percent_global.items()
+            },
+            "examples": examples,
+        }
+        results.append(res)
+
+    results = pd.DataFrame(results)
+    return results
     results = []
     for label in labels.index:
         df_label = df[df.property_description_cluster_label == label].drop_duplicates(subset=['question_id', 'model'])

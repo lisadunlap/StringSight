@@ -76,7 +76,7 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         if hasattr(self, 'cache'):
             self.cache.close()
 
-    def run(self, data: PropertyDataset) -> PropertyDataset:
+    def run(self, data: PropertyDataset, progress_callback=None) -> PropertyDataset:
         """Run OpenAI extraction for all conversations.
 
         Each conversation is formatted with ``prompt_builder`` and sent to the
@@ -84,6 +84,10 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         stored inside a *placeholder* ``Property`` object (one per
         conversation).  Down-stream stages (``LLMJsonParser``) will parse these
         raw strings into fully-formed properties.
+
+        Args:
+            data: PropertyDataset with conversations to extract from
+            progress_callback: Optional callback(completed, total) for progress updates
         """
 
         n_conv = len(data.conversations)
@@ -93,32 +97,21 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
 
         self.log(f"Extracting properties from {n_conv} conversations using {self.model}")
 
-        # Print diagnostic information about models before extraction
-        print(f"\n🔍 Property extraction diagnostic:")
-        print(f"   • Input dataset has {len(data.all_models)} models: {sorted(data.all_models)}")
-        print(f"   • Input conversations: {len(data.conversations)}")
-        
-        # Count conversations per model before extraction
-        model_conversation_counts = {}
-        for conv in data.conversations:
-            if isinstance(conv.model, str):
-                model_conversation_counts[conv.model] = model_conversation_counts.get(conv.model, 0) + 1
-            elif isinstance(conv.model, list):
-                for model in conv.model:
-                    model_conversation_counts[model] = model_conversation_counts.get(model, 0) + 1
-        
-        print(f"   • Conversations per model before extraction:")
-        for model in sorted(data.all_models):
-            count = model_conversation_counts.get(model, 0)
-            print(f"     - {model}: {count} conversations")
-        print()
 
         # ------------------------------------------------------------------
-        # 1️⃣  Build user messages for every conversation
+        # 1️⃣  Build user messages for every conversation (in parallel)
         # ------------------------------------------------------------------
-        user_messages: List[str] = []
-        for conv in data.conversations:
-            user_messages.append(self.prompt_builder(conv))
+        user_messages: List[str] = [""] * len(data.conversations)
+
+        def _build_prompt(idx: int, conv):
+            return idx, self.prompt_builder(conv)
+
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            futures = {executor.submit(_build_prompt, idx, conv): idx
+                      for idx, conv in enumerate(data.conversations)}
+            for future in as_completed(futures):
+                idx, prompt = future.result()
+                user_messages[idx] = prompt
 
         # ------------------------------------------------------------------
         # 2️⃣  Call the OpenAI API in parallel batches via shared LLM utils
@@ -132,7 +125,8 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
             top_p=self.top_p,
             max_tokens=self.max_tokens,
             show_progress=True,
-            progress_desc="Property extraction"
+            progress_desc="Property extraction",
+            progress_callback=progress_callback
         )
 
         # ------------------------------------------------------------------
@@ -153,27 +147,6 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
 
         self.log(f"Received {len(properties)} LLM responses")
 
-        # Print diagnostic information about properties after extraction
-        print(f"   • Properties created after extraction: {len(properties)}")
-        
-        # Count properties per model after extraction (these are placeholder properties)
-        model_property_counts = {}
-        for prop in properties:
-            if isinstance(prop.model, str):
-                model_property_counts[prop.model] = model_property_counts.get(prop.model, 0) + 1
-            elif isinstance(prop.model, list):
-                for model in prop.model:
-                    model_property_counts[model] = model_property_counts.get(model, 0) + 1
-        
-        print(f"   • Properties per model after extraction (placeholder):")
-        for model in sorted(data.all_models):
-            count = model_property_counts.get(model, 0)
-            print(f"     - {model}: {count} properties")
-            
-            # Show if there's a mismatch between conversations and properties
-            conv_count = model_conversation_counts.get(model, 0)
-            if count != conv_count:
-                print(f"       ⚠️  Mismatch: {conv_count} conversations but {count} properties")
 
         # Log to wandb if enabled
         if hasattr(self, 'use_wandb') and self.use_wandb:

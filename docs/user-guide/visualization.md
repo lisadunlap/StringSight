@@ -1,36 +1,6 @@
-# Visualization & Dashboards
+# Visualization
 
-StringSight includes a Gradio chat viewer for exploring analysis results.
-
-## 
-
-## Gradio Chat Viewer
-
-Simple interface focused on conversation viewing.
-
-### Starting Gradio
-
-```bash
-python gradio_chat_viewer.py
-```
-
-**Access:** Open [http://localhost:7860](http://localhost:7860)
-
-### Features
-
-- **Conversation browser** - Navigate all conversations
-- **Side-by-side comparison** - Compare model A vs model B responses
-- **Property display** - Show extracted properties for each response
-- **Cluster information** - Display cluster assignments
-- **Search** - Find specific conversations
-- **Export** - Save individual conversations
-
-### Use Cases
-
-- **Quick inspection** - Rapidly browse conversations
-- **Quality assessment** - Review extraction quality
-- **Debugging** - Check property extraction results
-- **Presentation** - Share specific examples
+StringSight provides various ways to visualize and explore analysis results.
 
 ## Visualization Best Practices
 
@@ -95,13 +65,8 @@ Shows relative differences from baseline/median performance.
 **For Sharing:**
 - Export filtered data to CSV
 - Save plots as PNG/PDF
-- Use Streamlit **--share** for public links
 
 ## Customizing Visualizations
-
-### Streamlit Customization
-
-Create custom plots in `stringsight/dashboard/plots_tab.py`:
 
 ```python
 import plotly.express as px
@@ -136,12 +101,6 @@ const chartConfig = {
 ```
 
 ## Exporting Results
-
-### From Streamlit
-
-1. Use built-in download buttons for CSV/JSON
-2. Right-click plots and "Save image as..."
-3. Use sidebar "Export Data" button
 
 ### From React
 
@@ -208,13 +167,10 @@ app.add_middleware(
 )
 ```
 
-### Streamlit Issues
+### Visualization Issues
 
 **Plots not rendering:**
 ```bash
-# Clear cache
-streamlit cache clear
-
 # Reinstall plotly
 pip install --upgrade plotly
 ```
@@ -224,14 +180,6 @@ pip install --upgrade plotly
 # Check file paths are absolute
 import os
 data_path = os.path.abspath("results/clustered_results.parquet")
-```
-
-### Gradio Issues
-
-**Interface not opening:**
-```bash
-# Try specifying port explicitly
-python gradio_chat_viewer.py --port 7861
 ```
 
 **Slow loading:**

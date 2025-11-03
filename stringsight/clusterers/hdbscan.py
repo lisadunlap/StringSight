@@ -7,6 +7,8 @@ into pipeline stages.
 
 from typing import Optional
 import pandas as pd
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from tqdm import tqdm
 
 from .base import BaseClusterer
 from ..core.data_objects import PropertyDataset
@@ -41,13 +43,14 @@ class HDBSCANClusterer(BaseClusterer):
     def __init__(
         self,
         min_cluster_size: int | None = None,
-        embedding_model: str = "text-embedding-3-small",
+        embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
         assign_outliers: bool = False,
-        include_embeddings: bool = True,
+        include_embeddings: bool = False,
         use_wandb: bool = False,
         wandb_project: Optional[str] = None,
         output_dir: Optional[str] = None,
         # Additional explicit configuration parameters
+        use_gpu: Optional[bool] = None,  # None = auto-detect
         min_samples: Optional[int] = None,
         cluster_selection_epsilon: float = 0.0,
         disable_dim_reduction: bool = False,
@@ -58,15 +61,24 @@ class HDBSCANClusterer(BaseClusterer):
         umap_metric: str = "cosine",
         context: Optional[str] = None,
         groupby_column: Optional[str] = None,
+        parallel_clustering: bool = False,
         precomputed_embeddings: Optional[object] = None,
         cache_embeddings: bool = False,
         input_model_name: Optional[str] = None,
         summary_model: str = "gpt-4.1",
         cluster_assignment_model: str = "gpt-4.1-mini",
         verbose: bool = True,
+        llm_max_workers: int = 10,
         **kwargs,
     ):
-        """Initialize the HDBSCAN clusterer with explicit, overridable parameters."""
+        """Initialize the HDBSCAN clusterer with explicit, overridable parameters.
+        
+        Args:
+            use_gpu: Enable GPU acceleration for embeddings, UMAP, and HDBSCAN.
+                    None (default) = auto-detect based on CUDA availability.
+                    True = force GPU (requires cuML and CuPy, falls back to CPU if not available).
+                    False = force CPU.
+        """
         super().__init__(
             output_dir=output_dir,
             include_embeddings=include_embeddings,
@@ -89,10 +101,13 @@ class HDBSCANClusterer(BaseClusterer):
             min_samples=min_samples,
             cluster_selection_epsilon=cluster_selection_epsilon,
             cache_embeddings=cache_embeddings,
+            # GPU acceleration
+            use_gpu=use_gpu,
             # models
             embedding_model=embedding_model,
             summary_model=summary_model,
             cluster_assignment_model=cluster_assignment_model,
+            llm_max_workers=llm_max_workers,
             # dim reduction
             dim_reduction_method=dim_reduction_method,
             umap_n_components=umap_n_components,
@@ -101,6 +116,7 @@ class HDBSCANClusterer(BaseClusterer):
             umap_metric=umap_metric,
             # groupby
             groupby_column=groupby_column,
+            parallel_clustering=parallel_clustering,
             # wandb
             use_wandb=use_wandb,
             wandb_project=wandb_project,
@@ -137,21 +153,63 @@ class HDBSCANClusterer(BaseClusterer):
         group_col = getattr(self.config, "groupby_column", None)
 
         if group_col is not None and group_col in df.columns:
-            clustered_parts = []
-            for group, group_df in df.groupby(group_col):
-                if getattr(self, "verbose", False):
-                    logger.info("--------------------------------")
-                    logger.info(f"Clustering group {group}")
-                    logger.info("--------------------------------")
-                part = hdbscan_cluster_categories(
-                    group_df,
-                    column_name=column_name,
-                    config=self.config,
-                )
-                # Add meta column with group information as a dictionary
-                part["meta"] = [{"group": group}] * len(part)
-                clustered_parts.append(part)
-            clustered_df = pd.concat(clustered_parts, ignore_index=True)
+            parallel_clustering = getattr(self.config, "parallel_clustering", False)
+
+            if parallel_clustering:
+                # Parallelize clustering per group for better performance
+                groups = list(df.groupby(group_col))
+
+                def _cluster_group(group_info):
+                    group, group_df = group_info
+                    if getattr(self, "verbose", False):
+                        logger.info("--------------------------------")
+                        logger.info(f"Clustering group {group}")
+                        logger.info("--------------------------------")
+                    part = hdbscan_cluster_categories(
+                        group_df,
+                        column_name=column_name,
+                        config=self.config,
+                    )
+                    return group, part
+
+                # Process groups in parallel
+                clustered_parts = []
+                max_workers = min(len(groups), getattr(self.config, 'llm_max_workers', 10))
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = {executor.submit(_cluster_group, group_info): idx
+                              for idx, group_info in enumerate(groups)}
+
+                    # Add progress bar for parallel clustering
+                    with tqdm(total=len(groups), desc=f"Clustering {len(groups)} groups in parallel", disable=not getattr(self, "verbose", False)) as pbar:
+                        for future in as_completed(futures):
+                            group, part = future.result()
+                            # Add meta column with group information as a dictionary
+                            # Use list comprehension to create independent dict objects for each row
+                            part["meta"] = [{"group": group} for _ in range(len(part))]
+                            clustered_parts.append(part)
+                            pbar.update(1)
+                clustered_df = pd.concat(clustered_parts, ignore_index=True)
+            else:
+                # Process groups sequentially (default behavior)
+                clustered_parts = []
+                groups = list(df.groupby(group_col))
+
+                # Add progress bar for sequential clustering
+                for group, group_df in tqdm(groups, desc=f"Clustering {len(groups)} groups sequentially", disable=not getattr(self, "verbose", False)):
+                    if getattr(self, "verbose", False):
+                        logger.info("--------------------------------")
+                        logger.info(f"Clustering group {group}")
+                        logger.info("--------------------------------")
+                    part = hdbscan_cluster_categories(
+                        group_df,
+                        column_name=column_name,
+                        config=self.config,
+                    )
+                    # Add meta column with group information as a dictionary
+                    # Use list comprehension to create independent dict objects for each row
+                    part["meta"] = [{"group": group} for _ in range(len(part))]
+                    clustered_parts.append(part)
+                clustered_df = pd.concat(clustered_parts, ignore_index=True)
         else:
             clustered_df = hdbscan_cluster_categories(
                 df,

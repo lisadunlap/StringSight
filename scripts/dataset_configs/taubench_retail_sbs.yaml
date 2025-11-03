@@ -1,11 +1,12 @@
-data_path: data/taubench/retail_data_oai_format.jsonl
-output_dir: results/taubench_retail
+data_path: data/taubench/retail_data.jsonl
+output_dir: results/taubench_retail_sbs
 method: side_by_side
 model_a: gpt-4o
 model_b: claude-sonnet-35
 min_cluster_size: 5
 embedding_model: text-embedding-3-small
 max_workers: 64
+sample_size: 50
 groupby_column: behavior_type
 assign_outliers: false
 system_prompt: taubench_comparison_system_prompt

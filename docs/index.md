@@ -24,7 +24,7 @@ StringSight is a comprehensive analysis framework for evaluating and comparing L
 - **Multiple analysis modes** - Single-model analysis or side-by-side comparisons (Arena-style)
 - **🏷️ Fixed-taxonomy labeling** - LLM-as-judge with predefined behavioral axes
 - **💰 Cost tracking** - Built-in monitoring of LLM API costs
-- **📱 Interactive visualizations** - React frontend, Streamlit dashboard, and Gradio chat viewer
+- **📱 Interactive visualizations** - React frontend for exploring results
 - **🔧 Flexible pipeline** - Modular architecture supports custom extractors, clusterers, and metrics
 
 ## Quick Example
@@ -48,8 +48,7 @@ clustered_df, model_stats = explain(
     output_dir="results/"
 )
 
-# View results in interactive dashboard
-# python -m stringsight.dashboard.launcher --share
+# View results using the React frontend or other visualization tools
 ```
 
 ## Use Cases

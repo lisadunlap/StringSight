@@ -9,6 +9,7 @@ import uuid
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 import pandas as pd
+from tqdm import tqdm
 from ..core.stage import PipelineStage
 from ..core.data_objects import PropertyDataset, Property
 from ..core.mixins import LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin
@@ -45,25 +46,6 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
         """
         self.log(f"Parsing {len(data.properties)} raw property responses")
         
-        # Print diagnostic information about models before parsing
-        print(f"\n🔍 JSON parsing diagnostic:")
-        print(f"   • Input dataset has {len(data.all_models)} models: {sorted(data.all_models)}")
-        print(f"   • Input properties: {len(data.properties)}")
-        
-        # Count properties per model before parsing
-        model_property_counts = {}
-        for prop in data.properties:
-            if isinstance(prop.model, str):
-                model_property_counts[prop.model] = model_property_counts.get(prop.model, 0) + 1
-            elif isinstance(prop.model, list):
-                for model in prop.model:
-                    model_property_counts[model] = model_property_counts.get(model, 0) + 1
-        
-        print(f"   • Properties per model before parsing:")
-        for model in sorted(data.all_models):
-            count = model_property_counts.get(model, 0)
-            print(f"     - {model}: {count} properties")
-        print()
         
         parsed_properties: List[Property] = []
         parse_errors = 0
@@ -71,8 +53,9 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
         empty_list_responses = 0  # Track when LLM returns empty lists
         consecutive_errors = 0  # Track consecutive parsing errors
         max_consecutive_errors = 10
-        
-        for i, prop in enumerate(data.properties):
+
+        # Add progress bar for better visibility
+        for i, prop in enumerate(tqdm(data.properties, desc="Parsing properties", disable=not getattr(self, 'verbose', False))):
             # We only process properties that still have raw_response
             if not prop.raw_response:
                 # Debug: Print information about the property with empty raw_response
@@ -262,42 +245,6 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
         self.log(f"{empty_list_responses} conversations returned empty lists (no properties found)")
         self.log(f"Collected {len(self.parsing_failures)} detailed failure records")
         
-        # Count properties per model after parsing
-        parsed_model_property_counts = {}
-        for prop in parsed_properties:
-            if isinstance(prop.model, str):
-                parsed_model_property_counts[prop.model] = parsed_model_property_counts.get(prop.model, 0) + 1
-            elif isinstance(prop.model, list):
-                for model in prop.model:
-                    parsed_model_property_counts[model] = parsed_model_property_counts.get(model, 0) + 1
-        
-        print(f"   • Properties per model after parsing:")
-        for model in sorted(data.all_models):
-            count = parsed_model_property_counts.get(model, 0)
-            print(f"     - {model}: {count} properties")
-            
-            # Show if model was completely filtered out
-            if count == 0 and model_property_counts.get(model, 0) > 0:
-                print(f"       ⚠️  All properties for this model were filtered out during parsing!")
-            elif count < model_property_counts.get(model, 0):
-                original_count = model_property_counts.get(model, 0)
-                filtered_out = original_count - count
-                print(f"       ⚠️  {filtered_out} properties filtered out during parsing ({count}/{original_count} kept)")
-        print()
-        
-        # Summary statistics
-        total_original = sum(model_property_counts.values())
-        total_parsed = sum(parsed_model_property_counts.values())
-        total_filtered = total_original - total_parsed
-        print(f"   • Parsing Summary:")
-        print(f"     - Total properties before parsing: {total_original}")
-        print(f"     - Total properties after parsing: {total_parsed}")
-        print(f"     - Total properties filtered out: {total_filtered}")
-        print(f"       • JSON parsing errors: {parse_errors}")
-        print(f"       • Empty list responses (no properties found): {empty_list_responses}")
-        print(f"       • Unknown model filtered: {unknown_model_filtered}")
-        print(f"     - Parsing success rate: {total_parsed/total_original*100:.1f}%")
-        print()
         
         # Log to wandb if enabled
         if hasattr(self, 'use_wandb') and self.use_wandb:

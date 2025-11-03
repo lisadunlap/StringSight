@@ -60,7 +60,8 @@ class LLMUtils:
         config: LLMConfig,
         system_prompt: Optional[str] = None,
         show_progress: bool = True,
-        progress_desc: str = "LLM calls"
+        progress_desc: str = "LLM calls",
+        progress_callback: Optional[Callable[[int, int], None]] = None
     ) -> List[str]:
         """
         Execute LLM completions in parallel with order preservation.
@@ -71,7 +72,8 @@ class LLMUtils:
             system_prompt: Optional system prompt (if messages are strings)
             show_progress: Whether to show progress bar
             progress_desc: Description for progress bar
-            
+            progress_callback: Optional callback(completed, total) called after each completion
+
         Returns:
             List of completion responses in the same order as input
         """
@@ -167,18 +169,23 @@ class LLMUtils:
         # Execute in parallel
         with ThreadPoolExecutor(max_workers=config.max_workers) as executor:
             futures = {
-                executor.submit(_single_completion, idx, msg): idx 
+                executor.submit(_single_completion, idx, msg): idx
                 for idx, msg in enumerate(messages)
             }
-            
+
             # Process results with optional progress bar
-            iterator = as_completed(futures)
-            if show_progress:
-                iterator = tqdm(iterator, total=len(messages), desc=progress_desc)
-                
-            for future in iterator:
+            # Use manual progress updates for smoother per-item tracking
+            pbar = tqdm(total=len(messages), desc=progress_desc, disable=not show_progress)
+            completed = 0
+            for future in as_completed(futures):
                 idx, result = future.result()
                 results[idx] = result
+                completed += 1
+                pbar.update(1)
+                # Call progress callback if provided
+                if progress_callback:
+                    progress_callback(completed, len(messages))
+            pbar.close()
         
         return results
     
@@ -282,16 +289,16 @@ class LLMUtils:
                 executor.submit(_single_embedding_batch, start, batch_texts): (start, len(batch_texts))
                 for start, batch_texts in batches
             }
-            
+
             # Process results with optional progress bar
-            iterator = as_completed(futures)
-            if show_progress:
-                iterator = tqdm(iterator, total=len(batches), desc=progress_desc)
-            
-            for future in iterator:
+            # Track by number of texts embedded, not batches, for better granularity
+            pbar = tqdm(total=len(texts), desc=progress_desc, disable=not show_progress)
+            for future in as_completed(futures):
                 start_idx, batch_embeddings = future.result()
                 batch_size = len(batch_embeddings)
                 embeddings[start_idx:start_idx + batch_size] = batch_embeddings
+                pbar.update(batch_size)
+            pbar.close()
         
         # Verify all embeddings were filled
         if any(e is None for e in embeddings):
@@ -334,8 +341,11 @@ def get_default_llm_utils() -> LLMUtils:
             import os
             if os.environ.get("STRINGSIGHT_DISABLE_CACHE", "0") in ("1", "true", "True"):
                 _default_cache = None
+                logger.info("LLM caching disabled (STRINGSIGHT_DISABLE_CACHE=1)")
             else:
                 _default_cache = Cache()
+                embedding_status = "disabled" if os.environ.get("STRINGSIGHT_DISABLE_EMBEDDING_CACHE", "0") in ("1", "true", "True") else "enabled"
+                logger.info(f"LLM caching enabled (embeddings={embedding_status})")
         _default_llm_utils = LLMUtils(_default_cache)
     
     return _default_llm_utils
@@ -349,16 +359,17 @@ def parallel_completions(
     max_workers: int = 10,
     show_progress: bool = True,
     progress_desc: str = "LLM calls",
+    progress_callback: Optional[Callable[[int, int], None]] = None,
     **kwargs
 ) -> List[str]:
     """Convenience function for parallel completions with default settings."""
     # Separate function-specific parameters from config parameters
-    config_kwargs = {k: v for k, v in kwargs.items() 
+    config_kwargs = {k: v for k, v in kwargs.items()
                     if k in ['max_retries', 'base_sleep_time', 'timeout', 'temperature', 'top_p', 'max_tokens']}
-    
+
     config = LLMConfig(model=model, max_workers=max_workers, **config_kwargs)
     utils = get_default_llm_utils()
-    return utils.parallel_completions(messages, config, system_prompt, show_progress, progress_desc)
+    return utils.parallel_completions(messages, config, system_prompt, show_progress, progress_desc, progress_callback)
 
 
 def parallel_embeddings(

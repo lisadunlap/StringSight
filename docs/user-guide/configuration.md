@@ -184,29 +184,30 @@ clustered_df, model_stats = compute_metrics_only(
 )
 ```
 
-### Building Dashboards
+### Building Custom Visualizations
 
 ```python
-# Interactive visualization
-import streamlit as st
+# Interactive visualization with plotly
+import plotly.express as px
+import pandas as pd
 
 # Load results
-@st.cache_data
-def load_data():
-    return pd.read_parquet("results/clustered_results.parquet")
-
-df = load_data()
+df = pd.read_parquet("results/clustered_results.parquet")
 
 # Build interactive filters
-selected_models = st.multiselect("Select Models", df['model'].unique())
-selected_clusters = st.multiselect("Select Clusters", df['property_description_cluster_label'].unique())
+selected_models = ["gpt-4", "claude-3"]  # Filter by model
+selected_clusters = df['property_description_cluster_label'].unique()[:10]  # Top clusters
 
 # Filter and display
 filtered_df = df[
     (df['model'].isin(selected_models)) & 
     (df['property_description_cluster_label'].isin(selected_clusters))
 ]
-st.dataframe(filtered_df)
+
+# Create interactive plot
+fig = px.bar(filtered_df, x='model', y='property_description_cluster_label', 
+             title='Model Behavior Comparison')
+fig.show()
 ```
 
 ## File Format Details

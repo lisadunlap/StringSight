@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stringsight"
-version = "0.0.1"
+version = "0.3.1"
 authors = [
     {name = "Lisa Dunlap", email = "lisabdunlap@berkeley.edu"},
 ]
@@ -25,8 +25,8 @@ classifiers = [
 ]
 dependencies = [
     "pandas>=2.0.0",
-    "numpy>=2.2.6",
-    "scipy>=1.16.1",
+    "numpy>=1.19.3,<2.0",
+    "scipy>=1.9.0",
     "scikit-learn>=1.7.1",
     "tqdm>=4.65.0",
     "pydantic>=1.8.0",
@@ -46,7 +46,6 @@ dependencies = [
     "nltk>=3.8.0",
     "rouge-score>=0.1.2",
     "markdown>=3.4.0",
-    "gradio>=5.0.0",
     "diskcache>=5.6.3",
 ]
 

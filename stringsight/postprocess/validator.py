@@ -38,25 +38,6 @@ class PropertyValidator(LoggingMixin, PipelineStage):
         """
         self.log(f"Validating {len(data.properties)} properties")
         
-        # Print diagnostic information about models before validation
-        print(f"\n🔍 Property validation diagnostic:")
-        print(f"   • Input dataset has {len(data.all_models)} models: {sorted(data.all_models)}")
-        print(f"   • Input properties: {len(data.properties)}")
-        
-        # Count properties per model before validation
-        model_property_counts = {}
-        for prop in data.properties:
-            if isinstance(prop.model, str):
-                model_property_counts[prop.model] = model_property_counts.get(prop.model, 0) + 1
-            elif isinstance(prop.model, list):
-                for model in prop.model:
-                    model_property_counts[model] = model_property_counts.get(model, 0) + 1
-        
-        print(f"   • Properties per model before validation:")
-        for model in sorted(data.all_models):
-            count = model_property_counts.get(model, 0)
-            print(f"     - {model}: {count} properties")
-        print()
         
         valid_properties = []
         invalid_properties = []
@@ -69,44 +50,6 @@ class PropertyValidator(LoggingMixin, PipelineStage):
         self.log(f"Kept {len(valid_properties)} valid properties")
         self.log(f"Filtered out {len(invalid_properties)} invalid properties")
         
-        # Count properties per model after validation
-        valid_model_property_counts = {}
-        for prop in valid_properties:
-            if isinstance(prop.model, str):
-                valid_model_property_counts[prop.model] = valid_model_property_counts.get(prop.model, 0) + 1
-            elif isinstance(prop.model, list):
-                for model in prop.model:
-                    valid_model_property_counts[model] = valid_model_property_counts.get(model, 0) + 1
-        
-        print(f"   • Properties per model after validation:")
-        for model in sorted(data.all_models):
-            count = valid_model_property_counts.get(model, 0)
-            print(f"     - {model}: {count} properties")
-            
-            # Show if model was completely filtered out
-            if count == 0 and model_property_counts.get(model, 0) > 0:
-                print(f"       ⚠️  All properties for this model were filtered out!")
-            elif count < model_property_counts.get(model, 0):
-                original_count = model_property_counts.get(model, 0)
-                filtered_out = original_count - count
-                print(f"       ⚠️  {filtered_out} properties filtered out during validation ({count}/{original_count} kept)")
-        print()
-        
-        # Summary statistics
-        total_original = sum(model_property_counts.values())
-        total_valid = sum(valid_model_property_counts.values())
-        total_filtered = total_original - total_valid
-
-        print("   • Validation Summary:")
-        print(f"     - Total properties before validation: {total_original}")
-        print(f"     - Total properties after validation: {total_valid}")
-        print(f"     - Total properties filtered out: {total_filtered}")
-
-        if total_original == 0:
-            print("     - Validation success rate: N/A (no properties)")
-        else:
-            print(f"     - Validation success rate: {total_valid/total_original*100:.1f}%")
-        print()
         
         # Check for 0 valid properties and provide helpful error message
         if len(valid_properties) == 0:

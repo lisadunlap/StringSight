@@ -218,8 +218,7 @@ StringSight uses the following environment variables:
 - `sentence-transformers` - Local embedding models
 
 ### Visualization Dependencies
-- `streamlit`, `plotly` - Interactive dashboards
-- `gradio` - Chat viewer interface
+- `plotly` - Interactive charts
 
 ### Frontend Dependencies (npm)
 - `react`, `typescript` - Frontend framework

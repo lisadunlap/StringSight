@@ -19,6 +19,7 @@ import random
 import os
 import pickle
 import argparse
+from tqdm import tqdm
 from ..logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -103,7 +104,8 @@ def prepare_embeddings(unique_values: List[Any], config: ClusterConfig) -> np.nd
             logger.info(f"Embeddings shape: {embeddings.shape}")
     else:
         # Use caching if enabled
-        embeddings, _ = _setup_embeddings(unique_strings, config.embedding_model, config.verbose)
+        use_gpu = getattr(config, 'use_gpu', False)
+        embeddings, _ = _setup_embeddings(unique_strings, config.embedding_model, config.verbose, use_gpu)
         embeddings = np.array(embeddings)
     
     # Normalize embeddings
@@ -135,8 +137,10 @@ def prepare_embeddings(unique_values: List[Any], config: ClusterConfig) -> np.nd
             method = config.dim_reduction_method
         
         if method == "umap":
+            use_gpu = getattr(config, 'use_gpu', False)
             if config.verbose:
-                logger.info(f"Applying UMAP dimensionality reduction...")
+                device_msg = "on GPU (cuML)" if use_gpu else "on CPU"
+                logger.info(f"Applying UMAP dimensionality reduction {device_msg}...")
             
             # Adaptive parameters with better safeguards
             n_components = min(config.umap_n_components, n_dims - 1)
@@ -149,15 +153,54 @@ def prepare_embeddings(unique_values: List[Any], config: ClusterConfig) -> np.nd
                     logger.warning(f"Dataset too small for UMAP (n_points={n_points}, n_neighbors={n_neighbors}), skipping dimension reduction")
                 method = "none"
             else:
-                reducer = umap.UMAP(
-                    n_components=n_components,
-                    n_neighbors=n_neighbors,
-                    min_dist=config.umap_min_dist,
-                    metric=config.umap_metric,
-                    random_state=42,
-                    verbose=config.verbose
-                )
-                embeddings = reducer.fit_transform(embeddings)
+                # Try GPU first if requested, fallback to CPU if cuML not available
+                if use_gpu:
+                    try:
+                        from cuml import UMAP as cumlUMAP
+                        import cupy as cp
+                        if config.verbose:
+                            logger.info("Using cuML UMAP on GPU")
+                        # Convert to CuPy array for GPU computation
+                        embeddings_gpu = cp.asarray(embeddings)
+                        reducer = cumlUMAP(
+                            n_components=n_components,
+                            n_neighbors=n_neighbors,
+                            min_dist=config.umap_min_dist,
+                            metric=config.umap_metric,
+                            random_state=42,
+                            verbose=False  # Disable UMAP's own verbose to use tqdm
+                        )
+                        with tqdm(total=1, desc="UMAP dimensionality reduction (GPU)", disable=not config.verbose) as pbar:
+                            embeddings_reduced = reducer.fit_transform(embeddings_gpu)
+                            pbar.update(1)
+                        # Convert back to numpy
+                        embeddings = cp.asnumpy(embeddings_reduced)
+                    except ImportError as e:
+                        if config.verbose:
+                            logger.warning(f"cuML not available ({e}), falling back to CPU UMAP")
+                        reducer = umap.UMAP(
+                            n_components=n_components,
+                            n_neighbors=n_neighbors,
+                            min_dist=config.umap_min_dist,
+                            metric=config.umap_metric,
+                            random_state=42,
+                            verbose=False  # Disable UMAP's own verbose to use tqdm
+                        )
+                        with tqdm(total=1, desc="UMAP dimensionality reduction (CPU)", disable=not config.verbose) as pbar:
+                            embeddings = reducer.fit_transform(embeddings)
+                            pbar.update(1)
+                else:
+                    reducer = umap.UMAP(
+                        n_components=n_components,
+                        n_neighbors=n_neighbors,
+                        min_dist=config.umap_min_dist,
+                        metric=config.umap_metric,
+                        random_state=42,
+                        verbose=False  # Disable UMAP's own verbose to use tqdm
+                    )
+                    with tqdm(total=1, desc="UMAP dimensionality reduction (CPU)", disable=not config.verbose) as pbar:
+                        embeddings = reducer.fit_transform(embeddings)
+                        pbar.update(1)
                 
                 if config.verbose:
                     logger.info(f"Reduced to shape: {embeddings.shape}")
@@ -224,7 +267,7 @@ def generate_cluster_summaries(cluster_values: Dict[int, List], config: ClusterC
         messages,
         model=config.summary_model,
         system_prompt=clustering_systems_prompt,
-        max_workers=10,
+        max_workers=getattr(config, 'llm_max_workers', 10),
         show_progress=config.verbose,
         progress_desc=f"Generating {cluster_type} summaries"
     )
@@ -332,9 +375,9 @@ def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.Dat
     # Determine effective min_cluster_size (autoset if None)
     n_points = embeddings.shape[0]
     if getattr(config, 'min_cluster_size', None) is None:
-        # Autoset per rule: 1% if <500, else 0.5%; apply small floor
-        pct = 0.01 if n_points < 500 else 0.005
-        effective_min_cluster_size = max(3, int(np.ceil(pct * max(1, n_points))))
+        # Less conservative: Fixed at 5 for most datasets
+        # This reduces outliers significantly compared to old 1%/0.5% rule
+        effective_min_cluster_size = 5
     else:
         effective_min_cluster_size = int(config.min_cluster_size)
 
@@ -351,17 +394,60 @@ def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.Dat
         cluster_labels = np.full(n_points, -1, dtype=int)
         clusterer = None
     else:
-        clusterer = hdbscan.HDBSCAN(
-            min_cluster_size=effective_min_cluster_size,
-            min_samples=config.min_samples,
-            metric='euclidean',
-            cluster_selection_method='eom',
-            prediction_data=True,
-            algorithm='best',
-            core_dist_n_jobs=-1,
-            cluster_selection_epsilon=config.cluster_selection_epsilon
-        )
-        cluster_labels = clusterer.fit_predict(embeddings)
+        use_gpu = getattr(config, 'use_gpu', False)
+        
+        # Try GPU first if requested, fallback to CPU if cuML not available
+        if use_gpu:
+            try:
+                from cuml.cluster import HDBSCAN as cumlHDBSCAN
+                import cupy as cp
+                if config.verbose:
+                    logger.info("Using cuML HDBSCAN on GPU")
+                
+                # Convert to CuPy array for GPU computation
+                embeddings_gpu = cp.asarray(embeddings)
+                clusterer = cumlHDBSCAN(
+                    min_cluster_size=effective_min_cluster_size,
+                    min_samples=config.min_samples if config.min_samples else 1,
+                    metric='euclidean',  # Euclidean is fine since embeddings are normalized
+                    cluster_selection_method='eom',
+                    cluster_selection_epsilon=config.cluster_selection_epsilon
+                )
+                with tqdm(total=1, desc=f"HDBSCAN clustering (GPU) - {len(embeddings)} items", disable=not config.verbose) as pbar:
+                    cluster_labels_gpu = clusterer.fit_predict(embeddings_gpu)
+                    pbar.update(1)
+                # Convert back to numpy
+                cluster_labels = cp.asnumpy(cluster_labels_gpu).astype(int)
+            except ImportError as e:
+                if config.verbose:
+                    logger.warning(f"cuML not available ({e}), falling back to CPU HDBSCAN")
+                clusterer = hdbscan.HDBSCAN(
+                    min_cluster_size=effective_min_cluster_size,
+                    min_samples=config.min_samples if config.min_samples else 1,
+                    metric='euclidean',  # Euclidean is fine since embeddings are normalized
+                    cluster_selection_method='eom',
+                    prediction_data=True,
+                    algorithm='best',
+                    core_dist_n_jobs=-1,
+                    cluster_selection_epsilon=config.cluster_selection_epsilon
+                )
+                with tqdm(total=1, desc=f"HDBSCAN clustering (CPU) - {len(embeddings)} items", disable=not config.verbose) as pbar:
+                    cluster_labels = clusterer.fit_predict(embeddings)
+                    pbar.update(1)
+        else:
+            clusterer = hdbscan.HDBSCAN(
+                min_cluster_size=effective_min_cluster_size,
+                min_samples=config.min_samples if config.min_samples else 1,
+                metric='euclidean',  # Euclidean is fine since embeddings are normalized
+                cluster_selection_method='eom',
+                prediction_data=True,
+                algorithm='best',
+                core_dist_n_jobs=-1,
+                cluster_selection_epsilon=config.cluster_selection_epsilon
+            )
+            with tqdm(total=1, desc=f"HDBSCAN clustering (CPU) - {len(embeddings)} items", disable=not config.verbose) as pbar:
+                cluster_labels = clusterer.fit_predict(embeddings)
+                pbar.update(1)
 
     if config.verbose:
         n_initial_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
@@ -415,8 +501,9 @@ def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.Dat
 
     # Get outlier items
     outlier_items = [unique_values[i] for i, label in enumerate(cluster_labels) if label < 0]
-    
-    if len(outlier_items) > 0:
+
+    # Skip LLM-based outlier clustering if fewer than 5 outliers (not worth the overhead)
+    if len(outlier_items) >= 5:
         # Generate outlier cluster summaries
         outlier_cluster_names = generate_coarse_labels(
             outlier_items,
@@ -433,6 +520,7 @@ def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.Dat
             model=config.cluster_assignment_model,
             strategy="llm",
             verbose=config.verbose,
+            max_workers=getattr(config, 'llm_max_workers', 10),
         )
         
         if config.verbose:
@@ -482,80 +570,88 @@ def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.Dat
             logger.info("No outliers to cluster")
 
     # -------------------------------------------------------------
-    # Step 4b: Deduplicate fine-cluster labels via LLM            
+    # Step 4b: Deduplicate cluster labels via LLM            
     # -------------------------------------------------------------
-    if config.verbose:
-        logger.info("Deduplicating fine-cluster labels…")
+    
+    # Only perform deduplication if there are more than 1 non-outlier cluster
+    non_outlier_clusters = [cid for cid in cluster_values.keys() if cid >= 0]
+    if len(non_outlier_clusters) > 1:
+        if config.verbose:
+            logger.info("Deduplicating cluster labels…")
 
-    cluster_names = [cluster_label_map[cid] for cid in cluster_values.keys() if cid != -1]
+        cluster_names = [cluster_label_map[cid] for cid in cluster_values.keys() if cid >= 0]
 
-    # Generate deduplicated labels
-    deduped_names = generate_coarse_labels(
-        cluster_names,
-        max_coarse_clusters=None,
-        systems_prompt=deduplication_clustering_systems_prompt,
-        model=config.summary_model,
-        verbose=config.verbose,
-    )
+        # Generate deduplicated labels
+        deduped_names = generate_coarse_labels(
+            cluster_names,
+            max_coarse_clusters=None,
+            systems_prompt=deduplication_clustering_systems_prompt,
+            model=config.summary_model,
+            verbose=config.verbose,
+        )
 
-    # Assign fine labels to deduplicated labels
-    fine_to_dedupe = assign_fine_to_coarse(
-        cluster_names,
-        deduped_names,
-        model=config.cluster_assignment_model,
-        strategy="llm",
-        verbose=config.verbose,
-    )
+        # Assign fine labels to deduplicated labels
+        fine_to_dedupe = assign_fine_to_coarse(
+            cluster_names,
+            deduped_names,
+            model=config.cluster_assignment_model,
+            strategy="llm",
+            verbose=config.verbose,
+            max_workers=getattr(config, 'llm_max_workers', 10),
+        )
 
-    # -------------------------------------------------------------
-    # Merge fine clusters that were deduplicated
-    # -------------------------------------------------------------
+        # -------------------------------------------------------------
+        # Merge fine clusters that were deduplicated
+        # -------------------------------------------------------------
 
-    # 1. Update the label map so every original cluster id points to its deduped label
-    for cid in cluster_values.keys():
-        if cid < 0:
-            continue
-        original_label = cluster_label_map[cid]
-        # Handle case where fine label maps to 'Outliers' in deduplication
-        if original_label in fine_to_dedupe:
-            deduped_label = fine_to_dedupe[original_label]
-        else:
-            deduped_label = original_label
-        cluster_label_map[cid] = deduped_label
+        # 1. Update the label map so every original cluster id points to its deduped label
+        for cid in cluster_values.keys():
+            if cid < 0:
+                continue
+            original_label = cluster_label_map[cid]
+            # Handle case where fine label maps to 'Outliers' in deduplication
+            if original_label in fine_to_dedupe:
+                deduped_label = fine_to_dedupe[original_label]
+            else:
+                deduped_label = original_label
+            cluster_label_map[cid] = deduped_label
 
-    # 2. Build mapping from deduped label → new sequential id
-    unique_dedup_labels = [lbl for lbl in sorted(set(cluster_label_map.values())) if not (lbl == "Outliers" or lbl.startswith("Outliers - "))]
-    label_to_new_id = {lbl: idx for idx, lbl in enumerate(unique_dedup_labels)}
+        # 2. Build mapping from deduped label → new sequential id
+        unique_dedup_labels = [lbl for lbl in sorted(set(cluster_label_map.values())) if not (lbl == "Outliers" or lbl.startswith("Outliers - "))]
+        label_to_new_id = {lbl: idx for idx, lbl in enumerate(unique_dedup_labels)}
 
-    # 3. Re-assign cluster_labels array so duplicates share the same id
-    new_cluster_labels = []
-    for original_cid in cluster_labels:
-        if original_cid < 0:
-            new_cluster_labels.append(-1)
-        else:
-            deduped = cluster_label_map[original_cid]
-            if deduped == "Outliers" or deduped.startswith("Outliers - "):
+        # 3. Re-assign cluster_labels array so duplicates share the same id
+        new_cluster_labels = []
+        for original_cid in cluster_labels:
+            if original_cid < 0:
                 new_cluster_labels.append(-1)
             else:
-                new_cluster_labels.append(label_to_new_id[deduped])
+                deduped = cluster_label_map[original_cid]
+                if deduped == "Outliers" or deduped.startswith("Outliers - "):
+                    new_cluster_labels.append(-1)
+                else:
+                    new_cluster_labels.append(label_to_new_id[deduped])
 
-    cluster_labels = np.array(new_cluster_labels)
+        cluster_labels = np.array(new_cluster_labels)
 
-    # 4. Rebuild cluster_values & cluster_label_map using new ids
-    cluster_values = defaultdict(list)
-    for val, cid in zip(unique_values, cluster_labels):
-        cluster_values[cid].append(val)
+        # 4. Rebuild cluster_values & cluster_label_map using new ids
+        cluster_values = defaultdict(list)
+        for val, cid in zip(unique_values, cluster_labels):
+            cluster_values[cid].append(val)
 
-    cluster_label_map = {new_id: lbl for lbl, new_id in label_to_new_id.items()}
-    # Ensure outliers are properly mapped (handle both standard and group-specific outliers)
-    # Find any outlier labels that might exist
-    outlier_labels = [lbl for lbl in cluster_label_map.values() if lbl == "Outliers" or lbl.startswith("Outliers - ")]
-    if outlier_labels:
-        # Use the first outlier label found, or default to "Outliers"
-        cluster_label_map[-1] = outlier_labels[0]
+        cluster_label_map = {new_id: lbl for lbl, new_id in label_to_new_id.items()}
+        # Ensure outliers are properly mapped (handle both standard and group-specific outliers)
+        # Find any outlier labels that might exist
+        outlier_labels = [lbl for lbl in cluster_label_map.values() if lbl == "Outliers" or lbl.startswith("Outliers - ")]
+        if outlier_labels:
+            # Use the first outlier label found, or default to "Outliers"
+            cluster_label_map[-1] = outlier_labels[0]
+        else:
+            # If no outlier labels found, add default mapping
+            cluster_label_map[-1] = "Outliers"
     else:
-        # If no outlier labels found, add default mapping
-        cluster_label_map[-1] = "Outliers"
+        if config.verbose:
+            logger.info("Skipping deduplication - only 1 non-outlier cluster found")
 
     # Step 5: Format results
     df_result = format_clustering_results(
@@ -700,4 +796,3 @@ def main():
 
 if __name__ == "__main__":
     df_result = main() 
-

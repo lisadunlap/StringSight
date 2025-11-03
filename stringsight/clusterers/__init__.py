@@ -11,9 +11,10 @@ from ..core.stage import PipelineStage
 def get_clusterer(
     method: str = "hdbscan",
     min_cluster_size: int | None = None,
-    embedding_model: str = "text-embedding-3-small",
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
     assign_outliers: bool = False,
-    include_embeddings: bool = True,
+    include_embeddings: bool = False,
+    use_gpu: bool | None = None,
     **kwargs
 ) -> PipelineStage:
     """
@@ -25,6 +26,8 @@ def get_clusterer(
         embedding_model: Embedding model to use
         assign_outliers: Whether to assign outliers to nearest clusters
         include_embeddings: Whether to include embeddings in output
+        use_gpu: Enable GPU acceleration for embeddings, UMAP, and HDBSCAN.
+                None (default) = auto-detect based on CUDA availability.
         **kwargs: Additional configuration
         
     Returns:
@@ -38,6 +41,7 @@ def get_clusterer(
             embedding_model=embedding_model,
             assign_outliers=assign_outliers,
             include_embeddings=include_embeddings,
+            use_gpu=use_gpu,
             **kwargs
         )
     # 'hdbscan_stratified' alias has been removed; users should pass
@@ -60,4 +64,4 @@ __all__ = [
     "HDBSCANClusterer",
     "DummyClusterer",
     "BaseClusterer",
-] 
+]

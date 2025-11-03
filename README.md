@@ -97,12 +97,9 @@ clustered_df, model_stats = label(
 )
 ```
 
-### 3. View Results with Gradio Dashboard
+### 3. View Results
 
-```bash
-# Launch dashboard, add --share to create a shareable link
-python -m stringsight.dashboard.launcher --results_dir ./results
-```
+Use the React frontend or other visualization tools to explore your results.
 
 
 ## Input Data Requirements
@@ -216,6 +213,19 @@ StringSight uses an on-disk cache (DiskCache) by default to speed up repeated LL
 - Disable cache: `STRINGSIGHT_DISABLE_CACHE=1`
 
 Legacy LMDB-named env vars are ignored; use the `STRINGSIGHT_CACHE_*` variables above.
+
+### Email Configuration
+
+To enable the email functionality in the dashboard (for emailing clustering results):
+
+```bash
+export EMAIL_SMTP_SERVER="smtp.gmail.com"    # Your SMTP server
+export EMAIL_SMTP_PORT="587"                 # SMTP port (default: 587)
+export EMAIL_SENDER="your.email@gmail.com"   # Sender email address
+export EMAIL_PASSWORD="your-app-password"    # Email password or app password
+```
+
+**For Gmail:** Use an [App Password](https://support.google.com/accounts/answer/185833) instead of your regular password.
 
 **Model Options:**
 - Extraction: `"gpt-4.1"`, `"gpt-4o-mini"`, `"anthropic/claude-3-5-sonnet"`, `"google/gemini-1.5-pro"`

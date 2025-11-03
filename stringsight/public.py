@@ -152,7 +152,7 @@ def explain(
     # Caching & logging
     use_wandb: bool = True,
     wandb_project: Optional[str] = None,
-    include_embeddings: bool = True,
+    include_embeddings: bool = False,
     verbose: bool = True,
     # Output parameters
     output_dir: Optional[str] = None,
@@ -614,7 +614,11 @@ def _build_default_pipeline(
     # Forward any additional clusterer-specific kwargs (e.g., groupby_column)
     if kwargs:
         clusterer_kwargs.update(kwargs)
-    
+
+    # Ensure LLM concurrency for clustering calls follows extraction max_workers by default
+    # unless explicitly overridden by caller via kwargs
+    clusterer_kwargs.setdefault('llm_max_workers', max_workers)
+
     # Add cache directory for clustering if provided
     if clustering_cache_dir:
         clusterer_kwargs['cache_dir'] = clustering_cache_dir
@@ -940,7 +944,7 @@ def label(
     metrics_kwargs: Optional[Dict[str, Any]] = None,
     use_wandb: bool = True,
     wandb_project: Optional[str] = None,
-    include_embeddings: bool = True,
+    include_embeddings: bool = False,
     verbose: bool = True,
     output_dir: Optional[str] = None,
     extraction_cache_dir: Optional[str] = None,

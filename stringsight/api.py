@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Literal, Optional
 import io
 import os
+import time
 
 import pandas as pd
 from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Query
@@ -32,8 +33,9 @@ from stringsight.formatters import (
 from stringsight.utils.df_utils import explode_score_columns
 from stringsight import public as public_api
 from stringsight.clusterers import get_clusterer
-from stringsight.metrics.cluster_subset import prepare_long_frame, compute_subset_metrics, enrich_clusters_with_metrics, compute_total_conversations_by_model
+from stringsight.metrics.cluster_subset import enrich_clusters_with_metrics, compute_total_conversations_by_model
 from stringsight.logging_config import get_logger
+from stringsight.email_service import send_results_email
 import threading, uuid
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -41,6 +43,41 @@ from datetime import datetime, timedelta
 import hashlib
 
 logger = get_logger(__name__)
+
+# -------------------------------------------------------------------------
+# Render persistent disk configuration
+# -------------------------------------------------------------------------
+def _get_persistent_data_dir() -> Path:
+    """Get the base directory for persistent data (results, cache) on Render.
+    
+    If RENDER_DISK_PATH is set, use that as the base for all persistent data.
+    Otherwise, default to the current working directory (local development).
+    """
+    render_disk = os.environ.get("RENDER_DISK_PATH")
+    if render_disk:
+        base = Path(render_disk).resolve()
+        logger.info(f"Using Render persistent disk: {base}")
+        return base
+    return Path.cwd()
+
+def _get_results_dir() -> Path:
+    """Get the results directory, potentially on persistent disk."""
+    base = _get_persistent_data_dir()
+    return base / "results"
+
+def _get_cache_dir() -> Path:
+    """Get the cache directory, potentially on persistent disk."""
+    # Check if RENDER_DISK_PATH is set and STRINGSIGHT_CACHE_DIR is not explicitly set
+    # If so, automatically configure cache to use the persistent disk
+    if os.environ.get("RENDER_DISK_PATH") and not os.environ.get("STRINGSIGHT_CACHE_DIR"):
+        base = _get_persistent_data_dir()
+        cache_dir = base / ".cache" / "stringsight"
+        # Set the environment variable so the Cache class picks it up
+        os.environ["STRINGSIGHT_CACHE_DIR"] = str(cache_dir)
+        logger.info(f"Auto-configured cache directory to use persistent disk: {cache_dir}")
+        return cache_dir
+    # Otherwise, let Cache class handle it using STRINGSIGHT_CACHE_DIR env var or default
+    return Path.cwd() / ".cache" / "stringsight"
 
 # -------------------------------------------------------------------------
 # Simple in-memory cache for parsed JSONL data with TTL
@@ -204,6 +241,13 @@ class AutoDetectRequest(BaseModel):
     rows: List[Dict[str, Any]]  # Sample of data for detection
 
 
+class EmailResultsRequest(BaseModel):
+    """Request to email clustering results to a user."""
+    email: str
+    results_dir: str
+    experiment_name: str
+
+
 # -----------------------------
 # Extraction endpoints schemas
 # -----------------------------
@@ -217,7 +261,7 @@ class ExtractSingleRequest(BaseModel):
     temperature: Optional[float] = 0.7
     top_p: Optional[float] = 0.95
     max_tokens: Optional[int] = 16000
-    max_workers: Optional[int] = 16
+    max_workers: Optional[int] = 128
     include_scores_in_prompt: Optional[bool] = False
     use_wandb: Optional[bool] = False
     output_dir: Optional[str] = None
@@ -233,7 +277,7 @@ class ExtractBatchRequest(BaseModel):
     temperature: Optional[float] = 0.7
     top_p: Optional[float] = 0.95
     max_tokens: Optional[int] = 16000
-    max_workers: Optional[int] = 16
+    max_workers: Optional[int] = 128
     include_scores_in_prompt: Optional[bool] = False
     use_wandb: Optional[bool] = False
     output_dir: Optional[str] = None
@@ -336,6 +380,10 @@ def _resolve_df_and_method(
 
 
 app = FastAPI(title="StringSight API", version="0.1.0")
+
+# Initialize persistent disk configuration on startup
+# This sets up environment variables for cache and results directories
+_get_cache_dir()  # Call this to auto-configure cache if RENDER_DISK_PATH is set
 
 # GZIP compression disabled - can add significant CPU overhead
 # Uncomment below if network transfer is the bottleneck:
@@ -482,6 +530,14 @@ def health() -> Dict[str, bool]:
     return {"ok": True}
 
 
+# Alias with /api prefix for clients expecting /api/health
+@app.get("/api/health")
+def api_health() -> Dict[str, bool]:
+    """Health check alias at /api/health to match frontend expectations."""
+    logger.debug("BACKEND: API Health check called")
+    return {"ok": True}
+
+
 # -----------------------------
 # Clustering/metrics – embedding models
 # -----------------------------
@@ -601,30 +657,62 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
         # Create a set of unique (question_id, model) pairs from properties
         property_keys = {(prop.question_id, prop.model) for prop in properties}
         
-        logger.debug(f"Found {len(property_keys)} unique (question_id, model) pairs from {len(properties)} properties")
+        logger.info(f"Found {len(property_keys)} unique (question_id, model) pairs from {len(properties)} properties")
+        logger.info(f"Sample property keys: {list(property_keys)[:3]}")
+        
+        # Debug: Check operationalRows structure
+        if req.operationalRows:
+            logger.info(f"OperationalRows count: {len(req.operationalRows)}")
+            sample_op = req.operationalRows[0]
+            logger.info(f"Sample operationalRow keys: {list(sample_op.keys())}")
+            logger.info(f"Sample operationalRow: question_id={sample_op.get('question_id')}, model={sample_op.get('model')}, score={sample_op.get('score')}")
         
         # Create exactly one conversation per unique (question_id, model) pair
+        matches_found = 0
         for question_id, model in property_keys:
             all_models.add(model)
             
             # Find matching operational row for this conversation
             matching_row = None
             for row in req.operationalRows:
-                if (str(row.get("question_id", "")) == question_id and 
-                    str(row.get("model", "")) == model):
+                row_qid = str(row.get("question_id", ""))
+                row_model = str(row.get("model", ""))
+                
+                # Try exact match first
+                if row_qid == question_id and row_model == model:
                     matching_row = row
+                    matches_found += 1
+                    break
+                
+                # If no exact match, try matching on base question_id (strip suffix after '-')
+                # This handles side-by-side format where question_id might be "0-0" vs "0"
+                row_qid_base = row_qid.split('-')[0] if '-' in row_qid else row_qid
+                if row_qid_base == question_id and row_model == model:
+                    matching_row = row
+                    matches_found += 1
                     break
             
+            if not matching_row and matches_found == 0:
+                # Log first failed match for debugging
+                logger.warning(f"⚠️ No matching operationalRow for question_id={question_id}, model={model}")
+                logger.warning(f"  Looking for: question_id='{question_id}' (type: {type(question_id)}), model='{model}' (type: {type(model)})")
+                if req.operationalRows:
+                    logger.warning(f"  Sample from operationalRows: question_id='{req.operationalRows[0].get('question_id')}' (type: {type(req.operationalRows[0].get('question_id'))}), model='{req.operationalRows[0].get('model')}' (type: {type(req.operationalRows[0].get('model'))})")
+            
             # Create minimal conversation (use empty data if no matching row found)
+            scores = matching_row.get("score", {}) if matching_row else {}
+            
             conv = ConversationRecord(
                 question_id=question_id,
                 model=model,
                 prompt=matching_row.get("prompt", "") if matching_row else "",
                 responses=matching_row.get("model_response", "") if matching_row else "",
-                scores=matching_row.get("score", {}) if matching_row else {},
+                scores=scores,
                 meta={}
             )
             conversations.append(conv)
+        
+        logger.info(f"✅ Matched {matches_found}/{len(property_keys)} conversations with operationalRows")
         
         # Create PropertyDataset with matching conversations and properties
         dataset = PropertyDataset(
@@ -635,10 +723,20 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             model_stats={}
         )
         
-        logger.debug(f"PropertyDataset created with:")
-        logger.debug(f"  - {len(dataset.properties)} properties")
-        logger.debug(f"  - {len(dataset.conversations)} conversations") 
-        logger.debug(f"  - Models: {dataset.all_models}")
+        logger.info(f"PropertyDataset created with:")
+        logger.info(f"  - {len(dataset.properties)} properties")
+        logger.info(f"  - {len(dataset.conversations)} conversations") 
+        logger.info(f"  - Models: {dataset.all_models}")
+        
+        # Debug: Check scores in conversations
+        if dataset.conversations:
+            sample_conv = dataset.conversations[0]
+            logger.info(f"🔍 Sample conversation:")
+            logger.info(f"  - question_id: {sample_conv.question_id}")
+            logger.info(f"  - model: {sample_conv.model}")
+            logger.info(f"  - scores type: {type(sample_conv.scores)}")
+            logger.info(f"  - scores value: {sample_conv.scores}")
+            logger.info(f"  - scores keys: {sample_conv.scores.keys() if isinstance(sample_conv.scores, dict) else 'N/A'}")
         
         if dataset.properties:
             logger.debug(f"Sample properties:")
@@ -697,10 +795,105 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             "meta": cluster.meta,
         })
     
-    # Enrich clusters with metrics using the subset helper
-    long_df = prepare_long_frame(clusters=clusters, properties=req.properties, operational_rows=req.operationalRows)
+    # Compute metrics using FunctionalMetrics (without bootstrap for speed)
+    from stringsight.metrics.functional_metrics import FunctionalMetrics
+    
+    # FunctionalMetrics needs PropertyDataset with clusters populated
+    metrics_computer = FunctionalMetrics(
+        output_dir=None,
+        compute_bootstrap=False,  # Disable bootstrap for API speed
+        log_to_wandb=False,
+        generate_plots=False
+    )
+    
+    # Debug: Check what's in clustered_dataset before metrics
+    logger.info(f"🔍 Before FunctionalMetrics:")
+    logger.info(f"  - Clusters: {len(clustered_dataset.clusters)}")
+    logger.info(f"  - Conversations: {len(clustered_dataset.conversations)}")
+    logger.info(f"  - Properties: {len(clustered_dataset.properties)}")
+    if clustered_dataset.conversations:
+        sample = clustered_dataset.conversations[0]
+        logger.info(f"  - Sample conv scores: {sample.scores}")
+    
+    # Run metrics computation on the clustered dataset
+    clustered_dataset = metrics_computer.run(clustered_dataset)
+    
+    # Extract the computed metrics
+    model_cluster_scores_dict = clustered_dataset.model_stats.get("model_cluster_scores", {})
+    cluster_scores_dict = clustered_dataset.model_stats.get("cluster_scores", {})
+    model_scores_dict = clustered_dataset.model_stats.get("model_scores", {})
+    
+    # Convert to the format expected by the rest of the code
+    # FunctionalMetrics returns DataFrames, convert back to nested dicts
+    if hasattr(model_cluster_scores_dict, 'to_dict'):
+        # It's a DataFrame, need to restructure it
+        import pandas as pd
+        df = model_cluster_scores_dict
+        scores = {"model_cluster_scores": {}, "cluster_scores": {}, "model_scores": {}}
+        
+        # Convert DataFrame back to nested dict structure
+        for _, row in df.iterrows():
+            model = row['model']
+            cluster = row['cluster']
+            if model not in scores["model_cluster_scores"]:
+                scores["model_cluster_scores"][model] = {}
+            
+            # Extract all metrics from the row
+            metrics = {
+                "size": row.get('size'),
+                "proportion": row.get('proportion'),
+                "proportion_delta": row.get('proportion_delta'),
+                "quality": {},
+                "quality_delta": {},
+                "metadata": row.get('metadata', {})
+            }
+            
+            # Extract quality metrics
+            for col in df.columns:
+                if col.startswith('quality_') and not col.startswith('quality_delta_'):
+                    metric_name = col.replace('quality_', '')
+                    if not any(x in metric_name for x in ['_ci_', '_significant']):
+                        metrics["quality"][metric_name] = row[col]
+                elif col.startswith('quality_delta_'):
+                    metric_name = col.replace('quality_delta_', '')
+                    if not any(x in metric_name for x in ['_ci_', '_significant']):
+                        metrics["quality_delta"][metric_name] = row[col]
+            
+            scores["model_cluster_scores"][model][cluster] = metrics
+        
+        # Process cluster_scores
+        if hasattr(cluster_scores_dict, 'to_dict'):
+            df = cluster_scores_dict
+            for _, row in df.iterrows():
+                cluster = row['cluster']
+                metrics = {
+                    "size": row.get('size'),
+                    "proportion": row.get('proportion'),
+                    "quality": {},
+                    "quality_delta": {}
+                }
+                for col in df.columns:
+                    if col.startswith('quality_') and not col.startswith('quality_delta_'):
+                        metric_name = col.replace('quality_', '')
+                        if not any(x in metric_name for x in ['_ci_', '_significant']):
+                            metrics["quality"][metric_name] = row[col]
+                    elif col.startswith('quality_delta_'):
+                        metric_name = col.replace('quality_delta_', '')
+                        if not any(x in metric_name for x in ['_ci_', '_significant']):
+                            metrics["quality_delta"][metric_name] = row[col]
+                scores["cluster_scores"][cluster] = metrics
+    else:
+        # Already in dict format
+        scores = {
+            "model_cluster_scores": model_cluster_scores_dict,
+            "cluster_scores": cluster_scores_dict,
+            "model_scores": model_scores_dict
+        }
+    
+    # Get total conversations
     total_conversations = compute_total_conversations_by_model(req.properties)
-    scores = compute_subset_metrics(long_df, total_conversations)
+    
+    # Enrich clusters with the metrics
     enriched = enrich_clusters_with_metrics(clusters, scores)
 
     # Attach overall proportion and per-property model info for UI consumption
@@ -758,24 +951,37 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
     total_unique_conversations = len(set(str(p.get("question_id", "")) for p in req.properties if p.get("question_id")))
     
     # Save full pipeline results to disk with timestamped directory
+    results_dir: Optional[Path] = None
+    results_dir_name: Optional[str] = None
     try:
-        from datetime import datetime
-        from pathlib import Path
         import json
-        
-        # Create results directory with timestamp
+
+        # Always create timestamp for summary file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        # Use filename from operationalRows if available, otherwise use "clustering"
-        base_filename = "clustering"
-        if req.operationalRows and len(req.operationalRows) > 0:
-            # Extract original filename from __source_filename field
-            first_row = req.operationalRows[0]
-            if "__source_filename" in first_row:
-                base_filename = str(first_row["__source_filename"])
-                # Remove any path components and extension if present
-                base_filename = Path(base_filename).stem
-        
-        results_dir = Path("results") / f"{base_filename}_{timestamp}"
+
+        # Get base results directory (may be on persistent disk)
+        base_results_dir = _get_results_dir()
+
+        # Create results directory - use provided output_dir if available
+        if req.output_dir:
+            # Use the output_dir from the request
+            results_dir = base_results_dir / req.output_dir
+            results_dir_name = req.output_dir
+        else:
+            # Generate a new directory name with timestamp
+            # Use filename from operationalRows if available, otherwise use "clustering"
+            base_filename = "clustering"
+            if req.operationalRows and len(req.operationalRows) > 0:
+                # Extract original filename from __source_filename field
+                first_row = req.operationalRows[0]
+                if "__source_filename" in first_row:
+                    base_filename = str(first_row["__source_filename"])
+                    # Remove any path components and extension if present
+                    base_filename = Path(base_filename).stem
+
+            results_dir = base_results_dir / f"{base_filename}_{timestamp}"
+            results_dir_name = f"{base_filename}_{timestamp}"
+
         results_dir.mkdir(parents=True, exist_ok=True)
         
         logger.info(f"Saving clustering results to {results_dir}")
@@ -833,13 +1039,32 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
     
     # Transform metrics to frontend format (JSONL-style arrays)
     # Convert nested dict format to flat array format expected by frontend
+    
+    # Build cluster_id lookup map from enriched clusters
+    cluster_id_map = {c.get("label"): c.get("id") for c in enriched}
+    
     model_cluster_scores_array = []
     model_cluster_scores_dict = scores.get("model_cluster_scores", {})
+    
+    # Debug: log what we're transforming
+    if model_cluster_scores_dict:
+        sample_model = list(model_cluster_scores_dict.keys())[0]
+        sample_cluster = list(model_cluster_scores_dict[sample_model].keys())[0]
+        sample_metrics = model_cluster_scores_dict[sample_model][sample_cluster]
+        logger.info(f"🔧 Transforming model_cluster_scores to array format:")
+        logger.info(f"  - Sample model: {sample_model}")
+        logger.info(f"  - Sample cluster: {sample_cluster}")
+        logger.info(f"  - Sample metrics keys: {list(sample_metrics.keys())}")
+        logger.info(f"  - Sample quality: {sample_metrics.get('quality')}")
+        logger.info(f"  - Sample quality_delta: {sample_metrics.get('quality_delta')}")
+    
     for model_name, clusters_dict in model_cluster_scores_dict.items():
         for cluster_name, metrics in clusters_dict.items():
             row = {
                 "model": model_name,
                 "cluster": cluster_name,
+                "cluster_id": cluster_id_map.get(cluster_name),  # Add cluster_id for frontend matching
+                "size": metrics.get("size"),  # Add size (number of properties in this model-cluster combo)
                 "proportion": metrics.get("proportion", 0.0),
                 "proportion_delta": metrics.get("proportion_delta"),
             }
@@ -849,14 +1074,27 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             if quality and isinstance(quality, dict):
                 for metric_name, metric_value in quality.items():
                     row[f"quality_{metric_name}"] = metric_value
+            else:
+                logger.debug(f"No quality dict for {model_name}/{cluster_name}: {quality}")
             
             # Flatten quality_delta metrics
             quality_delta = metrics.get("quality_delta")
             if quality_delta and isinstance(quality_delta, dict):
                 for metric_name, metric_value in quality_delta.items():
                     row[f"quality_{metric_name}_delta"] = metric_value
+            else:
+                logger.debug(f"No quality_delta dict for {model_name}/{cluster_name}: {quality_delta}")
+            
+            # Add metadata (contains behavior_type, group, etc.)
+            row["metadata"] = metrics.get("metadata", {})
             
             model_cluster_scores_array.append(row)
+    
+    # Log sample of transformed array
+    if model_cluster_scores_array:
+        logger.info(f"✅ Transformed {len(model_cluster_scores_array)} model_cluster_scores rows")
+        logger.info(f"  - Sample row keys: {list(model_cluster_scores_array[0].keys())}")
+        logger.info(f"  - Sample row: {model_cluster_scores_array[0]}")
     
     # Transform cluster_scores to array format
     cluster_scores_array = []
@@ -864,6 +1102,7 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
     for cluster_name, metrics in cluster_scores_dict.items():
         row = {
             "cluster": cluster_name,
+            "cluster_id": cluster_id_map.get(cluster_name),  # Add cluster_id
             "size": metrics.get("size", 0),
             "proportion": metrics.get("proportion", 0.0),
         }
@@ -880,15 +1119,35 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             for metric_name, metric_value in quality_delta.items():
                 row[f"quality_{metric_name}_delta"] = metric_value
         
+        # Add metadata
+        row["metadata"] = metrics.get("metadata", {})
+        
         cluster_scores_array.append(row)
     
     # Note: model_scores would need to be computed separately if needed
     # For now, we'll return an empty array as it's not computed in this endpoint
     
+    # Persist flattened metrics in expected JSONL format for downstream endpoints/loaders
+    try:
+        if results_dir is not None:
+            import pandas as pd
+            mc_df = pd.DataFrame(model_cluster_scores_array)
+            (results_dir / "model_cluster_scores_df.jsonl").write_text(
+                mc_df.to_json(orient='records', lines=True)
+            )
+            cs_df = pd.DataFrame(cluster_scores_array)
+            (results_dir / "cluster_scores_df.jsonl").write_text(
+                cs_df.to_json(orient='records', lines=True)
+            )
+            logger.info(f"✓ Saved metrics JSONL files under: {results_dir}")
+    except Exception as e:
+        logger.warning(f"Failed to save metrics JSONL files: {e}")
+
     return {
         "clusters": enriched,
         "total_conversations_by_model": total_conversations,
         "total_unique_conversations": total_unique_conversations,
+        "results_dir": results_dir_name,
         "metrics": {
             "model_cluster_scores": model_cluster_scores_array,
             "cluster_scores": cluster_scores_array,
@@ -1280,6 +1539,35 @@ def stream_conversations(
     )
 
 
+@app.post("/results/email")
+def email_results(req: EmailResultsRequest) -> Dict[str, Any]:
+    """Email clustering results to a user.
+
+    Sends a zip file of the results directory to the specified email address.
+    Requires EMAIL_SMTP_SERVER, EMAIL_SENDER, and EMAIL_PASSWORD environment variables.
+
+    Args:
+        req: EmailResultsRequest with email, results_dir, and experiment_name
+
+    Returns:
+        Dict with 'success' boolean and 'message' string
+    """
+    results_dir = _resolve_within_base(req.results_dir)
+    if not results_dir.is_dir():
+        raise HTTPException(status_code=400, detail=f"Not a directory: {results_dir}")
+
+    result = send_results_email(
+        recipient_email=req.email,
+        results_dir=str(results_dir),
+        experiment_name=req.experiment_name
+    )
+
+    if not result['success']:
+        raise HTTPException(status_code=500, detail=result['message'])
+
+    return result
+
+
 # -----------------------------
 # DataFrame operations
 # -----------------------------
@@ -1561,6 +1849,114 @@ def prompt_text(name: str, task_description: Optional[str] = None, method: Optio
     return {"name": name, "text": value}
 
 
+# -----------------------------
+# Explain (tidy → side-by-side)
+# -----------------------------
+
+class TidyRow(BaseModel):
+    """A single tidy row for single-model data.
+
+    Fields:
+        question_id: Optional stable ID used to pair A/B responses; pairs by prompt when absent.
+        prompt: The task text.
+        model: Model name (e.g., 'gpt-4o').
+        model_response: The model's response; accepts string or OAI/chat-like structure.
+        score: Optional dict of metric name → value.
+
+    Additional keys are allowed and passed through to the DataFrame.
+    """
+    question_id: Optional[str] = None
+    prompt: str
+    model: str
+    model_response: Any
+    score: Optional[Dict[str, float]] = None
+
+    class Config:
+        extra = "allow"
+
+
+class ExplainSideBySideTidyRequest(BaseModel):
+    """Request payload to run side-by-side analysis from tidy rows.
+
+    Attributes:
+        method: Must be "side_by_side".
+        model_a: First model to compare; must exist in the tidy data.
+        model_b: Second model to compare; must exist in the tidy data.
+        data: List of tidy rows.
+        score_columns: Optional list of metric column names if not using a 'score' dict per row.
+        sample_size: Optional down-sampling for speed.
+        output_dir: Optional output directory for artifacts.
+    """
+    method: Literal["side_by_side"]
+    model_a: str
+    model_b: str
+    data: List[TidyRow]
+    score_columns: Optional[List[str]] = None
+    sample_size: Optional[int] = None
+    output_dir: Optional[str] = None
+
+
+@app.post("/api/explain/side-by-side")
+def explain_side_by_side_tidy(req: ExplainSideBySideTidyRequest) -> Dict[str, Any]:
+    """Convert tidy data to side-by-side, run explain(), and return results.
+
+    Returns a dictionary with:
+        clustered_df: List of row dicts from the clustered DataFrame
+        model_stats: Dict of DataFrame-like lists for model/cluster scores
+    """
+    rows_count = len(req.data) if getattr(req, "data", None) else 0
+    logger.info(f"BACKEND: /api/explain/side-by-side models={req.model_a} vs {req.model_b} rows={rows_count}")
+    if req.model_a == req.model_b:
+        logger.warning("model_a equals model_b; tidy pairing may yield zero pairs.")
+    if req.method != "side_by_side":
+        raise HTTPException(status_code=422, detail="method must be 'side_by_side'")
+    if not req.model_a or not req.model_b:
+        raise HTTPException(status_code=422, detail="model_a and model_b are required")
+    if not req.data:
+        raise HTTPException(status_code=422, detail="data (non-empty) is required")
+
+    # Construct DataFrame from tidy rows (extra fields preserved)
+    df = pd.DataFrame([r.dict() for r in req.data])
+    logger.debug(f"DataFrame shape: {df.shape}; columns: {list(df.columns)}")
+    if "model" in df.columns:
+        try:
+            models = sorted(df["model"].dropna().astype(str).unique().tolist())
+            logger.debug(f"Unique models in data: {models}")
+        except Exception:
+            pass
+    join_col = "question_id" if ("question_id" in df.columns and df["question_id"].notna().any()) else "prompt"
+    if join_col in df.columns and "model" in df.columns:
+        try:
+            model_sets = df.groupby(join_col)["model"].apply(lambda s: set(s.astype(str)))
+            est_pairs = int(sum(1 for s in model_sets if req.model_a in s and req.model_b in s))
+            logger.info(f"Estimated pairs on '{join_col}': {est_pairs}")
+        except Exception:
+            pass
+
+    # Delegate tidy→SxS conversion and full pipeline to library
+    t0 = time.perf_counter()
+    clustered_df, model_stats = public_api.explain(
+        df=df,
+        method="side_by_side",
+        model_a=req.model_a,
+        model_b=req.model_b,
+        score_columns=req.score_columns,
+        sample_size=req.sample_size,
+        output_dir=req.output_dir,
+    )
+    dt = time.perf_counter() - t0
+    stats_keys = list(model_stats.keys()) if isinstance(model_stats, dict) else []
+    logger.info(f"explain() completed in {dt:.2f}s; rows_out={len(clustered_df)}; model_stats_keys={stats_keys}")
+
+    return {
+        "clustered_df": clustered_df.to_dict(orient="records"),
+        "model_stats": {k: v.to_dict(orient="records") for k, v in (model_stats or {}).items()},
+    }
+
+# Alias without /api prefix for clients calling /explain/side-by-side
+app.add_api_route("/explain/side-by-side", explain_side_by_side_tidy, methods=["POST"])
+
+
 @app.post("/extract/single")
 def extract_single(req: ExtractSingleRequest) -> Dict[str, Any]:
     """Run extraction→parsing→validation for a single row."""
@@ -1588,7 +1984,7 @@ def extract_single(req: ExtractSingleRequest) -> Dict[str, Any]:
         temperature=req.temperature or 0.7,
         top_p=req.top_p or 0.95,
         max_tokens=req.max_tokens or 16000,
-        max_workers=req.max_workers or 16,
+        max_workers=req.max_workers or 64,
         include_scores_in_prompt=False if req.include_scores_in_prompt is None else req.include_scores_in_prompt,
         use_wandb=req.use_wandb or False,
         output_dir=req.output_dir,
@@ -1641,7 +2037,7 @@ def extract_batch(req: ExtractBatchRequest) -> Dict[str, Any]:
         temperature=req.temperature or 0.7,
         top_p=req.top_p or 0.95,
         max_tokens=req.max_tokens or 16000,
-        max_workers=req.max_workers or 16,
+        max_workers=req.max_workers or 64,
         include_scores_in_prompt=False if req.include_scores_in_prompt is None else req.include_scores_in_prompt,
         use_wandb=req.use_wandb or False,
         output_dir=req.output_dir,
@@ -1659,13 +2055,21 @@ def extract_batch(req: ExtractBatchRequest) -> Dict[str, Any]:
         if '__index' in df.columns:
             idx_map: Dict[tuple[str, str], int] = {}
             if method == 'single_model' and 'model' in df.columns:
-                for idx, r in df.iterrows():
-                    idx_map[(str(idx), str(r.get('model', '')))] = int(r['__index'])
+                # Vectorized: ~10x faster than iterrows()
+                idx_map = dict(zip(
+                    zip(df.index.astype(str), df['model'].astype(str)),
+                    df['__index'].astype(int)
+                ))
             elif method == 'side_by_side' and 'model_a' in df.columns and 'model_b' in df.columns:
-                for idx, r in df.iterrows():
-                    ui = int(r['__index'])
-                    idx_map[(str(idx), str(r.get('model_a', '')))] = ui
-                    idx_map[(str(idx), str(r.get('model_b', '')))] = ui
+                # Vectorized: create both model_a and model_b mappings
+                indices_int = df['__index'].astype(int).tolist()
+                indices_str = df.index.astype(str).tolist()
+                model_a_strs = df['model_a'].astype(str).tolist()
+                model_b_strs = df['model_b'].astype(str).tolist()
+                idx_map = {
+                    **{(idx, model_a): ui for idx, model_a, ui in zip(indices_str, model_a_strs, indices_int)},
+                    **{(idx, model_b): ui for idx, model_b, ui in zip(indices_str, model_b_strs, indices_int)}
+                }
             for p in props:
                 key = (str(p.get('question_id')), str(p.get('model')))
                 if key in idx_map:
@@ -1747,23 +2151,47 @@ def _run_extract_job(job: ExtractJob, req: ExtractJobStartRequest):
                 job.state = "cancelled"
                 return
 
+        # Define progress callback to update job status in real-time
+        def update_progress(completed: int, total: int):
+            with _JOBS_LOCK:
+                if job:
+                    job.count_done = completed
+                    job.progress = completed / total if total > 0 else 0.0
+
         # Process all rows at once - NO CHUNKING
         # The extractor already uses parallel workers internally
         # Note: We can't interrupt this mid-process, but user can cancel before it starts
-        result = public_api.extract_properties_only(
-            df,
-            method=method,
-            system_prompt=req.system_prompt,
-            task_description=req.task_description,
+
+        # Create dataset and extractor manually to pass progress callback
+        from stringsight.core.data_objects import PropertyDataset
+        from stringsight.extractors import get_extractor
+        from stringsight.postprocess import LLMJsonParser, PropertyValidator
+        from stringsight.prompts import get_system_prompt
+
+        system_prompt = get_system_prompt(method, req.system_prompt, req.task_description)
+        dataset = PropertyDataset.from_dataframe(df, method=method)
+
+        extractor = get_extractor(
             model_name=req.model_name or "gpt-4.1",
+            system_prompt=system_prompt,
             temperature=req.temperature or 0.7,
             top_p=req.top_p or 0.95,
             max_tokens=req.max_tokens or 16000,
-            max_workers=req.max_workers or 16,
+            max_workers=req.max_workers or 64,
             include_scores_in_prompt=False if req.include_scores_in_prompt is None else req.include_scores_in_prompt,
-            use_wandb=req.use_wandb or False,
-            output_dir=req.output_dir,
+            verbose=False,
+            use_wandb=False,
         )
+
+        # Run extraction with progress callback
+        extracted_dataset = extractor.run(dataset, progress_callback=update_progress)
+
+        # Run parsing and validation
+        parser = LLMJsonParser(fail_fast=False, verbose=False, use_wandb=False)
+        parsed_dataset = parser.run(extracted_dataset)
+
+        validator = PropertyValidator(verbose=False, use_wandb=False)
+        result = validator.run(parsed_dataset)
 
         # result is a PropertyDataset (or (PropertyDataset, failures) in other contexts)
         if isinstance(result, tuple):
@@ -1925,7 +2353,7 @@ async def extract_stream(req: ExtractBatchRequest):
             temperature=req.temperature or 0.7,
             top_p=req.top_p or 0.95,
             max_tokens=req.max_tokens or 16000,
-            max_workers=req.max_workers or 16,
+            max_workers=req.max_workers or 64,
             include_scores_in_prompt=req.include_scores_in_prompt or False,
             verbose=False,
             use_wandb=False,
@@ -1942,21 +2370,32 @@ async def extract_stream(req: ExtractBatchRequest):
         validator = PropertyValidator(verbose=False, use_wandb=False)
         validated_dataset = validator.run(parsed_dataset)
 
+        # Build index map ONCE before streaming (not inside the loop!)
+        idx_map: Dict[tuple[str, str], int] = {}
+        if '__index' in df.columns:
+            if method == 'single_model' and 'model' in df.columns:
+                # Vectorized: ~10x faster than iterrows()
+                idx_map = dict(zip(
+                    zip(df.index.astype(str), df['model'].astype(str)),
+                    df['__index'].astype(int)
+                ))
+            elif method == 'side_by_side' and 'model_a' in df.columns and 'model_b' in df.columns:
+                # Vectorized: create both model_a and model_b mappings
+                indices_int = df['__index'].astype(int).tolist()
+                indices_str = df.index.astype(str).tolist()
+                model_a_strs = df['model_a'].astype(str).tolist()
+                model_b_strs = df['model_b'].astype(str).tolist()
+                idx_map = {
+                    **{(idx, model_a): ui for idx, model_a, ui in zip(indices_str, model_a_strs, indices_int)},
+                    **{(idx, model_b): ui for idx, model_b, ui in zip(indices_str, model_b_strs, indices_int)}
+                }
+
         # Stream properties as JSONL
         for prop in validated_dataset.properties:
             if prop.property_description is not None:  # Only stream valid properties
                 prop_dict = prop.to_dict()
                 # Add row_index if available
-                if '__index' in df.columns:
-                    idx_map: Dict[tuple[str, str], int] = {}
-                    if method == 'single_model' and 'model' in df.columns:
-                        for idx, r in df.iterrows():
-                            idx_map[(str(idx), str(r.get('model', '')))] = int(r['__index'])
-                    elif method == 'side_by_side' and 'model_a' in df.columns and 'model_b' in df.columns:
-                        for idx, r in df.iterrows():
-                            ui = int(r['__index'])
-                            idx_map[(str(idx), str(r.get('model_a', '')))] = ui
-                            idx_map[(str(idx), str(r.get('model_b', '')))] = ui
+                if idx_map:
                     key = (str(prop_dict.get('question_id')), str(prop_dict.get('model')))
                     if key in idx_map:
                         prop_dict['row_index'] = idx_map[key]
@@ -1967,5 +2406,17 @@ async def extract_stream(req: ExtractBatchRequest):
         generate_properties(),
         media_type="application/x-ndjson",
         headers={"X-Extraction-Method": method}
+    )
+
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=port,
+        log_level="info",  # Keep application logs
+        access_log=False   # Disable access logs (the noisy GET requests)
     )
 

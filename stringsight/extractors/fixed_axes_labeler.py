@@ -74,7 +74,4 @@ class FixedAxesLabeler(OpenAIExtractor):
             if isinstance(conversation.responses, str)
             else str(conversation.responses)
         )
-        return (
-            f"# Prompt: {conversation.prompt}\n\n"
-            f"# Model response:\n {response}"
-        ) 
+        return f"# Model response:\n {response}" 

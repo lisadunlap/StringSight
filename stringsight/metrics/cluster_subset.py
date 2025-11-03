@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _build_property_maps(properties: List[Dict[str, Any]]) -> Tuple[Dict[str, Dict[str, Any]], Dict[Tuple[str, str], List[str]]]:
@@ -96,12 +99,16 @@ def prepare_long_frame(
 def _avg_scores(df: pd.DataFrame) -> Dict[str, float]:
     """Compute per-metric mean from a column of score dicts."""
     if df.empty or "scores" not in df.columns:
+        logger.debug("_avg_scores: DataFrame empty or no scores column")
         return {}
     valid = df[df["scores"].apply(lambda x: isinstance(x, dict) and len(x) > 0)]
     if valid.empty:
+        logger.debug(f"_avg_scores: No valid scores found. Total rows: {len(df)}, Sample scores: {df['scores'].head().tolist()}")
         return {}
     score_df = pd.DataFrame(valid["scores"].tolist())
-    return {col: float(score_df[col].mean()) for col in score_df.columns}
+    result = {col: float(score_df[col].mean()) for col in score_df.columns}
+    logger.debug(f"_avg_scores: Computed quality metrics: {result}")
+    return result
 
 
 def compute_total_conversations_by_model(properties: List[Dict[str, Any]]) -> Dict[str, int]:
@@ -189,18 +196,59 @@ def compute_subset_metrics(long_df: pd.DataFrame, total_conversations_by_model: 
         for cluster_name in all_clusters:
             out["model_cluster_scores"][model_name][cluster_name] = {"proportion": 0.0}
     
-    # Fill in actual proportions for models that appear in clusters
+    # Fill in actual proportions and quality metrics for models that appear in clusters
     for model_name, model_sub in base.groupby("model", dropna=False):
         model_name_str = str(model_name)
         denom = int(model_denoms.get(model_name_str, 0))
+        
+        # Compute model's overall quality scores for delta calculation
+        model_quality = _avg_scores(model_sub)
+        
         for cluster_name, sub in model_sub.groupby("cluster", dropna=False):
             cluster_name_str = str(cluster_name)
             numer = len(sub)
             prop = float(numer) / float(denom) if denom > 0 else 0.0
-            out["model_cluster_scores"][model_name_str][cluster_name_str] = {"proportion": prop}
+            
+            # Compute quality scores for this model-cluster combination
+            cluster_quality = _avg_scores(sub)
+            
+            # Compute quality deltas (how this cluster differs from model's overall average)
+            quality_delta = {k: cluster_quality.get(k, 0.0) - model_quality.get(k, 0.0) for k in cluster_quality.keys()}
+            
+            # Compute proportion delta (how this model over/under-represents in this cluster vs average)
+            # Average proportion across all models for this cluster
+            cluster_avg_prop = float(len(base[base["cluster"] == cluster_name])) / float(global_total) if global_total > 0 else 0.0
+            proportion_delta = prop - cluster_avg_prop
+            
+            out["model_cluster_scores"][model_name_str][cluster_name_str] = {
+                "size": int(numer),
+                "proportion": prop,
+                "proportion_delta": proportion_delta,
+                "quality": cluster_quality,
+                "quality_delta": quality_delta,
+            }
+            
+            # Debug log first model-cluster combo
+            if logger.isEnabledFor(logging.DEBUG):
+                if model_name_str == list(all_models)[0] and cluster_name_str == list(all_clusters)[0]:
+                    logger.debug(f"Sample model_cluster_scores for {model_name_str} / {cluster_name_str}:")
+                    logger.debug(f"  - size: {numer}")
+                    logger.debug(f"  - quality: {cluster_quality}")
+                    logger.debug(f"  - quality_delta: {quality_delta}")
 
     # Include total conversation counts in output for frontend display
     out["total_conversations_by_model"] = dict(model_denoms)
+    
+    # Log summary of what was computed
+    if out["model_cluster_scores"]:
+        sample_model = list(out["model_cluster_scores"].keys())[0]
+        sample_cluster = list(out["model_cluster_scores"][sample_model].keys())[0]
+        sample_metrics = out["model_cluster_scores"][sample_model][sample_cluster]
+        logger.info(f"✅ compute_subset_metrics completed:")
+        logger.info(f"  - Models: {len(out['model_cluster_scores'])}")
+        logger.info(f"  - Clusters: {len(out['cluster_scores'])}")
+        logger.info(f"  - Sample metrics keys: {list(sample_metrics.keys())}")
+        logger.info(f"  - Sample quality keys: {list(sample_metrics.get('quality', {}).keys())}")
     
     return out
 

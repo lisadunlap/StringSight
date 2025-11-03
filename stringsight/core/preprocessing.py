@@ -410,7 +410,7 @@ def tidy_to_side_by_side(
     if has_qid:
         base = {"question_id": wide_response["question_id"], **base}
     
-    sxs = pd.DataFrame(base)
+    sxs = pd.DataFrame(base).dropna()
     return sxs
 
 

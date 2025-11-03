@@ -47,10 +47,10 @@ class BaseClusterer(LoggingMixin, TimingMixin, WandbMixin, PipelineStage, ABC):
         self,
         *,
         output_dir: Optional[str] = None,
-        include_embeddings: bool = True,
+        include_embeddings: bool = False,
         use_wandb: bool = False,
         wandb_project: Optional[str] = None,
-        prettify_labels: bool = True,
+        prettify_labels: bool = False,
         config: Optional[ClusterConfig] = None,
         **kwargs: Any,
     ) -> None:
@@ -66,6 +66,9 @@ class BaseClusterer(LoggingMixin, TimingMixin, WandbMixin, PipelineStage, ABC):
             Enable Weights & Biases logging for clustering outputs.
         wandb_project:
             W&B project name to log under when enabled.
+        prettify_labels:
+            Whether to use an LLM to highlight key parts of cluster names in bold for improved readability.
+            Defaults to False to avoid 30-60s overhead from 100+ LLM calls.
         config:
             Optional pre-constructed ClusterConfig to use for this clusterer.
         kwargs:
@@ -74,6 +77,7 @@ class BaseClusterer(LoggingMixin, TimingMixin, WandbMixin, PipelineStage, ABC):
         super().__init__(use_wandb=use_wandb, wandb_project=wandb_project, **kwargs)
         self.output_dir = output_dir
         self.include_embeddings = include_embeddings
+        self.prettify_labels = prettify_labels
         self.config: Optional[ClusterConfig] = config
 
     @abstractmethod
@@ -128,7 +132,7 @@ Do not include any other text in your response."""
             labels_to_process,
             model=config.summary_model,
             system_prompt=system_prompt,
-            max_workers=min(10, len(labels_to_process)),
+            max_workers=min(getattr(config, "llm_max_workers", 10), len(labels_to_process)),
             show_progress=True,
             progress_desc="Prettifying cluster labels"
         )
@@ -209,7 +213,7 @@ Do not include any other text in your response."""
         clustered_df = self.cluster(data, column_name)
         if "meta" not in clustered_df.columns:
             clustered_df["meta"] = [{} for _ in range(len(clustered_df))]
-        clustered_df = self.postprocess_clustered_df(clustered_df, column_name)
+        clustered_df = self.postprocess_clustered_df(clustered_df, column_name, prettify_labels=self.prettify_labels)
 
         clusters = self._build_clusters_from_df(clustered_df, column_name)
         self.add_no_properties_cluster(data, clusters)

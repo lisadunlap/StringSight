@@ -101,6 +101,38 @@ docker build -t stringsight:latest .
 docker run -p 8000:8000 -e OPENAI_API_KEY=$OPENAI_API_KEY stringsight:latest
 ```
 
+### Deploying on Render
+
+**Render Persistent Disk Setup:**
+
+StringSight saves results and cache data to disk. On Render, you need to attach a persistent disk to preserve this data across deployments.
+
+1. **Add a Persistent Disk**:
+   - Go to your Render service → "Disks" tab
+   - Click "Add Disk"
+   - Set mount path to `/var/data` (or your preferred path)
+   - Choose size (e.g., 10-100 GB depending on your needs)
+
+2. **Configure Environment Variable**:
+   ```bash
+   RENDER_DISK_PATH=/var/data
+   ```
+   This tells StringSight to use the persistent disk for all results and cache storage.
+
+3. **Deploy**: Render will automatically trigger a new deployment.
+
+After deployment, check logs to confirm:
+```
+Using Render persistent disk: /var/data
+```
+
+**Important Limitations:**
+- Services with persistent disks cannot scale to multiple instances
+- Zero-downtime deploys are not supported with disks
+- Render creates daily snapshots (retained 7 days) for backup
+
+See **[Render Disk Setup Guide](../../RENDER_DISK_SETUP.md)** for detailed instructions.
+
 ## Monitoring
 
 ### Health Checks

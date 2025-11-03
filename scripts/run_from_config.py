@@ -29,12 +29,13 @@ def _load_config(config_path: str) -> Dict[str, Any]:
 
     Returns:
         A plain Python dictionary with configuration entries. Expected keys:
-        - data_path: str, path to input JSONL
+        - data_path: str, path to input file (.json, .jsonl, or .csv)
         - output_dir: str, directory for results
         - task_description: Optional[str]
         - method: Optional[str] in {"single_model", "side_by_side"}
         - min_cluster_size: Optional[int]
         - embedding_model: Optional[str]
+        - extraction_model: Optional[str]
         - max_workers: Optional[int]
         - disable_wandb: Optional[bool]
         - quiet: Optional[bool]
@@ -44,6 +45,7 @@ def _load_config(config_path: str) -> Dict[str, Any]:
         - model_a: Optional[str]
         - model_b: Optional[str]
         - models: Optional[List[str]] list of model names to include (filters input)
+        - score_columns: Optional[List[str]] list of column names containing scores
     """
     conf = OmegaConf.load(config_path)
     return OmegaConf.to_container(conf, resolve=True)  # type: ignore[return-value]
@@ -108,7 +110,7 @@ Examples:
     )
 
     # Optional overrides mirror run_full_pipeline with a subset of common args
-    parser.add_argument("--data_path", type=str, default=None, help="Override: dataset JSONL path")
+    parser.add_argument("--data_path", type=str, default=None, help="Override: dataset path (.json, .jsonl, or .csv)")
     parser.add_argument("--output_dir", type=str, default=None, help="Override: output directory")
     parser.add_argument(
         "--method",
@@ -121,6 +123,7 @@ Examples:
     parser.add_argument("--no_task_description", action="store_true", help="Disable task description")
     parser.add_argument("--min_cluster_size", type=int, default=None, help="Override: min cluster size")
     parser.add_argument("--embedding_model", type=str, default=None, help="Override: embedding model")
+    parser.add_argument("--extraction_model", type=str, default=None, help="Override: extraction model (default: gpt-4.1)")
     parser.add_argument("--max_workers", type=int, default=None, help="Override: parallel workers")
     parser.add_argument("--sample_size", type=int, default=None, help="Override: sample size")
     parser.add_argument("--disable_wandb", action="store_true", help="Disable Weights & Biases logging (default: enabled)")
@@ -138,6 +141,13 @@ Examples:
             "Optional list of model names to include. When provided and the input is in long/tidy format "
             "(column 'model' exists), the dataset will be filtered to only these models before analysis."
         ),
+    )
+    parser.add_argument(
+        "--score_columns",
+        nargs="+",
+        type=str,
+        default=None,
+        help="Optional list of column names containing score metrics (e.g., accuracy, helpfulness)",
     )
 
     args = parser.parse_args()
@@ -194,6 +204,7 @@ Examples:
         "task_description": task_desc,
         "min_cluster_size": args.min_cluster_size,
         "embedding_model": args.embedding_model,
+        "extraction_model": args.extraction_model,
         "max_workers": args.max_workers,
         "sample_size": args.sample_size,
         "disable_wandb": _bool_flag(args.disable_wandb),
@@ -203,6 +214,7 @@ Examples:
         "model_a": args.model_a,
         "model_b": args.model_b,
         "models": args.models,
+        "score_columns": args.score_columns,
     }
 
     cfg = _merge_overrides(base_cfg, overrides)
@@ -228,6 +240,7 @@ Examples:
         clusterer=cfg.get("clusterer", "hdbscan"),
         min_cluster_size=cfg.get("min_cluster_size", 15),
         embedding_model=cfg.get("embedding_model", "text-embedding-3-small"),
+        extraction_model=cfg.get("extraction_model"),
         max_workers=cfg.get("max_workers", 64),
         use_wandb=use_wandb_flag,
         verbose=verbose,
@@ -237,6 +250,7 @@ Examples:
         model_a=cfg.get("model_a"),
         model_b=cfg.get("model_b"),
         filter_models=cfg.get("models"),
+        score_columns=cfg.get("score_columns"),
     )
 
     return clustered_df, model_stats

@@ -126,6 +126,7 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
             if getattr(self, "output_dir", None):
                 from pathlib import Path
                 import os
+                import json
 
                 # Ensure the directory exists (mkdir ‑p semantics)
                 Path(self.output_dir).mkdir(parents=True, exist_ok=True)
@@ -140,8 +141,73 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
                 # Persist using the JSON format for maximum portability
                 current_data.save(snapshot_path)
 
+                # Also save conversations separately as JSONL
+                conversation_path = os.path.join(self.output_dir, "conversation.jsonl")
+                with open(conversation_path, 'w', encoding='utf-8') as f:
+                    for conv in current_data.conversations:
+                        # Build base conversation dict
+                        conv_dict = {
+                            "question_id": conv.question_id,
+                            "prompt": conv.prompt,
+                        }
+
+                        # Handle side-by-side vs single model format
+                        if isinstance(conv.model, list):
+                            # Side-by-side format
+                            conv_dict["model_a"] = conv.model[0]
+                            conv_dict["model_b"] = conv.model[1]
+                            conv_dict["model_a_response"] = conv.responses[0]
+                            conv_dict["model_b_response"] = conv.responses[1]
+
+                            # Convert scores list to score_a/score_b
+                            if isinstance(conv.scores, list) and len(conv.scores) == 2:
+                                conv_dict["score_a"] = conv.scores[0]
+                                conv_dict["score_b"] = conv.scores[1]
+                            else:
+                                conv_dict["score_a"] = {}
+                                conv_dict["score_b"] = {}
+
+                            # Add meta fields (includes winner)
+                            conv_dict.update(conv.meta)
+                        else:
+                            # Single model format
+                            conv_dict["model"] = conv.model
+                            conv_dict["model_response"] = conv.responses
+                            conv_dict["score"] = conv.scores
+
+                            # Add meta fields
+                            conv_dict.update(conv.meta)
+
+                        # Make JSON-safe and write
+                        conv_dict = current_data._json_safe(conv_dict)
+                        json.dump(conv_dict, f, ensure_ascii=False)
+                        f.write('\n')
+
+                # Save properties separately as JSONL
+                if current_data.properties:
+                    properties_path = os.path.join(self.output_dir, "properties.jsonl")
+                    with open(properties_path, 'w', encoding='utf-8') as f:
+                        for prop in current_data.properties:
+                            prop_dict = current_data._json_safe(prop.to_dict())
+                            json.dump(prop_dict, f, ensure_ascii=False)
+                            f.write('\n')
+
+                # Save clusters separately as JSONL
+                if current_data.clusters:
+                    clusters_path = os.path.join(self.output_dir, "clusters.jsonl")
+                    with open(clusters_path, 'w', encoding='utf-8') as f:
+                        for cluster in current_data.clusters:
+                            cluster_dict = current_data._json_safe(cluster.to_dict())
+                            json.dump(cluster_dict, f, ensure_ascii=False)
+                            f.write('\n')
+
                 if getattr(self, "verbose", False):
                     print(f"   • Saved dataset snapshot: {snapshot_path}")
+                    print(f"   • Saved conversations: {conversation_path}")
+                    if current_data.properties:
+                        print(f"   • Saved properties: {properties_path}")
+                    if current_data.clusters:
+                        print(f"   • Saved clusters: {clusters_path}")
                 
             # except Exception as e:
             #     self.stage_errors[stage.name] = str(e)

@@ -38,12 +38,13 @@ def parse_size_string(size_str: str) -> int:
     return int(number * multipliers[unit])
 
 class Cache:
-    def __init__(self, cache_dir: str = ".cache/stringsight", max_size: Union[str, int] = "50GB"):
+    def __init__(self, cache_dir: str = ".cache/stringsight", max_size: Union[str, int] = "50GB", enable_embeddings: bool = False):
         """Initialize DiskCache-backed cache.
-        
+
         Args:
             cache_dir: Base directory to store cache files
             max_size: Max on-disk cache size in bytes or size string like "50GB"
+            enable_embeddings: Whether to enable embedding caching (default: False)
         """
         import os
         self.cache_dir = Path(os.environ.get("STRINGSIGHT_CACHE_DIR", cache_dir))
@@ -55,9 +56,18 @@ class Cache:
         else:
             size_limit = int(max_size)
         
+        # Check environment variable to disable embedding caching
+        self.enable_embeddings = enable_embeddings and (
+            os.environ.get("STRINGSIGHT_DISABLE_EMBEDDING_CACHE", "0") not in ("1", "true", "True")
+        )
+        
         # Separate namespaces for completions and embeddings
         self._completions = DiskCache(str(self.cache_dir / "completions"), size_limit=size_limit)
-        self._embeddings = DiskCache(str(self.cache_dir / "embeddings"), size_limit=size_limit)
+        # Only initialize embeddings cache if enabled
+        if self.enable_embeddings:
+            self._embeddings = DiskCache(str(self.cache_dir / "embeddings"), size_limit=size_limit)
+        else:
+            self._embeddings = None
 
     def _get_cache_key(self, data: Dict[str, Any]) -> str:
         """Generate deterministic cache key from input data."""
@@ -85,6 +95,10 @@ class Cache:
         Args:
             text_key: Either a string (text only) or tuple of (model, text) for model-namespaced cache
         """
+        # Return None if embedding caching is disabled
+        if not self.enable_embeddings or self._embeddings is None:
+            return None
+            
         # Support both old format (text only) and new format (model, text)
         if isinstance(text_key, tuple):
             model, text = text_key
@@ -112,6 +126,10 @@ class Cache:
             text_key: Either a string (text only) or tuple of (model, text) for model-namespaced cache
             embedding: The embedding vector to cache
         """
+        # Skip if embedding caching is disabled
+        if not self.enable_embeddings or self._embeddings is None:
+            return
+            
         # Support both old format (text only) and new format (model, text)
         if isinstance(text_key, tuple):
             model, text = text_key
@@ -127,4 +145,5 @@ class Cache:
         try:
             self._completions.close()
         finally:
-            self._embeddings.close()
+            if self._embeddings is not None:
+                self._embeddings.close()
