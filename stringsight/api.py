@@ -390,13 +390,14 @@ _get_cache_dir()  # Call this to auto-configure cache if RENDER_DISK_PATH is set
 # from fastapi.middleware.gzip import GZipMiddleware
 # app.add_middleware(GZipMiddleware, minimum_size=10000, compresslevel=1)
 
-# Allow local Vite dev server by default - be permissive for development
+# CORS configuration - allow all origins for development and production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
-    allow_credentials=False,  # Set to False when using allow_origins=["*"]
-    allow_methods=["*"],  # Allow all methods including OPTIONS
+    allow_origins=["*"],  # Allow all origins (cannot use with allow_credentials=True)
+    allow_credentials=False,  # Must be False when using allow_origins=["*"]
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],  # Explicitly allow all HTTP methods
     allow_headers=["*"],  # Allow all headers
+    expose_headers=["*"],  # Expose all headers to frontend
 )
 
 # Include metrics endpoints (basic file serving)
