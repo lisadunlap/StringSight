@@ -31,7 +31,6 @@ dependencies = [
     "tqdm>=4.65.0",
     "pydantic>=1.8.0",
     "litellm>=1.0.0",
-    "sentence-transformers>=5.1.0",
     "bertopic>=0.17.3",
     "hdbscan>=0.8.40",
     "umap-learn>=0.5.9",
@@ -57,6 +56,9 @@ dev = [
     "flake8>=3.8",
     "mypy>=0.900",
 ]
+local-embeddings = [
+    "sentence-transformers>=5.1.0",
+]
 ml = [
     "torch>=2.7.1",
     "transformers>=4.56.1",
@@ -70,6 +72,7 @@ full = [
     "vllm>=0.3.0",
     "jupyter>=1.0.0",
     "ipykernel>=6.0.0",
+    "sentence-transformers>=5.1.0",
 ]
 
 [project.urls]

@@ -5,7 +5,9 @@ scikit-learn>=1.7.1
 tqdm>=4.65.0
 pydantic>=1.8.0
 litellm>=1.0.0
-sentence-transformers>=5.1.0
+# Note: sentence-transformers is optional (only needed for local embedding models)
+# Install with: pip install stringsight[local-embeddings]
+# or: pip install sentence-transformers
 bertopic>=0.17.3
 hdbscan>=0.8.40
 umap-learn>=0.5.9

@@ -72,7 +72,13 @@ def configure_logging(
     # Suppress noisy third-party library logs
     logging.getLogger("LiteLLM").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("openai").setLevel(logging.WARNING)
+    logging.getLogger("numba").setLevel(logging.WARNING)
+
+    # Suppress Numba debug output at the environment level
+    os.environ.setdefault("NUMBA_DISABLE_PERFORMANCE_WARNINGS", "1")
+    os.environ.setdefault("NUMBA_WARNINGS", "0")
 
 
 def get_logger(name: str) -> logging.Logger:

@@ -23,6 +23,10 @@ conda activate stringsight
 # Install StringSight
 pip install -e ".[full]"
 
+
+# Install StringSight in editable mode with dev dependencies
+pip install -e ".[dev]"
+
 # Set API keys
 export OPENAI_API_KEY="your-openai-key"
 export ANTHROPIC_API_KEY="your-anthropic-key"  # optional
@@ -51,19 +55,37 @@ clustered_df, model_stats = explain(
     output_dir="results/test"
 )
 
-# Side-by-side comparison
+# Side-by-side comparison (tidy format)
 df = pd.DataFrame({
-    "prompt": ["What is machine learning?", "Explain quantum computing"],
-    "model_a": ["gpt-4", "gpt-4"],
-    "model_b": ["claude-3", "claude-3"],
-    "model_a_response": ["ML is a subset of AI...", "Quantum computing uses..."],
-    "model_b_response": ["Machine learning involves...", "QC leverages quantum..."],
-    "score": [{"winner": "gpt-4", "helpfulness": 4.2}, {"winner": "claude-3", "helpfulness": 3.8}]
+    "prompt": ["What is ML?", "What is ML?", "Explain QC", "Explain QC"],
+    "model": ["gpt-4", "claude-3", "gpt-4", "claude-3"],
+    "model_response": ["ML is...", "ML involves...", "QC uses...", "QC leverages..."],
+    "score": [{"helpfulness": 4.2}, {"helpfulness": 3.8}, {"helpfulness": 4.5}, {"helpfulness": 4.0}]
+})
+
+# Automatically pairs shared prompts between model_a and model_b
+clustered_df, model_stats = explain(
+    df,
+    method="side_by_side",
+    model_a="gpt-4",
+    model_b="claude-3",
+    output_dir="results/test"
+)
+
+# Using score_columns (alternative to score dict)
+# Instead of a 'score' dict column, you can use separate columns
+df = pd.DataFrame({
+    "prompt": ["What is ML?", "Explain QC"],
+    "model": ["gpt-4", "gpt-4"],
+    "model_response": ["ML is...", "QC uses..."],
+    "accuracy": [0.95, 0.88],
+    "helpfulness": [4.2, 4.5],
+    "clarity": [4.0, 4.3]
 })
 
 clustered_df, model_stats = explain(
     df,
-    method="side_by_side",
+    score_columns=["accuracy", "helpfulness", "clarity"],
     output_dir="results/test"
 )
 ```
@@ -117,6 +139,7 @@ Use the React frontend or other visualization tools to explore your results.
 | Column | Description | Example |
 |--------|-------------|---------|
 | `score` | Evaluation metrics dictionary | `{"accuracy": 0.85, "helpfulness": 4.2}` |
+| `score_columns` | Alternative: separate columns for each metric (e.g., `accuracy`, `helpfulness`) instead of a dict | `score_columns=["accuracy", "helpfulness"]` |
 
 ### Side-by-Side Comparisons
 
@@ -134,7 +157,8 @@ Use the React frontend or other visualization tools to explore your results.
 **Optional Columns:**
 | Column | Description | Example |
 |--------|-------------|---------|
-| `score` | Winner and metrics | `{"winner": "model_a"}` |
+| `score` | Winner and metrics | `{"winner": "model_a", "helpfulness_a": 4.2, "helpfulness_b": 3.8}` |
+| `score_columns` | Alternative: separate columns for each metric with `_a` and `_b` suffixes (e.g., `accuracy_a`, `accuracy_b`) | `score_columns=["accuracy_a", "accuracy_b", "helpfulness_a", "helpfulness_b"]` |
 
 **Option 2: Tidy Data (Auto-pairing)**
 

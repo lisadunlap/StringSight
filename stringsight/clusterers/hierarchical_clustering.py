@@ -43,7 +43,7 @@ from .config import ClusterConfig
 from .clustering_prompts import coarse_clustering_systems_prompt, deduplication_clustering_systems_prompt, outlier_clustering_systems_prompt
 
 # Optional imports (will be checked when needed)
-from sentence_transformers import SentenceTransformer
+# sentence-transformers is optional - imported lazily when needed
 import hdbscan
 import umap
 import litellm
@@ -460,7 +460,6 @@ def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.Dat
             logger.info("Assigning outliers using BERTopic.reduce_outliers...")
         # Use OpenAIBackend if openai model, else None
         if config.embedding_model == "openai":
-            from bertopic.backend import OpenAIBackend
             import openai
             client = openai.OpenAI()
             bertopic_embedding_model = OpenAIBackend(client, "text-embedding-3-large")

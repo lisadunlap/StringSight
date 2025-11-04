@@ -11,7 +11,7 @@ from .public import explain, explain_side_by_side, explain_single_model, explain
 __version__ = "0.3.1"
 __all__ = [
     "explain",
-    "explain_side_by_side", 
+    "explain_side_by_side",
     "explain_single_model",
     "explain_with_custom_pipeline",
     "compute_metrics_only",

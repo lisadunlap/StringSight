@@ -23,6 +23,92 @@ from .caching import Cache
 logger = logging.getLogger(__name__)
 
 
+# ==================== LiteLLM Timing Callback ====================
+try:
+    from litellm.integrations.custom_logger import CustomLogger as LiteLLMCustomLogger
+except ImportError:
+    LiteLLMCustomLogger = object
+
+
+class LLMTimingCallback(LiteLLMCustomLogger):
+    """Custom LiteLLM callback to log API call timing information."""
+
+    def log_pre_api_call(self, model, messages, kwargs):
+        """Called before API call - not used for timing."""
+        pass
+
+    def log_post_api_call(self, kwargs, response_obj, start_time, end_time):
+        """Log timing for every API call."""
+        try:
+            duration = (end_time - start_time).total_seconds()
+            model = kwargs.get("model", "unknown")
+            print(f"[LLM Timing] {model}: {duration:.3f}s", flush=True)
+        except Exception:
+            pass
+
+    def log_success_event(self, kwargs, response_obj, start_time, end_time):
+        """Log successful API calls with detailed timing."""
+        try:
+            duration = (end_time - start_time).total_seconds()
+            model = kwargs.get("model", "unknown")
+
+            # Extract token usage if available
+            usage = getattr(response_obj, 'usage', None)
+            if usage:
+                prompt_tokens = getattr(usage, 'prompt_tokens', 0)
+                completion_tokens = getattr(usage, 'completion_tokens', 0)
+                total_tokens = getattr(usage, 'total_tokens', 0)
+                print(
+                    f"[LLM Success] {model}: {duration:.3f}s | "
+                    f"tokens: {total_tokens} (prompt: {prompt_tokens}, completion: {completion_tokens})",
+                    flush=True
+                )
+            else:
+                print(f"[LLM Success] {model}: {duration:.3f}s", flush=True)
+        except Exception:
+            pass
+
+    def log_failure_event(self, kwargs, response_obj, start_time, end_time):
+        """Log failed API calls."""
+        try:
+            duration = (end_time - start_time).total_seconds()
+            model = kwargs.get("model", "unknown")
+            error = kwargs.get("exception", "unknown error")
+            print(f"[LLM Failure] {model}: {duration:.3f}s | error: {error}", flush=True)
+        except Exception:
+            pass
+
+
+# Global timing callback instance
+_timing_callback = None
+
+
+def enable_timing_logs():
+    """Enable detailed timing logs for all LLM API calls."""
+    global _timing_callback
+    if _timing_callback is None:
+        _timing_callback = LLMTimingCallback()
+        if not hasattr(litellm, 'callbacks') or litellm.callbacks is None:
+            litellm.callbacks = []
+        litellm.callbacks.append(_timing_callback)
+        logger.info("✓ LLM timing logs enabled")
+
+
+def disable_timing_logs():
+    """Disable detailed timing logs for LLM API calls."""
+    global _timing_callback
+    if _timing_callback is not None and hasattr(litellm, 'callbacks'):
+        if litellm.callbacks and _timing_callback in litellm.callbacks:
+            litellm.callbacks.remove(_timing_callback)
+        _timing_callback = None
+        logger.info("✓ LLM timing logs disabled")
+
+
+# Enable timing logs by default
+# enable_timing_logs()  # Disabled by default - call manually to enable
+# ================================================================
+
+
 @dataclass
 class LLMConfig:
     """Configuration for LLM calls."""

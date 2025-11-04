@@ -26,7 +26,7 @@ import wandb
 
 import numpy as np
 import litellm  # type: ignore
-from sentence_transformers import SentenceTransformer  # type: ignore
+# sentence-transformers is optional - imported lazily when needed
 from .clustering_prompts import clustering_systems_prompt, coarse_clustering_systems_prompt, deduplication_clustering_systems_prompt
 from stringsight.logging_config import get_logger
 
@@ -190,6 +190,16 @@ def _get_embeddings(texts: List[str], embedding_model: str, verbose: bool = Fals
     # Treat OpenAI models either as "openai" keyword or provider-prefixed names
     if embedding_model == "openai" or str(embedding_model).startswith("openai/") or embedding_model in {"text-embedding-3-large", "text-embedding-3-small", "e3-large", "e3-small"}:
         return _get_openai_embeddings(texts, model=_normalize_embedding_model_name(embedding_model))
+
+    # Lazy import of sentence-transformers (optional dependency)
+    try:
+        from sentence_transformers import SentenceTransformer  # type: ignore
+    except ImportError:
+        raise ImportError(
+            "sentence-transformers is required for local embedding models. "
+            "Install it with: pip install stringsight[local-embeddings] "
+            "or: pip install sentence-transformers"
+        )
 
     if verbose:
         device = "cuda" if use_gpu else "cpu"
@@ -474,6 +484,15 @@ def _setup_embeddings(texts, embedding_model, verbose=False, use_gpu=False):
             logger.debug(f"[emb-debug] normalized embeddings contain NaN/Inf: nan={nan_cnt} inf={inf_cnt}")
         return embeddings, None
     else:
+        # Lazy import of sentence-transformers (optional dependency)
+        try:
+            from sentence_transformers import SentenceTransformer  # type: ignore
+        except ImportError:
+            raise ImportError(
+                "sentence-transformers is required for local embedding models. "
+                "Install it with: pip install stringsight[local-embeddings] "
+                "or: pip install sentence-transformers"
+            )
         if verbose:
             device = "cuda" if use_gpu else "cpu"
             logger.info(f"Using sentence transformer: {embedding_model} on {device}")
