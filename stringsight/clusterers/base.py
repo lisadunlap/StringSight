@@ -132,7 +132,7 @@ Do not include any other text in your response."""
             labels_to_process,
             model=config.summary_model,
             system_prompt=system_prompt,
-            max_workers=min(getattr(config, "llm_max_workers", 10), len(labels_to_process)),
+            max_workers=min(getattr(config, "llm_max_workers", 64), len(labels_to_process)),
             show_progress=True,
             progress_desc="Prettifying cluster labels"
         )

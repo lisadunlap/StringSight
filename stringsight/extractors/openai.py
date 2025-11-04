@@ -34,7 +34,7 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         temperature: float = 0.7,
         top_p: float = 0.95,
         max_tokens: int = 16000,
-        max_workers: int = 16,
+        max_workers: int = 64,
         cache_dir: str = ".cache/stringsight",
         include_scores_in_prompt: bool = False,
         **kwargs

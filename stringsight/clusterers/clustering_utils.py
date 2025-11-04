@@ -141,7 +141,7 @@ def _get_openai_embeddings_batch(batch: List[str], model: str, retries: int = 3,
             time.sleep(sleep_time)
 
 
-def _get_openai_embeddings(texts: List[str], *, model: str = "openai/text-embedding-3-large", batch_size: int = 100, max_workers: int = 10) -> List[List[float]]:
+def _get_openai_embeddings(texts: List[str], *, model: str = "openai/text-embedding-3-large", batch_size: int = 100, max_workers: int = 64) -> List[List[float]]:
     """Get embeddings for *texts* from the OpenAI API whilst preserving order."""
 
     if not texts:
@@ -323,7 +323,7 @@ def assign_fine_to_coarse(
     model: str = "gpt-4.1-mini",
     strategy: str = "llm",
     verbose: bool = True,
-    max_workers: int = 10,
+    max_workers: int = 64,
 ) -> Dict[str, str]:
     """Assign each fine cluster name to one of the coarse cluster names.
 
@@ -399,12 +399,12 @@ def match_label_names(label_name, label_options):
             return option
     return None
 
-def llm_match(cluster_names, coarse_cluster_names, max_workers=10, model="gpt-4.1-mini"):
+def llm_match(cluster_names, coarse_cluster_names, max_workers=64, model="gpt-4.1-mini"):
     """Match fine-grained cluster names to coarse-grained cluster names using an LLM with parallel processing."""
     coarse_names_text = "\n".join(coarse_cluster_names)
-
+    
     system_prompt = "You are a machine learning expert specializing in the behavior of large language models. Given the following coarse grained properties of model behavior, match the given fine grained property to the coarse grained property that it most closely resembles. Respond with the name of the coarse grained property that the fine grained property most resembles. If it is okay if the match is not perfect, just respond with the property that is most similar. If the fine grained property has absolutely no relation to any of the coarse grained properties, respond with 'Outliers'. Do NOT include anything but the name of the coarse grained property in your response."
-
+    
     # Build user messages for each fine cluster name
     messages = []
     for fine_name in cluster_names:
@@ -504,7 +504,7 @@ def _get_openai_embeddings_batch_litellm(batch, retries=3, sleep_time=2.0):
 
 
 # NOTE: renamed to avoid overriding the DiskCache-cached version defined earlier
-def _get_openai_embeddings_litellm(texts, batch_size=100, max_workers=10):
+def _get_openai_embeddings_litellm(texts, batch_size=100, max_workers=64):
     """Get embeddings using OpenAI API (LiteLLM cache)."""
 
     if not texts:

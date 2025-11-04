@@ -61,14 +61,14 @@ class HDBSCANClusterer(BaseClusterer):
         umap_metric: str = "cosine",
         context: Optional[str] = None,
         groupby_column: Optional[str] = None,
-        parallel_clustering: bool = False,
+        parallel_clustering: bool = True,
         precomputed_embeddings: Optional[object] = None,
         cache_embeddings: bool = False,
         input_model_name: Optional[str] = None,
         summary_model: str = "gpt-4.1",
         cluster_assignment_model: str = "gpt-4.1-mini",
         verbose: bool = True,
-        llm_max_workers: int = 10,
+        llm_max_workers: int = 64,
         **kwargs,
     ):
         """Initialize the HDBSCAN clusterer with explicit, overridable parameters.
@@ -174,7 +174,7 @@ class HDBSCANClusterer(BaseClusterer):
 
                 # Process groups in parallel
                 clustered_parts = []
-                max_workers = min(len(groups), getattr(self.config, 'llm_max_workers', 10))
+                max_workers = min(len(groups), getattr(self.config, 'llm_max_workers', 64))
                 with ThreadPoolExecutor(max_workers=max_workers) as executor:
                     futures = {executor.submit(_cluster_group, group_info): idx
                               for idx, group_info in enumerate(groups)}

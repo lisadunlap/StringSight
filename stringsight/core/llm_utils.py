@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class LLMConfig:
     """Configuration for LLM calls."""
     model: str = "gpt-4o-mini"
-    max_workers: int = 10
+    max_workers: int = 64
     max_retries: int = 3
     base_sleep_time: float = 2.0
     timeout: Optional[float] = None
@@ -41,7 +41,7 @@ class EmbeddingConfig:
     """Configuration for embedding calls."""
     model: str = "text-embedding-3-small"
     batch_size: int = 100
-    max_workers: int = 10
+    max_workers: int = 64
     max_retries: int = 3
     base_sleep_time: float = 2.0
 
@@ -356,7 +356,7 @@ def parallel_completions(
     messages: List[Union[str, List[Dict[str, Any]]]],
     model: str = "gpt-4o-mini",
     system_prompt: Optional[str] = None,
-    max_workers: int = 10,
+    max_workers: int = 64,
     show_progress: bool = True,
     progress_desc: str = "LLM calls",
     progress_callback: Optional[Callable[[int, int], None]] = None,
@@ -376,7 +376,7 @@ def parallel_embeddings(
     texts: List[str],
     model: str = "text-embedding-3-small",
     batch_size: int = 100,
-    max_workers: int = 10,
+    max_workers: int = 64,
     show_progress: bool = True,
     progress_desc: str = "Embedding calls",
     **kwargs

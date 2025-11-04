@@ -48,7 +48,7 @@ class ClusterConfig:
     cluster_selection_epsilon: float = 0.05  # Small epsilon to merge very similar clusters
     cache_embeddings: bool = False
     groupby_column: Optional[str] = None # if not None, the data will be grouped by this column before clustering
-    parallel_clustering: bool = True  # if True, parallelize clustering when groupby_column is set
+    parallel_clustering: bool = False  # if True, parallelize clustering when groupby_column is set
 
     # Model settings
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
@@ -56,7 +56,7 @@ class ClusterConfig:
     summary_model: str = "gpt-4.1"
     cluster_assignment_model: str = "gpt-4.1-mini"
     # Parallelism for LLM calls used during clustering (summaries, matching, prettify)
-    llm_max_workers: int = 10
+    llm_max_workers: int = 64
 
     # GPU acceleration (auto-detected by default)
     use_gpu: Optional[bool] = None  # None means auto-detect; will be set in __post_init__

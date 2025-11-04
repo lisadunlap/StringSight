@@ -4,6 +4,7 @@ results/
 benchmark/results/
 benchmark/evaluation_results/
 helm/
+tests/outputs/
 
 # Large downloaded SDKs and archives
 google-cloud-sdk/

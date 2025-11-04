@@ -15,7 +15,7 @@ def get_extractor(
     temperature: float = 0.6,
     top_p: float = 0.95,
     max_tokens: int = 16000,
-    max_workers: int = 16,
+    max_workers: int = 64,
     include_scores_in_prompt: bool = False,
     **kwargs
 ) -> PipelineStage:

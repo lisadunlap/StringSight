@@ -35,7 +35,7 @@ def main():
         max_coarse_clusters=12,
         embedding_model="text-embedding-3-small",
         hierarchical=False,
-        max_workers=32,
+        max_workers=64,
         use_wandb=False,
         verbose=True,
         sample_size=20,

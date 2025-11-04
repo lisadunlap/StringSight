@@ -35,7 +35,6 @@ def _load_config(config_path: str) -> Dict[str, Any]:
         - method: Optional[str] in {"single_model", "side_by_side"}
         - min_cluster_size: Optional[int]
         - embedding_model: Optional[str]
-        - extraction_model: Optional[str]
         - max_workers: Optional[int]
         - disable_wandb: Optional[bool]
         - quiet: Optional[bool]
@@ -46,6 +45,9 @@ def _load_config(config_path: str) -> Dict[str, Any]:
         - model_b: Optional[str]
         - models: Optional[List[str]] list of model names to include (filters input)
         - score_columns: Optional[List[str]] list of column names containing scores
+        - extraction_model: Optional[str] model for property extraction
+        - summary_model: Optional[str] model for cluster summarization
+        - cluster_assignment_model: Optional[str] model for cluster matching
     """
     conf = OmegaConf.load(config_path)
     return OmegaConf.to_container(conf, resolve=True)  # type: ignore[return-value]
@@ -123,7 +125,6 @@ Examples:
     parser.add_argument("--no_task_description", action="store_true", help="Disable task description")
     parser.add_argument("--min_cluster_size", type=int, default=None, help="Override: min cluster size")
     parser.add_argument("--embedding_model", type=str, default=None, help="Override: embedding model")
-    parser.add_argument("--extraction_model", type=str, default=None, help="Override: extraction model (default: gpt-4.1)")
     parser.add_argument("--max_workers", type=int, default=None, help="Override: parallel workers")
     parser.add_argument("--sample_size", type=int, default=None, help="Override: sample size")
     parser.add_argument("--disable_wandb", action="store_true", help="Disable Weights & Biases logging (default: enabled)")
@@ -149,6 +150,9 @@ Examples:
         default=None,
         help="Optional list of column names containing score metrics (e.g., accuracy, helpfulness)",
     )
+    parser.add_argument("--extraction_model", type=str, default=None, help="Override: model for property extraction (e.g., gpt-4.1)")
+    parser.add_argument("--summary_model", type=str, default=None, help="Override: model for cluster summarization (e.g., gpt-4.1)")
+    parser.add_argument("--cluster_assignment_model", type=str, default=None, help="Override: model for cluster matching (e.g., gpt-4.1-mini)")
 
     args = parser.parse_args()
 
@@ -204,7 +208,6 @@ Examples:
         "task_description": task_desc,
         "min_cluster_size": args.min_cluster_size,
         "embedding_model": args.embedding_model,
-        "extraction_model": args.extraction_model,
         "max_workers": args.max_workers,
         "sample_size": args.sample_size,
         "disable_wandb": _bool_flag(args.disable_wandb),
@@ -215,6 +218,9 @@ Examples:
         "model_b": args.model_b,
         "models": args.models,
         "score_columns": args.score_columns,
+        "extraction_model": args.extraction_model,
+        "summary_model": args.summary_model,
+        "cluster_assignment_model": args.cluster_assignment_model,
     }
 
     cfg = _merge_overrides(base_cfg, overrides)
@@ -240,7 +246,6 @@ Examples:
         clusterer=cfg.get("clusterer", "hdbscan"),
         min_cluster_size=cfg.get("min_cluster_size", 15),
         embedding_model=cfg.get("embedding_model", "text-embedding-3-small"),
-        extraction_model=cfg.get("extraction_model"),
         max_workers=cfg.get("max_workers", 64),
         use_wandb=use_wandb_flag,
         verbose=verbose,
@@ -251,6 +256,9 @@ Examples:
         model_b=cfg.get("model_b"),
         filter_models=cfg.get("models"),
         score_columns=cfg.get("score_columns"),
+        extraction_model=cfg.get("extraction_model"),
+        summary_model=cfg.get("summary_model"),
+        cluster_assignment_model=cfg.get("cluster_assignment_model"),
     )
 
     return clustered_df, model_stats

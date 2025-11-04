@@ -88,7 +88,6 @@ def run_pipeline(
     clusterer="hdbscan",
     min_cluster_size=15,
     embedding_model="text-embedding-3-small",
-    extraction_model: Optional[str] = None,
     max_workers=64,
     use_wandb=True,
     verbose=False,
@@ -104,18 +103,25 @@ def run_pipeline(
     model_b: Optional[str] = None,
     filter_models: Optional[List[str]] = None,
     score_columns: Optional[List[str]] = None,
+    extraction_model: Optional[str] = None,
+    summary_model: Optional[str] = None,
+    cluster_assignment_model: Optional[str] = None,
 ):
     """Run the complete pipeline on a dataset.
 
     Args:
-        extraction_model: Optional model name for property extraction (e.g., 'gpt-4o', 'claude-3-5-sonnet').
-            If not provided, uses the default model ('gpt-4.1').
         filter_models: Optional list of model names. When provided and the
             input is in long/tidy format with a 'model' column, the dataset is
             filtered to only these models before further processing.
         score_columns: Optional list of column names containing score metrics.
             Instead of providing scores as a dictionary in a single column,
             you can specify separate columns for each metric.
+        extraction_model: Optional model name for property extraction (e.g., 'gpt-4.1').
+            If not provided, uses the default from explain().
+        summary_model: Optional model name for cluster summarization (e.g., 'gpt-4.1').
+            If not provided, uses the default from ClusterConfig.
+        cluster_assignment_model: Optional model name for cluster matching (e.g., 'gpt-4.1-mini').
+            If not provided, uses the default from ClusterConfig.
     """
     
     # Create output directory
@@ -165,6 +171,8 @@ def run_pipeline(
     
     # Run the full pipeline
     print("Running full pipeline with explain()...")
+
+    # Build kwargs for explain() call
     explain_kwargs = {
         "method": method,
         "system_prompt": system_prompt,
@@ -182,13 +190,19 @@ def run_pipeline(
         "metrics_cache_dir": metrics_cache_dir,
         "metrics_kwargs": metrics_kwargs,
         "groupby_column": groupby_column,
-        "track_costs": True,
+        "track_costs": True,  # Enable cost tracking
         "model_a": model_a,
         "model_b": model_b,
         "score_columns": score_columns,
     }
+
+    # Add model parameters if provided
     if extraction_model is not None:
         explain_kwargs["model_name"] = extraction_model
+    if summary_model is not None:
+        explain_kwargs["summary_model"] = summary_model
+    if cluster_assignment_model is not None:
+        explain_kwargs["cluster_assignment_model"] = cluster_assignment_model
 
     clustered_df, model_stats = explain(df, **explain_kwargs)
     
@@ -290,8 +304,8 @@ def main():
                         help="Minimum cluster size (default: 15)")
     parser.add_argument("--embedding_model", type=str, default="text-embedding-3-small",
                         help="Embedding model to use (default: openai)")
-    parser.add_argument("--max_workers", type=int, default=16,
-                        help="Maximum number of workers (default: 4)")
+    parser.add_argument("--max_workers", type=int, default=64,
+                        help="Maximum number of workers (default: 64)")
     parser.add_argument("--sample_size", type=int, default=None,
                         help="Sample size to use (default: use full dataset)")
     
@@ -316,6 +330,12 @@ def main():
                         ))
     parser.add_argument("--score_columns", nargs="+", type=str, default=None,
                         help="Optional list of column names containing score metrics (e.g., accuracy, helpfulness)")
+    parser.add_argument("--extraction_model", type=str, default=None,
+                        help="Model for property extraction (e.g., gpt-4.1)")
+    parser.add_argument("--summary_model", type=str, default=None,
+                        help="Model for cluster summarization (e.g., gpt-4.1)")
+    parser.add_argument("--cluster_assignment_model", type=str, default=None,
+                        help="Model for cluster matching/assignment (e.g., gpt-4.1-mini)")
 
     args = parser.parse_args()
     
@@ -338,6 +358,9 @@ def main():
         model_a=args.model_a,
         model_b=args.model_b,
         score_columns=args.score_columns,
+        extraction_model=args.extraction_model,
+        summary_model=args.summary_model,
+        cluster_assignment_model=args.cluster_assignment_model,
     )
     
     print(f"\nResults saved to: {args.output_dir}")

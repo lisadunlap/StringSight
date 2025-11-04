@@ -26,7 +26,7 @@ class FixedAxesLabeler(OpenAIExtractor):
         temperature: float = 0.0,
         top_p: float = 1.0,
         max_tokens: int = 2048,
-        max_workers: int = 8,
+        max_workers: int = 64,
         cache_dir: str = ".cache/stringsight",
         prompt_builder: Optional[Callable] = None,
         **kwargs: Any,

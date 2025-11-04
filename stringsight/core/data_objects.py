@@ -229,7 +229,7 @@ class PropertyDataset:
             oai_results = [None] * len(rows_list)
 
             # Process conversions in parallel
-            with ThreadPoolExecutor(max_workers=min(32, len(rows_list))) as executor:
+            with ThreadPoolExecutor(max_workers=min(64, len(rows_list))) as executor:
                 futures = {executor.submit(_process_side_by_side_row, (idx, row)): idx
                           for idx, row in enumerate(rows_list)}
                 for future in as_completed(futures):
@@ -329,7 +329,7 @@ class PropertyDataset:
             oai_results = [None] * len(rows_list)
 
             # Process conversions in parallel
-            with ThreadPoolExecutor(max_workers=min(32, len(rows_list))) as executor:
+            with ThreadPoolExecutor(max_workers=min(64, len(rows_list))) as executor:
                 futures = {executor.submit(_process_single_model_row, (idx, row)): idx
                           for idx, row in enumerate(rows_list)}
                 for future in as_completed(futures):

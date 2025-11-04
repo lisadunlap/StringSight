@@ -267,7 +267,7 @@ def generate_cluster_summaries(cluster_values: Dict[int, List], config: ClusterC
         messages,
         model=config.summary_model,
         system_prompt=clustering_systems_prompt,
-        max_workers=getattr(config, 'llm_max_workers', 10),
+        max_workers=getattr(config, 'llm_max_workers', 64),
         show_progress=config.verbose,
         progress_desc=f"Generating {cluster_type} summaries"
     )
@@ -520,7 +520,7 @@ def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.Dat
             model=config.cluster_assignment_model,
             strategy="llm",
             verbose=config.verbose,
-            max_workers=getattr(config, 'llm_max_workers', 10),
+            max_workers=getattr(config, 'llm_max_workers', 64),
         )
         
         if config.verbose:
@@ -597,7 +597,7 @@ def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.Dat
             model=config.cluster_assignment_model,
             strategy="llm",
             verbose=config.verbose,
-            max_workers=getattr(config, 'llm_max_workers', 10),
+            max_workers=getattr(config, 'llm_max_workers', 64),
         )
 
         # -------------------------------------------------------------

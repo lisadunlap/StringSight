@@ -27,7 +27,7 @@ def extract_properties_only(
     temperature: float = 0.7,
     top_p: float = 0.95,
     max_tokens: int = 16000,
-    max_workers: int = 16,
+    max_workers: int = 64,
     include_scores_in_prompt: bool = False,
     # Logging & output
     use_wandb: bool = True,
@@ -139,7 +139,7 @@ def explain(
     temperature: float = 0.7,
     top_p: float = 0.95,
     max_tokens: int = 16000,
-    max_workers: int = 16,
+    max_workers: int = 64,
     include_scores_in_prompt: bool = False,
     # Clustering parameters  
     clusterer: Union[str, "PipelineStage"] = "hdbscan",
@@ -618,7 +618,7 @@ def _build_default_pipeline(
     # Ensure LLM concurrency for clustering calls follows extraction max_workers by default
     # unless explicitly overridden by caller via kwargs
     clusterer_kwargs.setdefault('llm_max_workers', max_workers)
-
+    
     # Add cache directory for clustering if provided
     if clustering_cache_dir:
         clusterer_kwargs['cache_dir'] = clustering_cache_dir
@@ -940,7 +940,7 @@ def label(
     temperature: float = 0.0,
     top_p: float = 1.0,
     max_tokens: int = 2048,
-    max_workers: int = 8,
+    max_workers: int = 64,
     metrics_kwargs: Optional[Dict[str, Any]] = None,
     use_wandb: bool = True,
     wandb_project: Optional[str] = None,
