@@ -420,11 +420,21 @@ class PropertyDataset:
             prop_df = pd.DataFrame([p.to_dict() for p in self.properties])
             logger.debug(f"len of base df {len(df)}")
             if "model_a" in df.columns and "model_b" in df.columns:
-                df = df.merge(prop_df, on=["question_id"], how="left").drop_duplicates(subset="id")
+                # For side-by-side inputs, merge properties by question_id (both models share the question)
+                df = df.merge(prop_df, on=["question_id"], how="left")
+                # Deduplicate by property id when available
+                if "id" in df.columns:
+                    df = df.drop_duplicates(subset="id")
+                    # Alias for clarity: id refers to property id
+                    if "property_id" not in df.columns:
+                        df["property_id"] = df["id"]
             else:
                 # CHANGE: Use left join to preserve all conversations, including those without properties
                 # Don't drop duplicates to ensure conversations without properties are preserved
                 df = df.merge(prop_df, on=["question_id", "model"], how="left")
+                # Alias when present
+                if "id" in df.columns and "property_id" not in df.columns:
+                    df["property_id"] = df["id"]
             logger.debug(f"len of df after merge with properties {len(df)}")
 
             # ------------------------------------------------------------------
@@ -459,18 +469,18 @@ class PropertyDataset:
                     inplace=True,
                 )
                 # Explode aligned list columns so each row maps to a single property
+                # Explode only aligned columns to avoid mismatched element counts
                 list_cols = [
                     col for col in [
                         "property_description",
-                        "property_ids",
                         "question_ids",
                     ] if col in cluster_df.columns
                 ]
                 if list_cols:
                     try:
                         cluster_df = cluster_df.explode(list_cols, ignore_index=True)
-                    except TypeError:
-                        # Fallback for older pandas: explode sequentially to preserve alignment
+                    except (TypeError, ValueError):
+                        # Fallback: explode sequentially to avoid alignment constraints
                         for col in list_cols:
                             cluster_df = cluster_df.explode(col, ignore_index=True)
                 df = df.merge(cluster_df, on=["property_description"], how="left")

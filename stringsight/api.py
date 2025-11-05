@@ -634,16 +634,26 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
         if not score_columns_to_use and req.operationalRows:
             import pandas as pd
             operational_df = pd.DataFrame(req.operationalRows)
-            
-            # Check if 'score' column already exists (nested dict format)
-            if 'score' in operational_df.columns:
+
+            # Check if 'score' or 'scores' column already exists (nested dict format)
+            # Frontend may send either 'score' (singular) or 'scores' (plural)
+            score_column_name = None
+            if 'scores' in operational_df.columns:
+                score_column_name = 'scores'
+            elif 'score' in operational_df.columns:
+                score_column_name = 'score'
+
+            if score_column_name:
                 # Check if it's actually a dict (not a string or number)
-                sample_score = operational_df['score'].iloc[0] if len(operational_df) > 0 else None
+                sample_score = operational_df[score_column_name].iloc[0] if len(operational_df) > 0 else None
                 if not isinstance(sample_score, dict):
-                    logger.info("'score' column exists but is not a dict - will attempt to detect score columns")
+                    logger.info(f"'{score_column_name}' column exists but is not a dict - will attempt to detect score columns")
                 else:
-                    logger.info("'score' column already in nested dict format - no conversion needed")
+                    logger.info(f"'{score_column_name}' column already in nested dict format - no conversion needed")
                     score_columns_to_use = None
+                    # Normalize to 'score' for consistency
+                    if score_column_name == 'scores':
+                        operational_df['score'] = operational_df['scores']
             else:
                 # Try to detect score columns based on naming patterns
                 # Look for columns like: score_X, X_score, helpfulness, accuracy, etc.
@@ -669,7 +679,19 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
                     score_columns_to_use = potential_score_cols
                 else:
                     logger.info("No score columns detected")
-        
+
+            # If we normalized 'scores' to 'score', update req.operationalRows
+            if score_column_name == 'scores':
+                logger.info("🔄 Normalizing 'scores' column to 'score' for backend compatibility")
+                req.operationalRows = operational_df.to_dict('records')
+                # Log sample after normalization
+                if req.operationalRows:
+                    sample = req.operationalRows[0]
+                    logger.info(f"  ✓ Sample after normalization:")
+                    logger.info(f"    - Has 'score' key: {'score' in sample}")
+                    logger.info(f"    - Score value: {sample.get('score')}")
+                    logger.info(f"    - Score type: {type(sample.get('score'))}")
+
         # Convert score columns if needed
         if score_columns_to_use:
             logger.info(f"Converting score columns to dict format: {score_columns_to_use}")
@@ -773,7 +795,11 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
                     logger.warning(f"  Sample from operationalRows: question_id='{req.operationalRows[0].get('question_id')}' (type: {type(req.operationalRows[0].get('question_id'))}), model='{req.operationalRows[0].get('model')}' (type: {type(req.operationalRows[0].get('model'))})")
             
             # Create minimal conversation (use empty data if no matching row found)
-            scores = matching_row.get("score", {}) if matching_row else {}
+            # Try both 'score' and 'scores' fields for compatibility
+            if matching_row:
+                scores = matching_row.get("score") or matching_row.get("scores") or {}
+            else:
+                scores = {}
             
             conv = ConversationRecord(
                 question_id=question_id,
@@ -784,8 +810,21 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
                 meta={}
             )
             conversations.append(conv)
-        
+
         logger.info(f"✅ Matched {matches_found}/{len(property_keys)} conversations with operationalRows")
+
+        # Enhanced logging for debugging quality metrics
+        if matches_found > 0 and conversations:
+            # Log sample conversation scores
+            sample_conv = conversations[0]
+            logger.info(f"📊 Score field verification:")
+            logger.info(f"  - Sample conversation has scores: {bool(sample_conv.scores)}")
+            logger.info(f"  - Scores type: {type(sample_conv.scores)}")
+            logger.info(f"  - Scores content: {sample_conv.scores}")
+            if isinstance(sample_conv.scores, dict):
+                logger.info(f"  - Score keys: {list(sample_conv.scores.keys())}")
+        else:
+            logger.warning("⚠️ No conversations matched with operationalRows - quality metrics will be empty!")
         
         # Create PropertyDataset with matching conversations and properties
         dataset = PropertyDataset(
@@ -895,7 +934,26 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
     model_cluster_scores_dict = clustered_dataset.model_stats.get("model_cluster_scores", {})
     cluster_scores_dict = clustered_dataset.model_stats.get("cluster_scores", {})
     model_scores_dict = clustered_dataset.model_stats.get("model_scores", {})
-    
+
+    # Debug: Log what was extracted from model_stats
+    logger.info(f"📈 After FunctionalMetrics computation:")
+    logger.info(f"  - model_cluster_scores type: {type(model_cluster_scores_dict)}")
+    logger.info(f"  - cluster_scores type: {type(cluster_scores_dict)}")
+    logger.info(f"  - model_scores type: {type(model_scores_dict)}")
+
+    if hasattr(model_cluster_scores_dict, 'shape'):
+        logger.info(f"  - model_cluster_scores shape: {model_cluster_scores_dict.shape}")
+        logger.info(f"  - model_cluster_scores columns: {list(model_cluster_scores_dict.columns)}")
+    if hasattr(cluster_scores_dict, 'shape'):
+        logger.info(f"  - cluster_scores shape: {cluster_scores_dict.shape}")
+        logger.info(f"  - cluster_scores columns: {list(cluster_scores_dict.columns)}")
+    if hasattr(model_scores_dict, 'shape'):
+        logger.info(f"  - model_scores shape: {model_scores_dict.shape}")
+        logger.info(f"  - model_scores columns: {list(model_scores_dict.columns)}")
+        # Check if quality columns exist
+        quality_cols = [col for col in model_scores_dict.columns if col.startswith('quality_')]
+        logger.info(f"  - model_scores quality columns: {quality_cols}")
+
     # Convert to the format expected by the rest of the code
     # FunctionalMetrics returns DataFrames, convert back to nested dicts
     if hasattr(model_cluster_scores_dict, 'to_dict'):
@@ -1196,10 +1254,96 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
         row["metadata"] = metrics.get("metadata", {})
         
         cluster_scores_array.append(row)
-    
-    # Note: model_scores would need to be computed separately if needed
-    # For now, we'll return an empty array as it's not computed in this endpoint
-    
+
+    # Transform model_scores to array format
+    model_scores_array = []
+    model_scores_dict = scores.get("model_scores", {})
+
+    # Check if model_scores_dict is a DataFrame (from FunctionalMetrics)
+    if hasattr(model_scores_dict, 'to_dict'):
+        # It's a DataFrame, convert to dict first
+        import pandas as pd
+        df = model_scores_dict
+
+        logger.info(f"🔧 Transforming model_scores DataFrame to array format:")
+        logger.info(f"  - DataFrame shape: {df.shape}")
+        logger.info(f"  - DataFrame columns: {list(df.columns)}")
+
+        for _, row in df.iterrows():
+            model_name = row['model']
+
+            model_row = {
+                "model": model_name,
+                "size": row.get('size', 0),
+                # Don't include 'cluster' field for model_scores (it's aggregated across all clusters)
+            }
+
+            # Flatten quality metrics: quality_helpfulness -> quality_helpfulness
+            for col in df.columns:
+                if col.startswith('quality_') and not col.startswith('quality_delta_'):
+                    if not any(x in col for x in ['_ci_', '_significant']):
+                        model_row[col] = row[col]
+                elif col.startswith('quality_delta_'):
+                    if not any(x in col for x in ['_ci_', '_significant']):
+                        model_row[col] = row[col]
+
+            # Add confidence intervals if they exist
+            for col in df.columns:
+                if '_ci_lower' in col or '_ci_upper' in col or '_significant' in col:
+                    model_row[col] = row[col]
+
+            model_scores_array.append(model_row)
+    else:
+        # It's already a dict, transform it similar to cluster_scores
+        for model_name, metrics in model_scores_dict.items():
+            if not isinstance(metrics, dict):
+                continue
+
+            row = {
+                "model": model_name,
+                "size": metrics.get("size", 0),
+            }
+
+            # Flatten quality metrics
+            quality = metrics.get("quality")
+            if quality and isinstance(quality, dict):
+                for metric_name, metric_value in quality.items():
+                    row[f"quality_{metric_name}"] = metric_value
+
+            # Flatten quality_delta metrics
+            quality_delta = metrics.get("quality_delta")
+            if quality_delta and isinstance(quality_delta, dict):
+                for metric_name, metric_value in quality_delta.items():
+                    row[f"quality_{metric_name}_delta"] = metric_value
+
+            # Add confidence intervals if they exist
+            quality_ci = metrics.get("quality_ci", {})
+            for metric_name, ci_dict in quality_ci.items():
+                if isinstance(ci_dict, dict):
+                    row[f"quality_{metric_name}_ci_lower"] = ci_dict.get("lower")
+                    row[f"quality_{metric_name}_ci_upper"] = ci_dict.get("upper")
+
+            quality_delta_ci = metrics.get("quality_delta_ci", {})
+            for metric_name, ci_dict in quality_delta_ci.items():
+                if isinstance(ci_dict, dict):
+                    row[f"quality_delta_{metric_name}_ci_lower"] = ci_dict.get("lower")
+                    row[f"quality_delta_{metric_name}_ci_upper"] = ci_dict.get("upper")
+
+            # Add significance flags if they exist
+            quality_delta_significant = metrics.get("quality_delta_significant", {})
+            for metric_name, is_significant in quality_delta_significant.items():
+                row[f"quality_delta_{metric_name}_significant"] = is_significant
+
+            model_scores_array.append(row)
+
+    # Log the transformed model_scores
+    if model_scores_array:
+        logger.info(f"✅ Transformed {len(model_scores_array)} model_scores rows")
+        logger.info(f"  - Sample row keys: {list(model_scores_array[0].keys())}")
+        logger.info(f"  - Sample row: {model_scores_array[0]}")
+    else:
+        logger.warning("⚠️ No model_scores computed - this may indicate missing quality metrics in the data")
+
     # Persist flattened metrics in expected JSONL format for downstream endpoints/loaders
     try:
         if results_dir is not None:
@@ -1212,6 +1356,12 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             (results_dir / "cluster_scores_df.jsonl").write_text(
                 cs_df.to_json(orient='records', lines=True)
             )
+            # Save model_scores as well
+            if model_scores_array:
+                ms_df = pd.DataFrame(model_scores_array)
+                (results_dir / "model_scores_df.jsonl").write_text(
+                    ms_df.to_json(orient='records', lines=True)
+                )
             logger.info(f"✓ Saved metrics JSONL files under: {results_dir}")
     except Exception as e:
         logger.warning(f"Failed to save metrics JSONL files: {e}")
@@ -1224,7 +1374,7 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
         "metrics": {
             "model_cluster_scores": model_cluster_scores_array,
             "cluster_scores": cluster_scores_array,
-            "model_scores": []  # Not computed in clustering-only endpoint
+            "model_scores": model_scores_array  # Now properly computed and transformed
         }
     }
 

@@ -1,16 +1,20 @@
 data_path: data/helm_capabilities/omni_math.jsonl
 output_dir: results/omni_math_gpt
 method: single_model
-min_cluster_size: 8
+min_cluster_size: 5
 embedding_model: text-embedding-3-large
 max_workers: 16
+extraction_model: gpt-4.1
+summary_model: gpt-4.1
+cluster_assignment_model: gpt-4.1-mini
 groupby_column: behavior_type
 assign_outliers: false
-sample_size: 50
+use_wandb: true
+sample_size: 800
 models:
   - openai/gpt-5-2025-08-07
-  # - openai/gpt-oss-20b
-  # - openai/o3-2025-04-16
+  - openai/gpt-oss-20b
+  - openai/o3-2025-04-16
   - openai/gpt-4.1-2025-04-14
 task_description: |
   This task is answering Olympiad level math questions.

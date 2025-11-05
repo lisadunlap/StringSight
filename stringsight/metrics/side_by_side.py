@@ -54,31 +54,17 @@ class SideBySideMetrics(FunctionalMetrics):
 
         clusters = pd.DataFrame([cluster.to_dict() for cluster in data.clusters])
 
-        # FIXED: Use the same approach as functional_metrics - explode only property_descriptions and question_ids
-        # This ensures the join works correctly and doesn't depend on complex property-model mappings
-        clusters = clusters.explode(["property_descriptions", "question_ids", "property_ids"]).drop_duplicates(
-            subset=["property_descriptions", "question_ids", "property_ids"]
+        # Explode only aligned columns to avoid mismatched element counts
+        clusters = clusters.explode(["property_descriptions", "question_ids"]).drop_duplicates(
+            subset=["property_descriptions", "question_ids"]
         )
-        clusters = clusters.dropna(subset=["property_descriptions", "question_ids", "property_ids"])
+        clusters = clusters.dropna(subset=["property_descriptions", "question_ids"])
         clusters = clusters.rename(
-            {"question_ids": "question_id", "property_descriptions": "property_description", "property_ids": "property_id"}, axis=1
+            {"question_ids": "question_id", "property_descriptions": "property_description"}, axis=1
         )
-        
-        properties = pd.DataFrame([property.to_dict() for property in data.properties])
 
-        properties_df = []
-        for index, row in properties.iterrows():
-            properties_df.append({
-                "property_id": row["id"],
-                "model": row["model"],
-            })
-        properties_df = pd.DataFrame(properties_df)
-        print(f"Number of properties: {len(properties_df)}")
-
-        properties = clusters.merge(properties_df, on="property_id", how="left").rename(
-            {"label": "cluster"},
-            axis=1,
-        )
+        # Prepare base properties frame directly from clusters
+        properties = clusters.rename({"label": "cluster"}, axis=1)
 
         # Expand conversations: one row per model with per-model scores
         expanded_rows: List[Dict[str, Any]] = []
@@ -112,10 +98,8 @@ class SideBySideMetrics(FunctionalMetrics):
             axis=1,
         )
 
-        # remove any rows where model_name != model
-        print(f"Length before: {len(properties)}")
-        properties = properties[properties["model_name"] == properties["model"]]
-        print(f"Length after: {len(properties)}")
+        # Set model from expanded conversation rows
+        properties["model"] = properties["model_name"]
         properties = properties.drop("model_name", axis=1)
         
         # Ensure conversation_metadata exists - fill missing values with empty dict

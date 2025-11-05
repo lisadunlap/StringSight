@@ -8,11 +8,15 @@ with configurable parameters.
 
 import argparse
 import os
+import sys
 import pandas as pd
 import json
 from pathlib import Path
 import time
 from datetime import datetime
+
+# Ensure local StringSightNew package is preferred over any globally installed version
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from stringsight import explain
 from stringsight.core.preprocessing import sample_prompts_evenly

@@ -4,7 +4,7 @@ OpenAI-based property extraction stage.
 This stage migrates the logic from generate_differences.py into the pipeline architecture.
 """
 
-from typing import Callable, Optional, List
+from typing import Callable, Optional, List, Dict, Any, Union
 import uuid
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -16,6 +16,7 @@ from ..prompts import extractor_prompts as _extractor_prompts
 from ..core.caching import Cache
 from ..core.llm_utils import parallel_completions
 from .conv_to_str import conv_to_str
+from .inp_to_conv import openai_messages_to_conv
 
 
 class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, PipelineStage):
@@ -101,7 +102,7 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         # ------------------------------------------------------------------
         # 1️⃣  Build user messages for every conversation (in parallel)
         # ------------------------------------------------------------------
-        user_messages: List[str] = [""] * len(data.conversations)
+        user_messages: List[Union[str, List[Dict[str, Any]]]] = [""] * len(data.conversations)
 
         def _build_prompt(idx: int, conv):
             return idx, self.prompt_builder(conv)
@@ -169,30 +170,44 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
 
     # Legacy helpers removed in favor of centralized llm_utils
     
-    def _default_prompt_builder(self, conversation) -> str:
+    def _default_prompt_builder(self, conversation) -> Union[str, List[Dict[str, Any]]]:
         """
-        Default prompt builder for side-by-side comparisons.
+        Default prompt builder for side-by-side comparisons, with multimodal support.
         
         Args:
             conversation: ConversationRecord
             
         Returns:
-            Formatted prompt string
+            - If no images present: a plain string prompt (backwards compatible)
+            - If images present: a full OpenAI messages list including a single
+              user turn with ordered text/image parts (and a system turn)
         """
         # Check if this is a side-by-side comparison or single model
         if isinstance(conversation.model, list) and len(conversation.model) == 2:
             # Side-by-side format
             model_a, model_b = conversation.model
             try:
-                response_a = conv_to_str(conversation.responses[0])
-                response_b = conv_to_str(conversation.responses[1])
+                responses_a = conversation.responses[0]
+                responses_b = conversation.responses[1]
             except Exception as e:
                 raise ValueError(
-                    f"Failed to convert conversation responses to string format. "
-                    f"Expected OpenAI conversation format (list of message dicts with 'role' and 'content' fields). "
-                    f"Got: {type(conversation.responses[0])}, {type(conversation.responses[1])}. "
-                    f"Error: {str(e)}"
+                    f"Failed to access conversation responses for side-by-side format. "
+                    f"Expected two response lists. Error: {str(e)}"
                 )
+
+            # Normalize both to our internal segments format
+            conv_a = openai_messages_to_conv(responses_a) if isinstance(responses_a, list) else responses_a
+            conv_b = openai_messages_to_conv(responses_b) if isinstance(responses_b, list) else responses_b
+
+            has_images = self._conversation_has_images(conv_a) or self._conversation_has_images(conv_b)
+
+            if has_images:
+                return self._build_side_by_side_messages(model_a, model_b, conv_a, conv_b)
+
+            # No images: keep string behavior for compatibility
+            response_a = conv_to_str(responses_a)
+            response_b = conv_to_str(responses_b)
+
             scores = conversation.scores
 
             # Handle list format [scores_a, scores_b]
@@ -228,13 +243,21 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         elif isinstance(conversation.model, str):
             # Single model format
             model = conversation.model if isinstance(conversation.model, str) else str(conversation.model)
+            responses = conversation.responses
+
+            # Normalize to our internal segments format only to detect images
+            conv_norm = openai_messages_to_conv(responses) if isinstance(responses, list) else responses
+            if self._conversation_has_images(conv_norm):
+                return self._build_single_user_messages(conv_norm)
+
+            # No images: keep string behavior
             try:
-                response = conv_to_str(conversation.responses)
+                response = conv_to_str(responses)
             except Exception as e:
                 raise ValueError(
                     f"Failed to convert conversation response to string format. "
                     f"Expected OpenAI conversation format (list of message dicts with 'role' and 'content' fields). "
-                    f"Got: {type(conversation.responses)}. "
+                    f"Got: {type(responses)}. "
                     f"Error: {str(e)}"
                 )
             scores = conversation.scores
@@ -247,6 +270,91 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
             )
         else:
             raise ValueError(f"Invalid conversation format: {conversation}")
+    
+    def _conversation_has_images(self, conv_msgs: List[Dict[str, Any]]) -> bool:
+        """Return True if any message contains an image segment in ordered segments format."""
+        for msg in conv_msgs:
+            content = msg.get("content", {})
+            segs = content.get("segments") if isinstance(content, dict) else None
+            if isinstance(segs, list):
+                for seg in segs:
+                    if isinstance(seg, dict) and seg.get("kind") == "image":
+                        return True
+        return False
+
+    def _collapse_segments_to_openai_content(self, conv_msgs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Collapse ordered segments into an OpenAI multimodal content list, preserving order.
+        Produces items like:
+          - {"type": "text", "text": str}
+          - {"type": "image_url", "image_url": {"url": str}}
+        """
+        content: List[Dict[str, Any]] = []
+        for msg in conv_msgs:
+            segs = msg.get("content", {}).get("segments", []) if isinstance(msg.get("content"), dict) else []
+            for seg in segs:
+                if not isinstance(seg, dict):
+                    content.append({"type": "text", "text": str(seg)})
+                    continue
+                kind = seg.get("kind")
+                if kind == "text":
+                    text_val = seg.get("text", "")
+                    if isinstance(text_val, str) and text_val != "":
+                        content.append({"type": "text", "text": text_val})
+                elif kind == "image":
+                    img = seg.get("image")
+                    url: Optional[str] = None
+                    if isinstance(img, str):
+                        url = img
+                    elif isinstance(img, dict):
+                        if isinstance(img.get("url"), str):
+                            url = img.get("url")
+                        elif isinstance(img.get("image_url"), dict) and isinstance(img["image_url"].get("url"), str):
+                            url = img["image_url"].get("url")
+                        elif isinstance(img.get("source"), str):
+                            url = img.get("source")
+                    if url:
+                        content.append({"type": "image_url", "image_url": {"url": url}})
+                elif kind == "tool":
+                    # Render tool output succinctly as text for extraction context
+                    tc = seg.get("tool_calls", [])
+                    if isinstance(tc, list) and tc:
+                        rendered = "\n".join([f"Tool call {t.get('name', '<tool>')} with args: {t.get('arguments')}" for t in tc if isinstance(t, dict)])
+                        if rendered:
+                            content.append({"type": "text", "text": rendered})
+                else:
+                    content.append({"type": "text", "text": str(seg)})
+        return content
+
+    def _build_single_user_messages(self, conv_msgs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Build a full messages list with system + single multimodal user turn."""
+        content = self._collapse_segments_to_openai_content(conv_msgs)
+        messages: List[Dict[str, Any]] = []
+        if self.system_prompt:
+            messages.append({"role": "system", "content": self.system_prompt})
+        messages.append({"role": "user", "content": content})
+        return messages
+
+    def _build_side_by_side_messages(
+        self,
+        model_a: str,
+        model_b: str,
+        conv_a: List[Dict[str, Any]],
+        conv_b: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """Build a full messages list with system + single user turn containing A/B sections."""
+        content: List[Dict[str, Any]] = []
+        content.append({"type": "text", "text": f"# Model A (Name: \"{model_a}\")"})
+        content.extend(self._collapse_segments_to_openai_content(conv_a))
+        content.append({"type": "text", "text": "--------------------------------"})
+        content.append({"type": "text", "text": f"# Model B (Name: \"{model_b}\")"})
+        content.extend(self._collapse_segments_to_openai_content(conv_b))
+
+        messages: List[Dict[str, Any]] = []
+        if self.system_prompt:
+            messages.append({"role": "system", "content": self.system_prompt})
+        messages.append({"role": "user", "content": content})
+        return messages
     
     def _log_extraction_to_wandb(self, user_messages: List[str], raw_responses: List[str], conversations):
         """Log extraction inputs/outputs to wandb."""

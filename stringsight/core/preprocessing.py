@@ -10,7 +10,7 @@ This module centralizes all data preparation logic including:
 
 from __future__ import annotations
 
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 import pandas as pd
 import numpy as np
 from stringsight.logging_config import get_logger
@@ -140,33 +140,6 @@ def convert_score_columns_to_dict(
         
     Raises:
         ValueError: If required score columns are missing or contain non-numeric values
-        
-    Examples:
-        >>> # Single model
-        >>> df = pd.DataFrame({
-        ...     "prompt": ["What is AI?"],
-        ...     "model": ["gpt-4"],
-        ...     "model_response": ["AI is..."],
-        ...     "accuracy": [0.9],
-        ...     "helpfulness": [4.2]
-        ... })
-        >>> df = convert_score_columns_to_dict(df, ["accuracy", "helpfulness"], "single_model")
-        >>> # df now has "score" column: {"accuracy": 0.9, "helpfulness": 4.2}
-        
-        >>> # Side-by-side
-        >>> df = pd.DataFrame({
-        ...     "prompt": ["What is AI?"],
-        ...     "model_a": ["gpt-4"],
-        ...     "model_b": ["claude-3"],
-        ...     "model_a_response": ["AI is..."],
-        ...     "model_b_response": ["AI is..."],
-        ...     "accuracy_a": [0.9],
-        ...     "accuracy_b": [0.8],
-        ...     "helpfulness_a": [4.2],
-        ...     "helpfulness_b": [4.5]
-        ... })
-        >>> df = convert_score_columns_to_dict(df, ["accuracy", "helpfulness"], "side_by_side")
-        >>> # df now has "score_a" and "score_b" columns with dicts
     """
     df = df.copy()
     
@@ -247,6 +220,34 @@ def convert_score_columns_to_dict(
     return df
 
 
+def _normalize_model_value(value: Any) -> Any:
+    """
+    Normalize model identifiers to hashable, comparable values for grouping/unique.
+    - Lists/tuples -> tuple
+    - Other types left unchanged
+    """
+    if isinstance(value, list):
+        return tuple(value)
+    if isinstance(value, tuple):
+        return value
+    return value
+
+def _normalize_prompt_key(value: Any) -> str:
+    """
+    Normalize prompt values to a stable, hashable key for grouping.
+    - For dict/list/tuple: JSON string with sorted keys
+    - Fallback: str(value)
+    """
+    try:
+        import json
+        if isinstance(value, (dict, list, tuple)):
+            return json.dumps(value, sort_keys=True, default=str)
+        return str(value)
+    except Exception:
+        # Avoid try/except per project style unless necessary; this is a safe fallback
+        return str(value)
+
+
 def sample_prompts_evenly(
     df: pd.DataFrame,
     *,
@@ -267,23 +268,6 @@ def sample_prompts_evenly(
     3. Otherwise, sample K prompts independently from each model
     
     For side_by_side or when no model column exists, falls back to row-level sampling.
-    
-    Args:
-        df: Input dataframe containing at least a ``prompt`` column and model columns as
-            determined by ``method``.
-        sample_size: Desired total number of rows across all models. If None or greater
-            than the dataset size, the input dataframe is returned unchanged.
-        method: Either "single_model" or "side_by_side".
-        prompt_column: Name of the prompt column to use for grouping.
-        random_state: Random seed for reproducible sampling.
-        
-    Returns:
-        A dataframe filtered to the sampled prompts. If ``sample_size`` is None or not
-        smaller than the input size, the input dataframe is returned.
-        
-    Raises:
-        ValueError: If the inferred number of models is greater than 0 and
-            int(sample_size / num_models) equals 0 (i.e., sample_size is too small).
     """
     if sample_size is None or sample_size <= 0 or sample_size >= len(df):
         return df
@@ -304,8 +288,14 @@ def sample_prompts_evenly(
     
     # For single_model: find prompts that have responses from all models
     if method == "single_model" and "model" in df.columns and num_models > 0:
+        # Normalize model identifiers to hashable
+        df_norm = df.copy()
+        df_norm["model"] = df_norm["model"].map(_normalize_model_value)
+        # Normalize prompt to a stable key for grouping/sampling
+        df_norm["__prompt_key__"] = df_norm[prompt_column].map(_normalize_prompt_key)
+        
         # Find prompts that have all models
-        coverage = df.groupby(prompt_column)["model"].nunique()
+        coverage = df_norm.groupby("__prompt_key__")["model"].nunique()
         prompts_with_all_models = coverage[coverage == num_models].index.tolist()
         
         # If we have enough prompts with all models, sample from those
@@ -313,23 +303,23 @@ def sample_prompts_evenly(
             sampled_prompts = pd.Series(prompts_with_all_models).sample(
                 n=prompts_per_model, random_state=random_state
             ).tolist()
-            return df[df[prompt_column].isin(sampled_prompts)]
+            return df_norm[df_norm["__prompt_key__"].isin(sampled_prompts)].drop(columns=["__prompt_key__"])  # keep original rows
         else:
             # Sample prompts_per_model prompts from each model independently
             sampled_rows = []
             for model in models:
-                model_df = df[df["model"] == model]
-                model_prompts = model_df[prompt_column].dropna().unique().tolist()
+                model_df = df_norm[df_norm["model"] == _normalize_model_value(model)]
+                model_prompts = model_df["__prompt_key__"].dropna().unique().tolist()
                 if len(model_prompts) > 0:
                     n_sample = min(prompts_per_model, len(model_prompts))
                     sampled_model_prompts = pd.Series(model_prompts).sample(
                         n=n_sample, random_state=random_state
                     ).tolist()
                     sampled_rows.append(
-                        model_df[model_df[prompt_column].isin(sampled_model_prompts)]
+                        df_norm[df_norm["__prompt_key__"].isin(sampled_model_prompts)]
                     )
             if sampled_rows:
-                return pd.concat(sampled_rows, ignore_index=True)
+                return pd.concat(sampled_rows, ignore_index=True).drop(columns=["__prompt_key__"])
             else:
                 return df.head(0)
     
@@ -340,24 +330,19 @@ def sample_prompts_evenly(
 def _infer_models(df: pd.DataFrame, method: str) -> list[str]:
     """
     Infer the list of models present in the dataset.
-    
-    Args:
-        df: Input dataframe.
-        method: Either "single_model" or "side_by_side".
-        
-    Returns:
-        List of unique model names across the dataset.
+    Returns a sorted list of normalized, hashable identifiers.
     """
     if method == "single_model":
         if "model" in df.columns:
-            return sorted([m for m in df["model"].dropna().unique().tolist()])
+            series = df["model"].dropna().map(_normalize_model_value)
+            return sorted([m for m in series.unique().tolist()])
         return []
     elif method == "side_by_side":
         models: set[str] = set()
         if "model_a" in df.columns:
-            models.update([m for m in df["model_a"].dropna().unique().tolist()])
+            models.update([m for m in df["model_a"].dropna().map(_normalize_model_value).unique().tolist()])
         if "model_b" in df.columns:
-            models.update([m for m in df["model_b"].dropna().unique().tolist()])
+            models.update([m for m in df["model_b"].dropna().map(_normalize_model_value).unique().tolist()])
         return sorted(list(models))
     else:
         return []
@@ -375,18 +360,6 @@ def tidy_to_side_by_side(
     
     Expects tidy data with columns: prompt, model, model_response, and optionally score or score columns.
     Pivots to create: prompt, model_a, model_b, model_a_response, model_b_response, score_a, score_b.
-    
-    Args:
-        df: Tidy format dataframe
-        model_a: First model name to select
-        model_b: Second model name to select
-        score_columns: Optional list of score column names to pivot alongside responses
-        
-    Returns:
-        Side-by-side format dataframe
-        
-    Raises:
-        ValueError: If required columns are missing or models not found
     """
     # Validate required columns
     required = ["prompt", "model", "model_response"]
@@ -544,30 +517,6 @@ def validate_and_prepare_dataframe(
     3. Convert score_columns to score dicts if specified
     4. Sample data if sample_size specified
     5. Validate required columns exist
-    
-    Args:
-        df: Input dataframe
-        method: Either "single_model" or "side_by_side"
-        score_columns: Optional list of column names containing scores to convert to dict format
-        sample_size: Optional number of rows to sample
-        model_a: For tidy→side_by_side conversion, first model name
-        model_b: For tidy→side_by_side conversion, second model name
-        prompt_column: Name of the prompt column (default: "prompt")
-        model_column: Name of the model column for single_model (default: "model")
-        model_response_column: Name of the model response column for single_model (default: "model_response")
-        question_id_column: Name of the question_id column (default: "question_id" if column exists)
-        model_a_column: Name of the model_a column for side_by_side (default: "model_a")
-        model_b_column: Name of the model_b column for side_by_side (default: "model_b")
-        model_a_response_column: Name of the model_a_response column for side_by_side (default: "model_a_response")
-        model_b_response_column: Name of the model_b_response column for side_by_side (default: "model_b_response")
-        verbose: Whether to print progress messages
-        **kwargs: Additional arguments (ignored, for forward compatibility)
-        
-    Returns:
-        Preprocessed dataframe ready for PropertyDataset.from_dataframe()
-        
-    Raises:
-        ValueError: If data validation fails
     """
     df = df.copy()
     

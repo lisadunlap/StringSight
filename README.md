@@ -149,6 +149,21 @@ clustered_df, model_stats = explain(
 
 If your columns already match these names, you don't need to specify mapping parameters.
 
+### Multimodal Conversations (Text + Images)
+
+StringSight supports multimodal model responses (single or multiple images across turns) and automatically collapses each dialog into one OpenAI-style user turn for extraction.
+
+- Ingestion accepts either plain strings or OpenAI Chat messages. If `content` is a list of parts (text/image), we preserve order.
+- Internal normalized format per message:
+  - `role: str`
+  - `content: { segments: [ {kind: "text", text: str} | {kind: "image", image: str|dict} | {kind: "tool", tool_calls: list[dict]} ] }`
+  - Ordering is preserved across messages and within each message.
+- The extractor builds a single user message with ordered OpenAI content parts:
+  - `{"type":"text","text":...}` and `{"type":"image_url","image_url":{"url":...}}`
+- Side-by-side comparisons: a single user turn contains clearly labeled sections for Model A and Model B with their own ordered parts.
+
+Backward compatibility: text-only dialogs remain a single user turn containing one text part; no configuration changes required.
+
 ### 2. Fixed Taxonomy Labeling with `label()`
 
 When you know exactly which behavioral axes you care about:

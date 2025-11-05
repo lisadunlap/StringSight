@@ -14,6 +14,8 @@
 import pprint
 import ast
 import json
+from typing import Any, Dict
+
 
 def pretty_print_dict(val):
     """
@@ -30,6 +32,7 @@ def pretty_print_dict(val):
         except Exception:
             pass
     return str(val)
+
 
 def convert_tool_calls_to_str(tool_calls):
     """
@@ -62,6 +65,38 @@ def convert_tool_calls_to_str(tool_calls):
         tool_calls_str.append(base)
     return "\n".join(tool_calls_str)
 
+
+def _render_image_value(image: Any) -> str:
+    """
+    Render an image value to a readable single-line string.
+    Accepts URL/data-URL strings or dict-like objects with nested url.
+    """
+    # String: URL or data URL
+    if isinstance(image, str):
+        if image.startswith('data:'):
+            return f"image: data-url (len={len(image)})"
+        return f"image: {image}"
+
+    # Dict: try common shapes
+    if isinstance(image, dict):
+        url = None
+        if 'url' in image and isinstance(image['url'], str):
+            url = image['url']
+        elif 'image_url' in image and isinstance(image['image_url'], dict):
+            inner = image['image_url']
+            if 'url' in inner and isinstance(inner['url'], str):
+                url = inner['url']
+        if url is not None:
+            if url.startswith('data:'):
+                return f"image: data-url (len={len(url)})"
+            return f"image: {url}"
+        # Fallback pretty-print
+        return f"image: {pretty_print_dict(image)}"
+
+    # Fallback
+    return f"image: {str(image)}"
+
+
 def convert_content_to_str(content):
     """
     Convert the content of a message to a string.
@@ -86,6 +121,24 @@ def convert_content_to_str(content):
     
     # Handle dictionaries
     elif isinstance(content, dict):
+        # Ordered segments path (preferred when present)
+        if 'segments' in content and isinstance(content['segments'], list):
+            out_lines = []
+            for seg in content['segments']:
+                if not isinstance(seg, dict) or 'kind' not in seg:
+                    out_lines.append(str(seg))
+                    continue
+                kind = seg['kind']
+                if kind == 'text':
+                    out_lines.append(pretty_print_dict(seg.get('text', '')))
+                elif kind == 'image':
+                    out_lines.append(_render_image_value(seg.get('image')))
+                elif kind == 'tool':
+                    out_lines.append(convert_tool_calls_to_str(seg.get('tool_calls', [])))
+                else:
+                    out_lines.append(str(seg))
+            return "\n".join(out_lines)
+
         ret = []
         for key, value in content.items():
             try:
@@ -93,7 +146,11 @@ def convert_content_to_str(content):
                     # Pretty print if text is a dict or dict-string
                     ret.append(pretty_print_dict(value))
                 elif key == 'image':
-                    ret.append(f"image: {value}")
+                    if isinstance(value, list):
+                        for img in value:
+                            ret.append(_render_image_value(img))
+                    else:
+                        ret.append(_render_image_value(value))
                 elif key == 'tool_calls':
                     ret.append(convert_tool_calls_to_str(value))
                 else:
@@ -117,6 +174,7 @@ def convert_content_to_str(content):
             return pretty_print_dict(content)
         except:
             return str(content)
+
 
 def conv_to_str(conv):
     """
@@ -159,6 +217,7 @@ def conv_to_str(conv):
     
     return "\n\n".join(ret)
 
+
 def simple_to_oai_format(prompt: str, response: str) -> list:
     """
     Convert a simple prompt-response pair to OAI format.
@@ -180,6 +239,7 @@ def simple_to_oai_format(prompt: str, response: str) -> list:
             "content": response
         }
     ]
+
 
 def check_and_convert_to_oai_format(prompt: str, response: str) -> tuple[list, bool]:
     """

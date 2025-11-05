@@ -1,18 +1,19 @@
-data_path: data/openai_exports/colorization__ColorizationEnv-v2.json
-output_dir: results/colorization_new
+data_path: data/gym_stringsight/match_move__MatchRotation-v0__easy.json
+output_dir: results/match_move__MatchRotation-v0__easy_images
 method: single_model
 min_cluster_size: 10
 embedding_model: text-embedding-3-small
+extraction_model: gpt-4.1
+summary_model: gpt-4.1
+cluster_assignment_model: gpt-4.1-mini
 max_workers: 16
 groupby_column: behavior_type
-assign_outliers: false
-# sample_size: 50
 system_prompt: agent_system_prompt_custom
 score_columns:
   - accuracy
   - harmfulness
 task_description: |
-  The traces you will analyze contain traces where an AI agent is completing a task described by the user. The task may include images as input, but you as the analyst are not able to see them.
+  The traces you will analyze contain traces where an AI agent is completing a task described by the user. The task is visual in nature and the model will output actions that can be in the form of text, images, or both. 
 
   **Focus on Agentic Properties:**
   Prioritize properties that are relevant to agent performance, which could include:
