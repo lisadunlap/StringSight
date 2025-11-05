@@ -587,6 +587,8 @@ class ClusterRunRequest(BaseModel):
     properties: List[Dict[str, Any]]
     params: ClusterRunParams
     output_dir: Optional[str] = None
+    score_columns: Optional[List[str]] = None  # NEW: List of score column names to convert to dict format
+    method: Optional[str] = "single_model"  # NEW: Method for score column conversion
 
 
 @app.post("/cluster/run")
@@ -624,6 +626,76 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
         pass
     
     try:
+        # NEW: Preprocess operationalRows to handle score_columns conversion
+        # This ensures scores are in the expected nested dict format before creating ConversationRecords
+        score_columns_to_use = req.score_columns
+        
+        # Auto-detect score columns if not provided
+        if not score_columns_to_use and req.operationalRows:
+            import pandas as pd
+            operational_df = pd.DataFrame(req.operationalRows)
+            
+            # Check if 'score' column already exists (nested dict format)
+            if 'score' in operational_df.columns:
+                # Check if it's actually a dict (not a string or number)
+                sample_score = operational_df['score'].iloc[0] if len(operational_df) > 0 else None
+                if not isinstance(sample_score, dict):
+                    logger.info("'score' column exists but is not a dict - will attempt to detect score columns")
+                else:
+                    logger.info("'score' column already in nested dict format - no conversion needed")
+                    score_columns_to_use = None
+            else:
+                # Try to detect score columns based on naming patterns
+                # Look for columns like: score_X, X_score, helpfulness, accuracy, etc.
+                potential_score_cols = []
+                score_related_keywords = ['score', 'rating', 'quality', 'helpfulness', 'accuracy', 'correctness', 'fluency', 'coherence', 'relevance']
+                
+                for col in operational_df.columns:
+                    # Skip non-numeric columns
+                    if not pd.api.types.is_numeric_dtype(operational_df[col]):
+                        continue
+                    
+                    # Skip ID and size columns
+                    if col in ['question_id', 'id', 'size', 'cluster_id'] or col.endswith('_id'):
+                        continue
+                    
+                    # Check if column name contains score-related keywords
+                    col_lower = col.lower()
+                    if any(keyword in col_lower for keyword in score_related_keywords):
+                        potential_score_cols.append(col)
+                
+                if potential_score_cols:
+                    logger.info(f"Auto-detected potential score columns: {potential_score_cols}")
+                    score_columns_to_use = potential_score_cols
+                else:
+                    logger.info("No score columns detected")
+        
+        # Convert score columns if needed
+        if score_columns_to_use:
+            logger.info(f"Converting score columns to dict format: {score_columns_to_use}")
+            import pandas as pd
+            from stringsight.core.preprocessing import convert_score_columns_to_dict
+            
+            # Convert to DataFrame for processing
+            operational_df = pd.DataFrame(req.operationalRows)
+            
+            # Convert score columns to dict format
+            operational_df = convert_score_columns_to_dict(
+                operational_df,
+                score_columns=score_columns_to_use,
+                method=req.method
+            )
+            
+            # Convert back to dict list
+            req.operationalRows = operational_df.to_dict('records')
+            
+            logger.info(f"✓ Score columns converted successfully")
+            if req.operationalRows:
+                sample = req.operationalRows[0]
+                logger.info(f"  - Sample operationalRow after conversion:")
+                logger.info(f"    - Has 'score' key: {'score' in sample}")
+                logger.info(f"    - Score value: {sample.get('score')}")
+        
         # Convert properties data to Property objects
         properties: List[Property] = []
         for p in req.properties:
@@ -1162,11 +1234,69 @@ class ClusterMetricsRequest(BaseModel):
     properties: List[Dict[str, Any]]
     operationalRows: List[Dict[str, Any]]
     included_property_ids: Optional[List[str]] = None
+    score_columns: Optional[List[str]] = None  # NEW: List of score column names to convert to dict format
+    method: Optional[str] = "single_model"  # NEW: Method for score column conversion
 
 
 @app.post("/cluster/metrics")
 def cluster_metrics(req: ClusterMetricsRequest) -> Dict[str, Any]:
     """Recompute cluster metrics for a filtered subset without reclustering."""
+    # NEW: Preprocess operationalRows to handle score_columns conversion
+    score_columns_to_use = req.score_columns
+    
+    # Auto-detect score columns if not provided (same logic as /cluster/run)
+    if not score_columns_to_use and req.operationalRows:
+        import pandas as pd
+        operational_df = pd.DataFrame(req.operationalRows)
+        
+        # Check if 'score' column already exists (nested dict format)
+        if 'score' in operational_df.columns:
+            sample_score = operational_df['score'].iloc[0] if len(operational_df) > 0 else None
+            if not isinstance(sample_score, dict):
+                logger.info("'score' column exists but is not a dict - will attempt to detect score columns")
+            else:
+                logger.info("'score' column already in nested dict format - no conversion needed")
+                score_columns_to_use = None
+        else:
+            # Try to detect score columns based on naming patterns
+            potential_score_cols = []
+            score_related_keywords = ['score', 'rating', 'quality', 'helpfulness', 'accuracy', 'correctness', 'fluency', 'coherence', 'relevance']
+            
+            for col in operational_df.columns:
+                if not pd.api.types.is_numeric_dtype(operational_df[col]):
+                    continue
+                if col in ['question_id', 'id', 'size', 'cluster_id'] or col.endswith('_id'):
+                    continue
+                col_lower = col.lower()
+                if any(keyword in col_lower for keyword in score_related_keywords):
+                    potential_score_cols.append(col)
+            
+            if potential_score_cols:
+                logger.info(f"Auto-detected potential score columns: {potential_score_cols}")
+                score_columns_to_use = potential_score_cols
+            else:
+                logger.info("No score columns detected")
+    
+    # Convert score columns if needed
+    if score_columns_to_use:
+        logger.info(f"Converting score columns to dict format: {score_columns_to_use}")
+        import pandas as pd
+        from stringsight.core.preprocessing import convert_score_columns_to_dict
+        
+        # Convert to DataFrame for processing
+        operational_df = pd.DataFrame(req.operationalRows)
+        
+        # Convert score columns to dict format
+        operational_df = convert_score_columns_to_dict(
+            operational_df,
+            score_columns=score_columns_to_use,
+            method=req.method
+        )
+        
+        # Convert back to dict list
+        req.operationalRows = operational_df.to_dict('records')
+        logger.info(f"✓ Score columns converted successfully")
+    
     long_df = prepare_long_frame(
         clusters=req.clusters,
         properties=req.properties,

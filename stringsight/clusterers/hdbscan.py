@@ -162,9 +162,7 @@ class HDBSCANClusterer(BaseClusterer):
                 def _cluster_group(group_info):
                     group, group_df = group_info
                     if getattr(self, "verbose", False):
-                        logger.info("--------------------------------")
-                        logger.info(f"Clustering group {group}")
-                        logger.info("--------------------------------")
+                        logger.info(f"--------------------------------\nClustering group {group}\n--------------------------------")
                     part = hdbscan_cluster_categories(
                         group_df,
                         column_name=column_name,
@@ -197,9 +195,7 @@ class HDBSCANClusterer(BaseClusterer):
                 # Add progress bar for sequential clustering
                 for group, group_df in tqdm(groups, desc=f"Clustering {len(groups)} groups sequentially", disable=not getattr(self, "verbose", False)):
                     if getattr(self, "verbose", False):
-                        logger.info("--------------------------------")
-                        logger.info(f"Clustering group {group}")
-                        logger.info("--------------------------------")
+                        logger.info(f"--------------------------------\nClustering group {group}\n--------------------------------")
                     part = hdbscan_cluster_categories(
                         group_df,
                         column_name=column_name,

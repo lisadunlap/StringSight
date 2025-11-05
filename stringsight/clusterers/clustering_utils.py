@@ -137,8 +137,42 @@ def _get_openai_embeddings_batch(batch: List[str], model: str, retries: int = 3,
         except Exception as exc:
             if attempt == retries - 1:
                 raise
-            logger.warning(f"[retry {attempt + 1}/{retries}] {exc}. Sleeping {sleep_time}s.")
-            time.sleep(sleep_time)
+            
+            # Check if this is a rate limit error
+            is_rate_limit = False
+            retry_after = None
+            
+            # Check for litellm rate limit errors
+            if hasattr(litellm, 'RateLimitError') and isinstance(exc, litellm.RateLimitError):
+                is_rate_limit = True
+            elif hasattr(exc, 'status_code') and exc.status_code == 429:
+                is_rate_limit = True
+            elif "rate limit" in str(exc).lower() or "429" in str(exc):
+                is_rate_limit = True
+            
+            # Try to extract Retry-After header from exception
+            if is_rate_limit:
+                try:
+                    if hasattr(exc, 'response') and hasattr(exc.response, 'headers'):
+                        retry_after_str = exc.response.headers.get('Retry-After', '')
+                        if retry_after_str:
+                            retry_after = float(retry_after_str)
+                except Exception:
+                    pass
+            
+            # Use Retry-After if available, otherwise use exponential backoff
+            if is_rate_limit and retry_after:
+                actual_sleep = retry_after
+                logger.warning(f"[retry {attempt + 1}/{retries}] Rate limit hit, waiting {actual_sleep}s per Retry-After header: {exc}")
+            elif is_rate_limit:
+                # For rate limits, use shorter initial backoff
+                actual_sleep = max(1.0, sleep_time * (1.5 ** attempt))
+                logger.warning(f"[retry {attempt + 1}/{retries}] Rate limit hit, retrying in {actual_sleep}s: {exc}")
+            else:
+                actual_sleep = sleep_time
+                logger.warning(f"[retry {attempt + 1}/{retries}] {exc}. Sleeping {actual_sleep}s.")
+            
+            time.sleep(actual_sleep)
 
 
 def _get_openai_embeddings(texts: List[str], *, model: str = "openai/text-embedding-3-large", batch_size: int = 100, max_workers: int = 64) -> List[List[float]]:
@@ -409,7 +443,7 @@ def match_label_names(label_name, label_options):
             return option
     return None
 
-def llm_match(cluster_names, coarse_cluster_names, max_workers=64, model="gpt-4.1-mini"):
+def llm_match(cluster_names, coarse_cluster_names, max_workers=16, model="gpt-4.1-mini"):
     """Match fine-grained cluster names to coarse-grained cluster names using an LLM with parallel processing."""
     coarse_names_text = "\n".join(coarse_cluster_names)
     
@@ -523,7 +557,7 @@ def _get_openai_embeddings_batch_litellm(batch, retries=3, sleep_time=2.0):
 
 
 # NOTE: renamed to avoid overriding the DiskCache-cached version defined earlier
-def _get_openai_embeddings_litellm(texts, batch_size=100, max_workers=64):
+def _get_openai_embeddings_litellm(texts, batch_size=100, max_workers=16):
     """Get embeddings using OpenAI API (LiteLLM cache)."""
 
     if not texts:

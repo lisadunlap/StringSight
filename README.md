@@ -35,6 +35,8 @@ export GOOGLE_API_KEY="your-google-key"        # optional
 
 ## Quick Start
 
+For a comprehensive tutorial with detailed explanations, see [starter_notebook.ipynb](starter_notebook.ipynb).
+
 ### 1. Extract and Cluster Properties with `explain()`
 
 ```python
@@ -90,6 +92,63 @@ clustered_df, model_stats = explain(
 )
 ```
 
+### Using Custom Column Names
+
+If your dataframe uses different column names, you can map them using column mapping parameters:
+
+```python
+# Your dataframe has custom column names
+df = pd.DataFrame({
+    "input": ["What is ML?", "Explain QC"],
+    "llm_name": ["gpt-4", "gpt-4"],
+    "output": ["ML is...", "QC uses..."],
+    "accuracy": [0.95, 0.88],
+    "helpfulness": [4.2, 4.5]
+})
+
+# Map custom column names to expected StringSight names
+clustered_df, model_stats = explain(
+    df,
+    prompt_column="input",           # Map "input" → "prompt"
+    model_column="llm_name",          # Map "llm_name" → "model"
+    model_response_column="output",   # Map "output" → "model_response"
+    score_columns=["accuracy", "helpfulness"],
+    output_dir="results/test"
+)
+```
+
+For side-by-side comparisons with custom column names:
+
+```python
+df = pd.DataFrame({
+    "query": ["What is ML?", "Explain QC"],
+    "model_1": ["gpt-4", "gpt-4"],
+    "model_2": ["claude-3", "claude-3"],
+    "response_1": ["ML is...", "QC uses..."],
+    "response_2": ["ML involves...", "QC leverages..."],
+    "accuracy_1": [0.95, 0.88],
+    "accuracy_2": [0.92, 0.85]
+})
+
+clustered_df, model_stats = explain(
+    df,
+    method="side_by_side",
+    prompt_column="query",                # Map "query" → "prompt"
+    model_a_column="model_1",              # Map "model_1" → "model_a"
+    model_b_column="model_2",              # Map "model_2" → "model_b"
+    model_a_response_column="response_1", # Map "response_1" → "model_a_response"
+    model_b_response_column="response_2", # Map "response_2" → "model_b_response"
+    score_columns=["accuracy"],           # Note: score columns need _a/_b suffixes
+    output_dir="results/test"
+)
+```
+
+**Note:** Default column names are:
+- `prompt`, `model`, `model_response`, `question_id` (optional) for single_model
+- `prompt`, `model_a`, `model_b`, `model_a_response`, `model_b_response`, `question_id` (optional) for side_by_side
+
+If your columns already match these names, you don't need to specify mapping parameters.
+
 ### 2. Fixed Taxonomy Labeling with `label()`
 
 When you know exactly which behavioral axes you care about:
@@ -140,6 +199,10 @@ Use the React frontend or other visualization tools to explore your results.
 |--------|-------------|---------|
 | `score` | Evaluation metrics dictionary | `{"accuracy": 0.85, "helpfulness": 4.2}` |
 | `score_columns` | Alternative: separate columns for each metric (e.g., `accuracy`, `helpfulness`) instead of a dict | `score_columns=["accuracy", "helpfulness"]` |
+| `prompt_column` | Name of the prompt column in your dataframe (default: `"prompt"`) | `prompt_column="input"` |
+| `model_column` | Name of the model column for single_model (default: `"model"`) | `model_column="llm_name"` |
+| `model_response_column` | Name of the model response column for single_model (default: `"model_response"`) | `model_response_column="output"` |
+| `question_id_column` | Name of the question_id column (default: `"question_id"` if column exists) | `question_id_column="qid"` |
 
 ### Side-by-Side Comparisons
 
@@ -159,6 +222,12 @@ Use the React frontend or other visualization tools to explore your results.
 |--------|-------------|---------|
 | `score` | Winner and metrics | `{"winner": "model_a", "helpfulness_a": 4.2, "helpfulness_b": 3.8}` |
 | `score_columns` | Alternative: separate columns for each metric with `_a` and `_b` suffixes (e.g., `accuracy_a`, `accuracy_b`) | `score_columns=["accuracy_a", "accuracy_b", "helpfulness_a", "helpfulness_b"]` |
+| `prompt_column` | Name of the prompt column in your dataframe (default: `"prompt"`) | `prompt_column="query"` |
+| `model_a_column` | Name of the model_a column (default: `"model_a"`) | `model_a_column="model_1"` |
+| `model_b_column` | Name of the model_b column (default: `"model_b"`) | `model_b_column="model_2"` |
+| `model_a_response_column` | Name of the model_a_response column (default: `"model_a_response"`) | `model_a_response_column="response_1"` |
+| `model_b_response_column` | Name of the model_b_response column (default: `"model_b_response"`) | `model_b_response_column="response_2"` |
+| `question_id_column` | Name of the question_id column (default: `"question_id"` if column exists) | `question_id_column="qid"` |
 
 **Option 2: Tidy Data (Auto-pairing)**
 

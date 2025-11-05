@@ -10,12 +10,113 @@ This module centralizes all data preparation logic including:
 
 from __future__ import annotations
 
-from typing import Optional, List
+from typing import Optional, List, Dict
 import pandas as pd
 import numpy as np
 from stringsight.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+def map_column_names(
+    df: pd.DataFrame,
+    column_mapping: Dict[str, str],
+    method: str,
+    verbose: bool = True
+) -> pd.DataFrame:
+    """
+    Rename columns in dataframe to match expected StringSight column names.
+    
+    This function allows users to specify custom column names for their data,
+    which are then mapped to the expected internal column names.
+    
+    Args:
+        df: Input dataframe with custom column names
+        column_mapping: Dictionary mapping custom column names to expected names.
+                       Expected keys depend on method:
+                       - single_model: "prompt", "model", "model_response", "question_id" (optional)
+                       - side_by_side: "prompt", "model_a", "model_b", "model_a_response", 
+                                       "model_b_response", "question_id" (optional)
+        method: Either "single_model" or "side_by_side"
+        verbose: Whether to print progress messages
+        
+    Returns:
+        DataFrame with columns renamed to expected names
+        
+    Raises:
+        ValueError: If required mapping keys are missing or columns don't exist
+        
+    Examples:
+        >>> # Single model with custom column names
+        >>> df = pd.DataFrame({
+        ...     "input": ["What is AI?"],
+        ...     "llm_name": ["gpt-4"],
+        ...     "output": ["AI is..."]
+        ... })
+        >>> mapping = {"prompt": "input", "model": "llm_name", "model_response": "output"}
+        >>> df = map_column_names(df, mapping, "single_model")
+        >>> # df now has columns: "prompt", "model", "model_response"
+        
+        >>> # Side-by-side with custom column names
+        >>> df = pd.DataFrame({
+        ...     "query": ["What is AI?"],
+        ...     "model_1": ["gpt-4"],
+        ...     "model_2": ["claude-3"],
+        ...     "response_1": ["AI is..."],
+        ...     "response_2": ["AI is..."]
+        ... })
+        >>> mapping = {
+        ...     "prompt": "query",
+        ...     "model_a": "model_1",
+        ...     "model_b": "model_2",
+        ...     "model_a_response": "response_1",
+        ...     "model_b_response": "response_2"
+        ... }
+        >>> df = map_column_names(df, mapping, "side_by_side")
+    """
+    df = df.copy()
+    
+    # Define expected mapping keys for each method
+    if method == "single_model":
+        required_keys = ["prompt", "model", "model_response"]
+        optional_keys = ["question_id"]
+    elif method == "side_by_side":
+        required_keys = ["prompt", "model_a", "model_b", "model_a_response", "model_b_response"]
+        optional_keys = ["question_id"]
+    else:
+        raise ValueError(f"Invalid method: {method}. Must be 'single_model' or 'side_by_side'")
+    
+    # Check that all required keys are in the mapping
+    missing_keys = [key for key in required_keys if key not in column_mapping]
+    if missing_keys:
+        raise ValueError(
+            f"Column mapping missing required keys for {method} method: {missing_keys}. "
+            f"Required keys: {required_keys}, Optional keys: {optional_keys}"
+        )
+    
+    # Check that all source columns exist in the dataframe
+    missing_cols = []
+    for expected_name, custom_name in column_mapping.items():
+        if custom_name not in df.columns:
+            missing_cols.append(f"{custom_name} (expected name: {expected_name})")
+    
+    if missing_cols:
+        raise ValueError(
+            f"Column mapping references columns that don't exist in dataframe: {missing_cols}. "
+            f"Available columns: {list(df.columns)}"
+        )
+    
+    # Build rename dictionary (custom_name -> expected_name)
+    rename_dict = {custom_name: expected_name 
+                   for expected_name, custom_name in column_mapping.items()}
+    
+    # Perform renaming
+    if verbose:
+        logger.info(f"Mapping column names: {rename_dict}")
+    
+    df = df.rename(columns=rename_dict)
+    
+    return df
 
 
 def convert_score_columns_to_dict(
@@ -422,6 +523,15 @@ def validate_and_prepare_dataframe(
     sample_size: Optional[int] = None,
     model_a: Optional[str] = None,
     model_b: Optional[str] = None,
+    # Column mapping parameters
+    prompt_column: str = "prompt",
+    model_column: Optional[str] = None,
+    model_response_column: Optional[str] = None,
+    question_id_column: Optional[str] = None,
+    model_a_column: Optional[str] = None,
+    model_b_column: Optional[str] = None,
+    model_a_response_column: Optional[str] = None,
+    model_b_response_column: Optional[str] = None,
     verbose: bool = True,
     **kwargs
 ) -> pd.DataFrame:
@@ -429,10 +539,11 @@ def validate_and_prepare_dataframe(
     Main preprocessing entry point - handles all data preparation steps.
     
     This function orchestrates the complete data preparation pipeline:
-    1. Convert tidy to side-by-side if model_a/model_b specified
-    2. Convert score_columns to score dicts if specified
-    3. Sample data if sample_size specified
-    4. Validate required columns exist
+    1. Map custom column names to expected names (if specified)
+    2. Convert tidy to side-by-side if model_a/model_b specified
+    3. Convert score_columns to score dicts if specified
+    4. Sample data if sample_size specified
+    5. Validate required columns exist
     
     Args:
         df: Input dataframe
@@ -441,6 +552,14 @@ def validate_and_prepare_dataframe(
         sample_size: Optional number of rows to sample
         model_a: For tidy→side_by_side conversion, first model name
         model_b: For tidy→side_by_side conversion, second model name
+        prompt_column: Name of the prompt column (default: "prompt")
+        model_column: Name of the model column for single_model (default: "model")
+        model_response_column: Name of the model response column for single_model (default: "model_response")
+        question_id_column: Name of the question_id column (default: "question_id" if column exists)
+        model_a_column: Name of the model_a column for side_by_side (default: "model_a")
+        model_b_column: Name of the model_b column for side_by_side (default: "model_b")
+        model_a_response_column: Name of the model_a_response column for side_by_side (default: "model_a_response")
+        model_b_response_column: Name of the model_b_response column for side_by_side (default: "model_b_response")
         verbose: Whether to print progress messages
         **kwargs: Additional arguments (ignored, for forward compatibility)
         
@@ -451,6 +570,73 @@ def validate_and_prepare_dataframe(
         ValueError: If data validation fails
     """
     df = df.copy()
+    
+    # Step 0: Map custom column names to expected names
+    # Build column mapping based on method and provided parameters
+    column_mapping = {}
+    needs_mapping = False
+    
+    if method == "single_model":
+        # Set defaults for single_model if not provided
+        if model_column is None:
+            model_column = "model"
+        if model_response_column is None:
+            model_response_column = "model_response"
+        
+        # Build mapping for columns that differ from defaults
+        if prompt_column != "prompt":
+            column_mapping["prompt"] = prompt_column
+            needs_mapping = True
+        if model_column != "model":
+            column_mapping["model"] = model_column
+            needs_mapping = True
+        if model_response_column != "model_response":
+            column_mapping["model_response"] = model_response_column
+            needs_mapping = True
+        if question_id_column is not None and question_id_column != "question_id":
+            column_mapping["question_id"] = question_id_column
+            needs_mapping = True
+        elif question_id_column is None and "question_id" in df.columns:
+            # If user didn't specify but column exists, keep it as is
+            pass
+    
+    elif method == "side_by_side":
+        # Set defaults for side_by_side if not provided
+        if model_a_column is None:
+            model_a_column = "model_a"
+        if model_b_column is None:
+            model_b_column = "model_b"
+        if model_a_response_column is None:
+            model_a_response_column = "model_a_response"
+        if model_b_response_column is None:
+            model_b_response_column = "model_b_response"
+        
+        # Build mapping for columns that differ from defaults
+        if prompt_column != "prompt":
+            column_mapping["prompt"] = prompt_column
+            needs_mapping = True
+        if model_a_column != "model_a":
+            column_mapping["model_a"] = model_a_column
+            needs_mapping = True
+        if model_b_column != "model_b":
+            column_mapping["model_b"] = model_b_column
+            needs_mapping = True
+        if model_a_response_column != "model_a_response":
+            column_mapping["model_a_response"] = model_a_response_column
+            needs_mapping = True
+        if model_b_response_column != "model_b_response":
+            column_mapping["model_b_response"] = model_b_response_column
+            needs_mapping = True
+        if question_id_column is not None and question_id_column != "question_id":
+            column_mapping["question_id"] = question_id_column
+            needs_mapping = True
+        elif question_id_column is None and "question_id" in df.columns:
+            # If user didn't specify but column exists, keep it as is
+            pass
+    
+    # Apply column mapping if needed
+    if needs_mapping:
+        df = map_column_names(df, column_mapping, method, verbose=verbose)
     
     # Step 1: Convert tidy to side-by-side if needed
     if method == "side_by_side" and model_a is not None and model_b is not None:
@@ -501,6 +687,7 @@ def validate_and_prepare_dataframe(
 
 __all__ = [
     "convert_score_columns_to_dict",
+    "map_column_names",
     "sample_prompts_evenly",
     "tidy_to_side_by_side",
     "validate_and_prepare_dataframe",

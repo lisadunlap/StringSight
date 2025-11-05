@@ -88,7 +88,7 @@ def run_pipeline(
     clusterer="hdbscan",
     min_cluster_size=15,
     embedding_model="text-embedding-3-small",
-    max_workers=64,
+    max_workers=16,
     use_wandb=True,
     verbose=False,
     sample_size=None,

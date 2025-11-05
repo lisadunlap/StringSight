@@ -6,6 +6,6 @@ model_b: openai/gpt-5-nano-2025-08-07
 sample_size: 25
 min_cluster_size: 2
 embedding_model: text-embedding-3-small
-max_workers: 64
+max_workers: 16
 groupby_column: behavior_type
 assign_outliers: false

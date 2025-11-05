@@ -22,6 +22,20 @@ def extract_properties_only(
     method: str = "single_model",
     system_prompt: str | None = None,
     task_description: str | None = None,
+    # Data preparation
+    score_columns: Optional[List[str]] = None,
+    sample_size: Optional[int] = None,
+    model_a: Optional[str] = None,
+    model_b: Optional[str] = None,
+    # Column mapping parameters
+    prompt_column: str = "prompt",
+    model_column: Optional[str] = None,
+    model_response_column: Optional[str] = None,
+    question_id_column: Optional[str] = None,
+    model_a_column: Optional[str] = None,
+    model_b_column: Optional[str] = None,
+    model_a_response_column: Optional[str] = None,
+    model_b_response_column: Optional[str] = None,
     # Extraction parameters
     model_name: str = "gpt-4.1",
     temperature: float = 0.7,
@@ -32,7 +46,7 @@ def extract_properties_only(
     # Logging & output
     use_wandb: bool = True,
     wandb_project: str | None = None,
-    verbose: bool = True,
+    verbose: bool = False,
     output_dir: str | None = None,
     # Caching
     extraction_cache_dir: str | None = None,
@@ -45,6 +59,18 @@ def extract_properties_only(
         method: "single_model" | "side_by_side"
         system_prompt: Explicit system prompt text or a short prompt name from stringsight.prompts
         task_description: Optional task-aware description (used only if the chosen prompt has {task_description})
+        score_columns: Optional list of column names containing score metrics to convert to dict format
+        sample_size: Optional number of rows to sample from the dataset before processing
+        model_a: For side_by_side method with tidy data, specifies first model to select
+        model_b: For side_by_side method with tidy data, specifies second model to select
+        prompt_column: Name of the prompt column in your dataframe (default: "prompt")
+        model_column: Name of the model column for single_model (default: "model")
+        model_response_column: Name of the model response column for single_model (default: "model_response")
+        question_id_column: Name of the question_id column (default: "question_id" if column exists)
+        model_a_column: Name of the model_a column for side_by_side (default: "model_a")
+        model_b_column: Name of the model_b column for side_by_side (default: "model_b")
+        model_a_response_column: Name of the model_a_response column for side_by_side (default: "model_a_response")
+        model_b_response_column: Name of the model_b_response column for side_by_side (default: "model_b_response")
         model_name, temperature, top_p, max_tokens, max_workers: LLM config for extraction
         include_scores_in_prompt: Whether to include any provided score fields in the prompt context
         use_wandb, wandb_project, verbose: Logging configuration
@@ -70,6 +96,26 @@ def extract_properties_only(
         logger.info("="*80 + "\n")
     if len(system_prompt) < 50:
         raise ValueError("System prompt is too short. Please provide a longer system prompt.")
+
+    # Preprocess data: handle score_columns, sampling, tidy→side_by_side conversion, column mapping
+    from .core.preprocessing import validate_and_prepare_dataframe
+    df = validate_and_prepare_dataframe(
+        df,
+        method=method,
+        score_columns=score_columns,
+        sample_size=sample_size,
+        model_a=model_a,
+        model_b=model_b,
+        prompt_column=prompt_column,
+        model_column=model_column,
+        model_response_column=model_response_column,
+        question_id_column=question_id_column,
+        model_a_column=model_a_column,
+        model_b_column=model_b_column,
+        model_a_response_column=model_a_response_column,
+        model_b_response_column=model_b_response_column,
+        verbose=verbose,
+    )
 
     # Prepare dataset
     dataset = PropertyDataset.from_dataframe(df, method=method)
@@ -134,6 +180,15 @@ def explain(
     model_a: Optional[str] = None,
     model_b: Optional[str] = None,
     score_columns: Optional[List[str]] = None,
+    # Column mapping parameters
+    prompt_column: str = "prompt",
+    model_column: Optional[str] = None,
+    model_response_column: Optional[str] = None,
+    question_id_column: Optional[str] = None,
+    model_a_column: Optional[str] = None,
+    model_b_column: Optional[str] = None,
+    model_a_response_column: Optional[str] = None,
+    model_b_response_column: Optional[str] = None,
     # Extraction parameters
     model_name: str = "gpt-4.1",
     temperature: float = 0.7,
@@ -147,13 +202,15 @@ def explain(
     embedding_model: str = "text-embedding-3-small",
     prettify_labels: bool = False,
     assign_outliers: bool = False,
+    summary_model: str = "gpt-4.1",
+    cluster_assignment_model: str = "gpt-4.1-mini",
     # Metrics parameters
     metrics_kwargs: Optional[Dict[str, Any]] = None,
     # Caching & logging
     use_wandb: bool = True,
     wandb_project: Optional[str] = None,
     include_embeddings: bool = False,
-    verbose: bool = True,
+    verbose: bool = False,
     # Output parameters
     output_dir: Optional[str] = None,
     # Pipeline configuration
@@ -193,6 +250,16 @@ def explain(
                     be named like 'accuracy_a', 'accuracy_b', 'helpfulness_a', 'helpfulness_b'.
                     If provided, these columns will be converted to the expected score dict format.
         
+        # Column mapping parameters
+        prompt_column: Name of the prompt column in your dataframe (default: "prompt")
+        model_column: Name of the model column for single_model (default: "model")
+        model_response_column: Name of the model response column for single_model (default: "model_response")
+        question_id_column: Name of the question_id column (default: "question_id" if column exists)
+        model_a_column: Name of the model_a column for side_by_side (default: "model_a")
+        model_b_column: Name of the model_b column for side_by_side (default: "model_b")
+        model_a_response_column: Name of the model_a_response column for side_by_side (default: "model_a_response")
+        model_b_response_column: Name of the model_b_response column for side_by_side (default: "model_b_response")
+        
         # Extraction parameters
         model_name: LLM model for property extraction
         temperature: Temperature for LLM
@@ -205,6 +272,8 @@ def explain(
         min_cluster_size: Minimum cluster size
         embedding_model: Embedding model ("openai" or sentence-transformer model)
         assign_outliers: Whether to assign outliers to nearest clusters
+        summary_model: LLM model for generating cluster summaries (default: "gpt-4.1")
+        cluster_assignment_model: LLM model for assigning outliers to clusters (default: "gpt-4.1-mini")
         
         # Metrics parameters
         metrics_kwargs: Additional metrics configuration
@@ -270,7 +339,7 @@ def explain(
         **kwargs
     )
     
-    # Preprocess data: handle score_columns, sampling, tidy→side_by_side conversion
+    # Preprocess data: handle score_columns, sampling, tidy→side_by_side conversion, column mapping
     from .core.preprocessing import validate_and_prepare_dataframe
     df = validate_and_prepare_dataframe(
         df,
@@ -279,6 +348,14 @@ def explain(
         sample_size=sample_size,
         model_a=model_a,
         model_b=model_b,
+        prompt_column=prompt_column,
+        model_column=model_column,
+        model_response_column=model_response_column,
+        question_id_column=question_id_column,
+        model_a_column=model_a_column,
+        model_b_column=model_b_column,
+        model_a_response_column=model_a_response_column,
+        model_b_response_column=model_b_response_column,
         verbose=verbose,
     )
     
@@ -294,6 +371,8 @@ def explain(
         logger.info("="*80 + "\n")
     if len(system_prompt) < 50:
         raise ValueError("System prompt is too short. Please provide a longer system prompt.")
+
+    print(f"df length: {len(df)}")
     
     # Create PropertyDataset from input DataFrame
     dataset = PropertyDataset.from_dataframe(df, method=method)
@@ -396,6 +475,8 @@ def explain(
             embedding_model=embedding_model,
             assign_outliers=assign_outliers,
             prettify_labels=prettify_labels,
+            summary_model=summary_model,
+            cluster_assignment_model=cluster_assignment_model,
             metrics_kwargs=metrics_kwargs,
             use_wandb=use_wandb,
             wandb_project=wandb_project,
@@ -516,6 +597,8 @@ def _build_default_pipeline(
     embedding_model: str,
     assign_outliers: bool,
     prettify_labels: bool,
+    summary_model: str,
+    cluster_assignment_model: str,
     metrics_kwargs: Optional[Dict[str, Any]],
     use_wandb: bool,
     wandb_project: Optional[str],
@@ -605,6 +688,8 @@ def _build_default_pipeline(
         'assign_outliers': assign_outliers,
         'include_embeddings': include_embeddings,
         'prettify_labels': prettify_labels,
+        'summary_model': summary_model,
+        'cluster_assignment_model': cluster_assignment_model,
         'output_dir': clustering_output,
         **common_config
     }
@@ -795,7 +880,7 @@ def _save_final_summary(
     clustered_df: pd.DataFrame,
     model_stats: Dict[str, pd.DataFrame],
     output_dir: str,
-    verbose: bool = True
+    verbose: bool = False
 ):
     """Save a final summary of the explain run to a text file."""
     import pathlib
@@ -935,7 +1020,12 @@ def label(
     *,
     taxonomy: Dict[str, str],
     sample_size: Optional[int] = None,
+    # Column mapping parameters
     score_columns: Optional[List[str]] = None,
+    prompt_column: str = "prompt",
+    model_column: Optional[str] = None,
+    model_response_column: Optional[str] = None,
+    question_id_column: Optional[str] = None,
     model_name: str = "gpt-4.1",
     temperature: float = 0.0,
     top_p: float = 1.0,
@@ -945,7 +1035,7 @@ def label(
     use_wandb: bool = True,
     wandb_project: Optional[str] = None,
     include_embeddings: bool = False,
-    verbose: bool = True,
+    verbose: bool = False,
     output_dir: Optional[str] = None,
     extraction_cache_dir: Optional[str] = None,
     metrics_cache_dir: Optional[str] = None,
@@ -969,6 +1059,10 @@ def label(
                     providing scores as a dictionary in a 'score' column, you can specify
                     separate columns for each metric (e.g., ['accuracy', 'helpfulness']).
                     If provided, these columns will be converted to the expected score dict format.
+        prompt_column: Name of the prompt column in your dataframe (default: "prompt")
+        model_column: Name of the model column (default: "model")
+        model_response_column: Name of the model response column (default: "model_response")
+        question_id_column: Name of the question_id column (default: "question_id" if column exists)
         model_name: LLM model for property extraction (default: "gpt-4.1")
         temperature: Temperature for LLM (default: 0.0)
         top_p: Top-p for LLM (default: 1.0)
@@ -1004,13 +1098,17 @@ def label(
     if "model_b" in df.columns:
         raise ValueError("label() currently supports only single-model data.  Use explain() for side-by-side analyses.")
 
-    # Preprocess data: handle score_columns and sampling
+    # Preprocess data: handle score_columns, sampling, and column mapping
     from .core.preprocessing import validate_and_prepare_dataframe
     df = validate_and_prepare_dataframe(
         df,
         method=method,
         score_columns=score_columns,
         sample_size=sample_size,
+        prompt_column=prompt_column,
+        model_column=model_column,
+        model_response_column=model_response_column,
+        question_id_column=question_id_column,
         verbose=verbose,
     )
 
@@ -1120,6 +1218,11 @@ def label(
     # Execute
     # ------------------------------------------------------------------
     result_dataset = pipeline.run(dataset)
+
+    # Check for 0 properties before attempting to save
+    if len([p for p in result_dataset.properties if p.property_description is not None]) == 0:
+        raise RuntimeError("Label pipeline completed with 0 valid properties. Check logs for parsing errors or API issues.")
+
     clustered_df = result_dataset.to_dataframe(type="clusters", method=method)
 
     # Save final summary and full dataset if output_dir is provided (same as explain() function)
@@ -1217,7 +1320,7 @@ def compute_metrics_only(
     output_dir: Optional[str] = None,
     metrics_kwargs: Optional[Dict[str, Any]] = None,
     use_wandb: bool = True,
-    verbose: bool = True
+    verbose: bool = False
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """
     Run only the metrics computation stage on existing pipeline results.

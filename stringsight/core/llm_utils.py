@@ -186,9 +186,13 @@ class LLMUtils:
                     request_data = {
                         "model": config.model,
                         "messages": request_messages,
-                        "temperature": config.temperature,
-                        "top_p": config.top_p,
                     }
+                    
+                    # GPT-5 models only support temperature=1, so skip temperature/top_p for them
+                    if "gpt-5" not in config.model.lower():
+                        request_data["temperature"] = config.temperature
+                        request_data["top_p"] = config.top_p
+                    
                     if config.max_tokens:
                         request_data["max_completion_tokens"] = config.max_tokens
                     
@@ -207,24 +211,36 @@ class LLMUtils:
                             caching=False,  # Use our own caching
                             timeout=config.timeout
                         )
-                    except litellm.BadRequestError as api_err:
-                        # Some models only accept default temperature/top_p; drop unsupported args and retry once
+                    except Exception as api_err:
+                        # Check if this is an unsupported params error
                         err_text = str(api_err).lower()
-                        safe_request = dict(request_data)
-                        retried = False
-                        if "temperature" in err_text:
-                            safe_request.pop("temperature", None)
-                            retried = True
-                        if "top_p" in err_text:
-                            safe_request.pop("top_p", None)
-                            retried = True
-                        if retried:
-                            response = litellm.completion(
-                                **safe_request,
-                                caching=False,
-                                timeout=config.timeout
-                            )
+                        err_type = type(api_err).__name__.lower()
+                        
+                        # Handle unsupported parameter errors (BadRequestError, UnsupportedParamsError, etc.)
+                        if ("unsupported" in err_text or "don't support" in err_text or 
+                            "badrequest" in err_type or "unsupportedparams" in err_type):
+                            safe_request = dict(request_data)
+                            retried = False
+                            
+                            if "temperature" in err_text:
+                                safe_request.pop("temperature", None)
+                                retried = True
+                                logger.info(f"Dropping temperature parameter for {config.model}")
+                            if "top_p" in err_text:
+                                safe_request.pop("top_p", None)
+                                retried = True
+                                logger.info(f"Dropping top_p parameter for {config.model}")
+                            
+                            if retried:
+                                response = litellm.completion(
+                                    **safe_request,
+                                    caching=False,
+                                    timeout=config.timeout
+                                )
+                            else:
+                                raise
                         else:
+                            # Not an unsupported params error, re-raise to outer handler
                             raise
                     
                     content = response.choices[0].message.content
@@ -246,8 +262,41 @@ class LLMUtils:
                         logger.error(f"LLM call failed after {config.max_retries} attempts: {e}")
                         return idx, f"ERROR: {e}"
                     else:
-                        sleep_time = config.base_sleep_time * (2 ** attempt)
-                        logger.warning(f"LLM call attempt {attempt + 1} failed, retrying in {sleep_time}s: {e}")
+                        # Check if this is a rate limit error
+                        is_rate_limit = False
+                        retry_after = None
+                        
+                        # Check for litellm rate limit errors
+                        if hasattr(litellm, 'RateLimitError') and isinstance(e, litellm.RateLimitError):
+                            is_rate_limit = True
+                        elif hasattr(e, 'status_code') and e.status_code == 429:
+                            is_rate_limit = True
+                        elif "rate limit" in str(e).lower() or "429" in str(e):
+                            is_rate_limit = True
+                        
+                        # Try to extract Retry-After header from exception
+                        if is_rate_limit:
+                            try:
+                                if hasattr(e, 'response') and hasattr(e.response, 'headers'):
+                                    retry_after_str = e.response.headers.get('Retry-After', '')
+                                    if retry_after_str:
+                                        retry_after = float(retry_after_str)
+                            except Exception:
+                                pass
+                        
+                        # Use Retry-After if available, otherwise use exponential backoff
+                        if is_rate_limit and retry_after:
+                            sleep_time = retry_after
+                            logger.warning(f"Rate limit hit (attempt {attempt + 1}/{config.max_retries}), waiting {sleep_time}s per Retry-After header: {e}")
+                        elif is_rate_limit:
+                            # For rate limits, use shorter initial backoff but still exponential
+                            sleep_time = max(1.0, config.base_sleep_time * (1.5 ** attempt))
+                            logger.warning(f"Rate limit hit (attempt {attempt + 1}/{config.max_retries}), retrying in {sleep_time}s: {e}")
+                        else:
+                            # For other errors, use standard exponential backoff
+                            sleep_time = config.base_sleep_time * (2 ** attempt)
+                            logger.warning(f"LLM call attempt {attempt + 1} failed, retrying in {sleep_time}s: {e}")
+                        
                         time.sleep(sleep_time)
             
             return idx, "ERROR: Max retries exceeded"
@@ -280,7 +329,7 @@ class LLMUtils:
         texts: List[str],
         config: EmbeddingConfig,
         show_progress: bool = True,
-        progress_desc: str = "Embedding calls"
+        progress_desc: str = "Generating embeddings"
     ) -> List[List[float]]:
         """
         Generate embeddings in parallel with batching and order preservation.
@@ -361,8 +410,41 @@ class LLMUtils:
                         fallback_embeddings = [[0.0] * 1536] * len(batch_texts)  # Default to 1536 dims
                         return start_idx, fallback_embeddings
                     else:
-                        sleep_time = config.base_sleep_time * (2 ** attempt)
-                        logger.warning(f"Embedding batch attempt {attempt + 1} failed, retrying in {sleep_time}s: {e}")
+                        # Check if this is a rate limit error
+                        is_rate_limit = False
+                        retry_after = None
+                        
+                        # Check for litellm rate limit errors
+                        if hasattr(litellm, 'RateLimitError') and isinstance(e, litellm.RateLimitError):
+                            is_rate_limit = True
+                        elif hasattr(e, 'status_code') and e.status_code == 429:
+                            is_rate_limit = True
+                        elif "rate limit" in str(e).lower() or "429" in str(e):
+                            is_rate_limit = True
+                        
+                        # Try to extract Retry-After header from exception
+                        if is_rate_limit:
+                            try:
+                                if hasattr(e, 'response') and hasattr(e.response, 'headers'):
+                                    retry_after_str = e.response.headers.get('Retry-After', '')
+                                    if retry_after_str:
+                                        retry_after = float(retry_after_str)
+                            except Exception:
+                                pass
+                        
+                        # Use Retry-After if available, otherwise use exponential backoff
+                        if is_rate_limit and retry_after:
+                            sleep_time = retry_after
+                            logger.warning(f"Rate limit hit (attempt {attempt + 1}/{config.max_retries}), waiting {sleep_time}s per Retry-After header: {e}")
+                        elif is_rate_limit:
+                            # For rate limits, use shorter initial backoff but still exponential
+                            sleep_time = max(1.0, config.base_sleep_time * (1.5 ** attempt))
+                            logger.warning(f"Rate limit hit (attempt {attempt + 1}/{config.max_retries}), retrying in {sleep_time}s: {e}")
+                        else:
+                            # For other errors, use standard exponential backoff
+                            sleep_time = config.base_sleep_time * (2 ** attempt)
+                            logger.warning(f"Embedding batch attempt {attempt + 1} failed, retrying in {sleep_time}s: {e}")
+                        
                         time.sleep(sleep_time)
             
             # Fallback
@@ -464,7 +546,7 @@ def parallel_embeddings(
     batch_size: int = 100,
     max_workers: int = 64,
     show_progress: bool = True,
-    progress_desc: str = "Embedding calls",
+    progress_desc: str = "Generating embeddings",
     **kwargs
 ) -> List[List[float]]:
     """Convenience function for parallel embeddings with default settings."""

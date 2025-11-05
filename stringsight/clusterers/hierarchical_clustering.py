@@ -501,8 +501,8 @@ def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.Dat
     # Get outlier items
     outlier_items = [unique_values[i] for i, label in enumerate(cluster_labels) if label < 0]
 
-    # Skip LLM-based outlier clustering if fewer than 5 outliers (not worth the overhead)
-    if len(outlier_items) >= 5:
+    # Skip LLM-based outlier clustering if fewer than min_cluster_size * 2 outliers (not worth the overhead)
+    if len(outlier_items) >= effective_min_cluster_size * 2:
         # Generate outlier cluster summaries
         outlier_cluster_names = generate_coarse_labels(
             outlier_items,
@@ -566,7 +566,7 @@ def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.Dat
             logger.info(f"Assigned outliers to {n_outlier_clusters} clusters, {n_remaining_outliers} remain as outliers")
     else:
         if config.verbose:
-            logger.info("No outliers to cluster")
+            logger.info(f"No outliers/too few outliers ({len(outlier_items)}) to cluster")
 
     # -------------------------------------------------------------
     # Step 4b: Deduplicate cluster labels via LLM            

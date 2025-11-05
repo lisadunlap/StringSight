@@ -3,7 +3,7 @@ output_dir: results/omni_math_top_models
 method: single_model
 min_cluster_size: 8
 embedding_model: text-embedding-3-large
-max_workers: 64
+max_workers: 16
 groupby_column: behavior_type
 assign_outliers: false
 models:
