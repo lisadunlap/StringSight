@@ -1,8 +1,10 @@
 misc/one_sided_comparisons/** filter=lfs diff=lfs merge=lfs -text
 misc/*.csv filter=lfs diff=lfs merge=lfs -text
-misc/*.jsonl filter=lfs diff=lfs merge=lfs -text 
+misc/*.jsonl filter=lfs diff=lfs merge=lfs -text
 cluster_results/* ilter=lfs diff=lfs merge=lfs -text
 helm_capabilities/* filter=lfs diff=lfs merge=lfs -text
 processed_helm/* filter=lfs diff=lfs merge=lfs -text
+data/airline_data_demo.jsonl !filter !diff !merge text
+data/taubench/airline_data_demo.jsonl !filter !diff !merge text
 data/** filter=lfs diff=lfs merge=lfs -text
 benchmark/results/** filter=lfs diff=lfs merge=lfs -text
