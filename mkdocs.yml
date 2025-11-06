@@ -42,6 +42,7 @@ nav:
   - User Guide:
     - Basic Usage: user-guide/basic-usage.md
     - Data Formats: user-guide/data-formats.md
+    - Parameter Reference: user-guide/parameters.md
     - Configuration Guide: user-guide/configuration-guide.md
     - Output Files: user-guide/configuration.md
     - Visualization: user-guide/visualization.md

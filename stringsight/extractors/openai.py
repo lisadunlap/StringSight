@@ -6,6 +6,7 @@ This stage migrates the logic from generate_differences.py into the pipeline arc
 
 from typing import Callable, Optional, List, Dict, Any, Union
 import uuid
+import json
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import litellm
@@ -284,24 +285,49 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
 
     def _collapse_segments_to_openai_content(self, conv_msgs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Collapse ordered segments into an OpenAI multimodal content list, preserving order.
+        Collapse ordered segments into an OpenAI multimodal content list with aggregated text.
+        
+        Algorithm:
+        - Walk through messages in order, accumulating non-image content in a buffer
+        - When an image is encountered, flush the buffer (convert to string via conv_to_str),
+          then add the image as a separate item
+        - Continue until all messages processed, then flush any remaining buffer
+        
+        This ensures consecutive non-image turns are aggregated into single text items,
+        with images interspersed at their proper positions.
+        
         Produces items like:
-          - {"type": "text", "text": str}
+          - {"type": "text", "text": str}  (potentially aggregated from multiple turns)
           - {"type": "image_url", "image_url": {"url": str}}
         """
         content: List[Dict[str, Any]] = []
+        message_buffer: List[Dict[str, Any]] = []  # Buffer for messages without images
+        
+        def flush_buffer():
+            """Convert buffered messages to a single text string using conv_to_str."""
+            if message_buffer:
+                text_str = conv_to_str(message_buffer)
+                if text_str and text_str.strip():
+                    content.append({"type": "text", "text": text_str})
+                message_buffer.clear()
+        
         for msg in conv_msgs:
-            segs = msg.get("content", {}).get("segments", []) if isinstance(msg.get("content"), dict) else []
+            # Extract segments from this message
+            msg_content = msg.get("content", {})
+            segs = msg_content.get("segments", []) if isinstance(msg_content, dict) else []
+            
+            # Check if this message contains any images
+            images_in_msg: List[str] = []
+            non_image_segments: List[Dict[str, Any]] = []
+            
             for seg in segs:
                 if not isinstance(seg, dict):
-                    content.append({"type": "text", "text": str(seg)})
+                    non_image_segments.append(seg)
                     continue
+                    
                 kind = seg.get("kind")
-                if kind == "text":
-                    text_val = seg.get("text", "")
-                    if isinstance(text_val, str) and text_val != "":
-                        content.append({"type": "text", "text": text_val})
-                elif kind == "image":
+                if kind == "image":
+                    # Extract image URL
                     img = seg.get("image")
                     url: Optional[str] = None
                     if isinstance(img, str):
@@ -314,16 +340,28 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
                         elif isinstance(img.get("source"), str):
                             url = img.get("source")
                     if url:
-                        content.append({"type": "image_url", "image_url": {"url": url}})
-                elif kind == "tool":
-                    # Render tool output succinctly as text for extraction context
-                    tc = seg.get("tool_calls", [])
-                    if isinstance(tc, list) and tc:
-                        rendered = "\n".join([f"Tool call {t.get('name', '<tool>')} with args: {t.get('arguments')}" for t in tc if isinstance(t, dict)])
-                        if rendered:
-                            content.append({"type": "text", "text": rendered})
+                        images_in_msg.append(url)
                 else:
-                    content.append({"type": "text", "text": str(seg)})
+                    # Keep non-image segments (text, tool, etc.)
+                    non_image_segments.append(seg)
+            
+            # Build a message dict with only non-image content for the buffer
+            if non_image_segments:
+                msg_for_buffer = dict(msg)  # Copy message structure
+                msg_for_buffer["content"] = {
+                    "segments": non_image_segments
+                }
+                message_buffer.append(msg_for_buffer)
+            
+            # If we encountered images, flush buffer then add images
+            if images_in_msg:
+                flush_buffer()
+                for img_url in images_in_msg:
+                    content.append({"type": "image_url", "image_url": {"url": img_url}})
+        
+        # Flush any remaining buffered messages at the end
+        flush_buffer()
+        
         return content
 
     def _build_single_user_messages(self, conv_msgs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

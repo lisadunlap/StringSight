@@ -176,8 +176,6 @@ def prepare_embeddings(unique_values: List[Any], config: ClusterConfig) -> np.nd
                         # Convert back to numpy
                         embeddings = cp.asnumpy(embeddings_reduced)
                     except ImportError as e:
-                        if config.verbose:
-                            logger.warning(f"cuML not available ({e}), falling back to CPU UMAP")
                         reducer = umap.UMAP(
                             n_components=n_components,
                             n_neighbors=n_neighbors,
@@ -419,8 +417,6 @@ def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.Dat
                 # Convert back to numpy
                 cluster_labels = cp.asnumpy(cluster_labels_gpu).astype(int)
             except ImportError as e:
-                if config.verbose:
-                    logger.warning(f"cuML not available ({e}), falling back to CPU HDBSCAN")
                 clusterer = hdbscan.HDBSCAN(
                     min_cluster_size=effective_min_cluster_size,
                     min_samples=config.min_samples if config.min_samples else 1,
