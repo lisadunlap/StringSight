@@ -1,0 +1,2895 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Extract, cluster, and analyze behavioral properties from Large Language Models">
+      
+      
+        <meta name="author" content="StringSight Team">
+      
+      
+      
+        <link rel="prev" href="../basic-usage/">
+      
+      
+        <link rel="next" href="../parameters/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.23">
+    
+    
+      
+        <title>Data Formats - StringSight Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.84d31ad4.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#data-formats" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="StringSight Documentation" class="md-header__button md-logo" aria-label="StringSight Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            StringSight Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Data Formats
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lisabdunlap/StringSight" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    StringSight
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../basic-usage/" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../advanced/custom-pipelines/" class="md-tabs__link">
+          
+  
+  
+  Advanced
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../deployment/production/" class="md-tabs__link">
+          
+  
+  
+  Deployment
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../development/contributing/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../troubleshooting/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Troubleshooting
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="StringSight Documentation" class="md-nav__button md-logo" aria-label="StringSight Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    StringSight Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lisabdunlap/StringSight" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    StringSight
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Getting Started
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting Started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quick Start
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    User Guide
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            User Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../basic-usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Basic Usage
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Data Formats
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Data Formats
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#input-data-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      Input Data Formats
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Input Data Formats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-model-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Single Model Format
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Single Model Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Required Columns
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Optional Columns
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-dataframe" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example DataFrame
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#side-by-side-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Side-by-Side Format
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Side-by-Side Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-1-pre-paired-format-explicit-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Option 1: Pre-Paired Format (Explicit Columns)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-2-tidy-format-with-model-selection-auto-pairing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Option 2: Tidy Format with Model Selection (Auto-Pairing)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#response-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Response Format
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Response Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automatic-format-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Automatic Format Detection
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#openai-conversation-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      OpenAI Conversation Format
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="OpenAI Conversation Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#message-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Message Structure
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#simple-text-conversation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Simple Text Conversation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-turn-conversation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Multi-Turn Conversation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tool-augmented-response" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tool-Augmented Response
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multimodal-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      Multimodal Input
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#score-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Score Format
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Score Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-metric" class="md-nav__link">
+    <span class="md-ellipsis">
+      Single Metric
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multiple-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Multiple Metrics
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#side-by-side-winner-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Side-by-Side Winner Format
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#combined-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Combined Format
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-separate-score-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using Separate Score Columns
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using Separate Score Columns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-model-with-score-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Single Model with Score Columns
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#side-by-side-with-score-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Side-by-Side with Score Columns
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tidy-data-with-score-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tidy Data with Score Columns
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-data-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      Output Data Formats
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Output Data Formats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#main-output-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      Main Output Files
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Main Output Files">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#clustered_resultsparquet" class="md-nav__link">
+    <span class="md-ellipsis">
+      clustered_results.parquet
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full_datasetjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      full_dataset.json
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_cluster_scoresjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      model_cluster_scores.json
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cluster_scoresjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      cluster_scores.json
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_scoresjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      model_scores.json
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summarytxt" class="md-nav__link">
+    <span class="md-ellipsis">
+      summary.txt
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#intermediate-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      Intermediate Files
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#loading-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      Loading Data
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Loading Data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      From Files
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-various-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      From Various Sources
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data Validation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#converting-between-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      Converting Between Formats
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Converting Between Formats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tidy-to-side-by-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tidy to Side-by-Side
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#programmatic-conversion" class="md-nav__link">
+    <span class="md-ellipsis">
+      Programmatic Conversion
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      Best Practices
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-preparation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data Preparation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quality-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Quality Checks
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance Tips
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Troubleshooting
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      Common Issues
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      Next Steps
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../parameters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Parameter Reference
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Configuration Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Output Files
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../visualization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Visualization
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Advanced
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Advanced
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/custom-pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Custom Pipelines
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Performance Tuning
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Deployment
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Deployment
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/production/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Production Setup
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Development
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Development
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Contributing
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Testing
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Troubleshooting
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#input-data-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      Input Data Formats
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Input Data Formats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-model-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Single Model Format
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Single Model Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Required Columns
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Optional Columns
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-dataframe" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example DataFrame
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#side-by-side-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Side-by-Side Format
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Side-by-Side Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-1-pre-paired-format-explicit-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Option 1: Pre-Paired Format (Explicit Columns)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-2-tidy-format-with-model-selection-auto-pairing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Option 2: Tidy Format with Model Selection (Auto-Pairing)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#response-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Response Format
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Response Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automatic-format-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Automatic Format Detection
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#openai-conversation-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      OpenAI Conversation Format
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="OpenAI Conversation Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#message-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Message Structure
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#simple-text-conversation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Simple Text Conversation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-turn-conversation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Multi-Turn Conversation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tool-augmented-response" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tool-Augmented Response
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multimodal-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      Multimodal Input
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#score-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Score Format
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Score Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-metric" class="md-nav__link">
+    <span class="md-ellipsis">
+      Single Metric
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multiple-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Multiple Metrics
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#side-by-side-winner-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Side-by-Side Winner Format
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#combined-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Combined Format
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-separate-score-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using Separate Score Columns
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using Separate Score Columns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-model-with-score-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Single Model with Score Columns
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#side-by-side-with-score-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Side-by-Side with Score Columns
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tidy-data-with-score-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tidy Data with Score Columns
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-data-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      Output Data Formats
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Output Data Formats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#main-output-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      Main Output Files
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Main Output Files">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#clustered_resultsparquet" class="md-nav__link">
+    <span class="md-ellipsis">
+      clustered_results.parquet
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full_datasetjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      full_dataset.json
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_cluster_scoresjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      model_cluster_scores.json
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cluster_scoresjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      cluster_scores.json
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_scoresjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      model_scores.json
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summarytxt" class="md-nav__link">
+    <span class="md-ellipsis">
+      summary.txt
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#intermediate-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      Intermediate Files
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#loading-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      Loading Data
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Loading Data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      From Files
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-various-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      From Various Sources
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data Validation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#converting-between-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      Converting Between Formats
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Converting Between Formats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tidy-to-side-by-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tidy to Side-by-Side
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#programmatic-conversion" class="md-nav__link">
+    <span class="md-ellipsis">
+      Programmatic Conversion
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      Best Practices
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-preparation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data Preparation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quality-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Quality Checks
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance Tips
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Troubleshooting
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      Common Issues
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      Next Steps
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="data-formats">Data Formats<a class="headerlink" href="#data-formats" title="Permanent link">&para;</a></h1>
+<p>StringSight requires specific data formats for input and produces structured outputs. This guide covers all supported formats and schemas.</p>
+<h2 id="input-data-formats">Input Data Formats<a class="headerlink" href="#input-data-formats" title="Permanent link">&para;</a></h2>
+<p>StringSight supports two primary analysis methods, each with specific column requirements.</p>
+<h3 id="single-model-format">Single Model Format<a class="headerlink" href="#single-model-format" title="Permanent link">&para;</a></h3>
+<p>Used for analyzing behavioral patterns from individual model responses.</p>
+<h4 id="required-columns">Required Columns<a class="headerlink" href="#required-columns" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>prompt</code></td>
+<td><code>str</code></td>
+<td>User question/prompt</td>
+<td><code>"What is machine learning?"</code></td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>str</code></td>
+<td>Model identifier</td>
+<td><code>"gpt-4"</code>, <code>"claude-3-opus"</code></td>
+</tr>
+<tr>
+<td><code>model_response</code></td>
+<td><code>str</code> or <code>list</code></td>
+<td>Model's response (see <a href="#response-format">Response Format</a>)</td>
+<td><code>"Machine learning is..."</code></td>
+</tr>
+</tbody>
+</table>
+<h4 id="optional-columns">Optional Columns<a class="headerlink" href="#optional-columns" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>question_id</code></td>
+<td><code>str</code></td>
+<td>Unique conversation ID</td>
+<td><code>"q_12345"</code> (auto-generated if missing)</td>
+</tr>
+<tr>
+<td><code>score</code></td>
+<td><code>dict</code></td>
+<td>Quality/evaluation scores</td>
+<td><code>{"accuracy": 0.85, "helpfulness": 4.2}</code></td>
+</tr>
+</tbody>
+</table>
+<h4 id="example-dataframe">Example DataFrame<a class="headerlink" href="#example-dataframe" title="Permanent link">&para;</a></h4>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="s2">&quot;question_id&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;q1&quot;</span><span class="p">,</span> <span class="s2">&quot;q2&quot;</span><span class="p">,</span> <span class="s2">&quot;q3&quot;</span><span class="p">],</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s2">&quot;prompt&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="s2">&quot;What is machine learning?&quot;</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="s2">&quot;Explain quantum computing&quot;</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="s2">&quot;Write a poem about AI&quot;</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="p">],</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span> <span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span> <span class="s2">&quot;gpt-4&quot;</span><span class="p">],</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="s2">&quot;model_response&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>        <span class="s2">&quot;Machine learning is a subset of AI...&quot;</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>        <span class="s2">&quot;Quantum computing uses quantum bits...&quot;</span><span class="p">,</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>        <span class="s2">&quot;In circuits of light, intelligence grows...&quot;</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="p">],</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>        <span class="p">{</span><span class="s2">&quot;accuracy&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;helpfulness&quot;</span><span class="p">:</span> <span class="mf">4.5</span><span class="p">},</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>        <span class="p">{</span><span class="s2">&quot;accuracy&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;helpfulness&quot;</span><span class="p">:</span> <span class="mf">3.8</span><span class="p">},</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>        <span class="p">{</span><span class="s2">&quot;accuracy&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;helpfulness&quot;</span><span class="p">:</span> <span class="mf">4.2</span><span class="p">}</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>    <span class="p">]</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="p">})</span>
+</span></code></pre></div>
+<h3 id="side-by-side-format">Side-by-Side Format<a class="headerlink" href="#side-by-side-format" title="Permanent link">&para;</a></h3>
+<p>Used for head-to-head model comparisons (Arena-style battles).</p>
+<p><strong>StringSight supports TWO ways to provide side-by-side data:</strong></p>
+<h4 id="option-1-pre-paired-format-explicit-columns">Option 1: Pre-Paired Format (Explicit Columns)<a class="headerlink" href="#option-1-pre-paired-format-explicit-columns" title="Permanent link">&para;</a></h4>
+<p>Provide explicit columns for both models with their responses already paired.</p>
+<p><strong>Required Columns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>prompt</code></td>
+<td><code>str</code></td>
+<td>Question given to both models</td>
+<td><code>"What is machine learning?"</code></td>
+</tr>
+<tr>
+<td><code>model_a</code></td>
+<td><code>str</code></td>
+<td>First model identifier</td>
+<td><code>"gpt-4"</code></td>
+</tr>
+<tr>
+<td><code>model_b</code></td>
+<td><code>str</code></td>
+<td>Second model identifier</td>
+<td><code>"claude-3"</code></td>
+</tr>
+<tr>
+<td><code>model_a_response</code></td>
+<td><code>str</code> or <code>list</code></td>
+<td>First model's response</td>
+<td><code>"ML is a subset of AI..."</code></td>
+</tr>
+<tr>
+<td><code>model_b_response</code></td>
+<td><code>str</code> or <code>list</code></td>
+<td>Second model's response</td>
+<td><code>"Machine learning involves..."</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Optional Columns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>question_id</code></td>
+<td><code>str</code></td>
+<td>Unique conversation ID</td>
+<td><code>"battle_001"</code></td>
+</tr>
+<tr>
+<td><code>score</code></td>
+<td><code>dict</code></td>
+<td>Battle results and scores</td>
+<td><code>{"winner": "model_a", "helpfulness": 4.2}</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Pre-paired side-by-side format</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="s2">&quot;question_id&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;b1&quot;</span><span class="p">,</span> <span class="s2">&quot;b2&quot;</span><span class="p">,</span> <span class="s2">&quot;b3&quot;</span><span class="p">],</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="s2">&quot;prompt&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="s2">&quot;What is machine learning?&quot;</span><span class="p">,</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="s2">&quot;Explain quantum computing&quot;</span><span class="p">,</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="s2">&quot;Write a poem about AI&quot;</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="p">],</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="s2">&quot;model_a&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span> <span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span> <span class="s2">&quot;gpt-4&quot;</span><span class="p">],</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="s2">&quot;model_b&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;claude-3&quot;</span><span class="p">,</span> <span class="s2">&quot;claude-3&quot;</span><span class="p">,</span> <span class="s2">&quot;claude-3&quot;</span><span class="p">],</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="s2">&quot;model_a_response&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>        <span class="s2">&quot;ML is a subset of AI...&quot;</span><span class="p">,</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>        <span class="s2">&quot;Quantum computing uses qubits...&quot;</span><span class="p">,</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>        <span class="s2">&quot;In circuits of light...&quot;</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="p">],</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="s2">&quot;model_b_response&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>        <span class="s2">&quot;Machine learning involves...&quot;</span><span class="p">,</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>        <span class="s2">&quot;QC leverages quantum phenomena...&quot;</span><span class="p">,</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>        <span class="s2">&quot;Silicon dreams awaken...&quot;</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>    <span class="p">],</span>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>    <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>        <span class="p">{</span><span class="s2">&quot;winner&quot;</span><span class="p">:</span> <span class="s2">&quot;model_a&quot;</span><span class="p">,</span> <span class="s2">&quot;helpfulness&quot;</span><span class="p">:</span> <span class="mf">4.2</span><span class="p">},</span>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>        <span class="p">{</span><span class="s2">&quot;winner&quot;</span><span class="p">:</span> <span class="s2">&quot;model_a&quot;</span><span class="p">,</span> <span class="s2">&quot;helpfulness&quot;</span><span class="p">:</span> <span class="mf">3.8</span><span class="p">},</span>
+</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>        <span class="p">{</span><span class="s2">&quot;winner&quot;</span><span class="p">:</span> <span class="s2">&quot;model_b&quot;</span><span class="p">,</span> <span class="s2">&quot;helpfulness&quot;</span><span class="p">:</span> <span class="mf">4.5</span><span class="p">}</span>
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>    <span class="p">]</span>
+</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="p">})</span>
+</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>
+</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="c1"># Run analysis</span>
+</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a><span class="kn">from</span><span class="w"> </span><span class="nn">stringsight</span><span class="w"> </span><span class="kn">import</span> <span class="n">explain</span>
+</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="n">clustered_df</span><span class="p">,</span> <span class="n">model_stats</span> <span class="o">=</span> <span class="n">explain</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;side_by_side&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="option-2-tidy-format-with-model-selection-auto-pairing">Option 2: Tidy Format with Model Selection (Auto-Pairing)<a class="headerlink" href="#option-2-tidy-format-with-model-selection-auto-pairing" title="Permanent link">&para;</a></h4>
+<p>Provide data in tidy single-model format and specify which two models to compare using the <strong><code>model_a</code> and <code>model_b</code> parameters</strong>. StringSight will automatically pair responses for shared prompts.</p>
+<p><strong>Key Parameters:</strong>
+- <code>model_a="model_name"</code> - First model to compare
+- <code>model_b="model_name"</code> - Second model to compare</p>
+<p><strong>Required Columns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>prompt</code></td>
+<td><code>str</code></td>
+<td>User question/prompt</td>
+<td><code>"What is machine learning?"</code></td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>str</code></td>
+<td>Model identifier</td>
+<td><code>"gpt-4"</code>, <code>"claude-3"</code></td>
+</tr>
+<tr>
+<td><code>model_response</code></td>
+<td><code>str</code> or <code>list</code></td>
+<td>Model's response</td>
+<td><code>"Machine learning is..."</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Complete Example:</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Tidy format with multiple models</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">df_tidy</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="s2">&quot;prompt&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>        <span class="s2">&quot;What is machine learning?&quot;</span><span class="p">,</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>        <span class="s2">&quot;What is machine learning?&quot;</span><span class="p">,</span>  <span class="c1"># Same prompt, different model</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="s2">&quot;Explain quantum computing&quot;</span><span class="p">,</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="s2">&quot;Explain quantum computing&quot;</span><span class="p">,</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        <span class="s2">&quot;Write a poem about AI&quot;</span><span class="p">,</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="s2">&quot;Write a poem about AI&quot;</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="p">],</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span> <span class="s2">&quot;claude-3&quot;</span><span class="p">,</span> <span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span> <span class="s2">&quot;claude-3&quot;</span><span class="p">,</span> <span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span> <span class="s2">&quot;claude-3&quot;</span><span class="p">],</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    <span class="s2">&quot;model_response&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>        <span class="s2">&quot;ML is a subset of AI...&quot;</span><span class="p">,</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>        <span class="s2">&quot;Machine learning involves...&quot;</span><span class="p">,</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>        <span class="s2">&quot;Quantum computing uses qubits...&quot;</span><span class="p">,</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>        <span class="s2">&quot;QC leverages quantum phenomena...&quot;</span><span class="p">,</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>        <span class="s2">&quot;In circuits of light...&quot;</span><span class="p">,</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>        <span class="s2">&quot;Silicon dreams awaken...&quot;</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>    <span class="p">]</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="p">})</span>
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>
+</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="c1"># Run side-by-side analysis on tidy data</span>
+</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="kn">from</span><span class="w"> </span><span class="nn">stringsight</span><span class="w"> </span><span class="kn">import</span> <span class="n">explain</span>
+</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>
+</span><span id="__span-2-25"><a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a><span class="n">clustered_df</span><span class="p">,</span> <span class="n">model_stats</span> <span class="o">=</span> <span class="n">explain</span><span class="p">(</span>
+</span><span id="__span-2-26"><a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>    <span class="n">df_tidy</span><span class="p">,</span>
+</span><span id="__span-2-27"><a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;side_by_side&quot;</span><span class="p">,</span>
+</span><span id="__span-2-28"><a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>    <span class="n">model_a</span><span class="o">=</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span>      <span class="c1"># ← Specify first model</span>
+</span><span id="__span-2-29"><a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>    <span class="n">model_b</span><span class="o">=</span><span class="s2">&quot;claude-3&quot;</span>    <span class="c1"># ← Specify second model</span>
+</span><span id="__span-2-30"><a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a><span class="p">)</span>
+</span><span id="__span-2-31"><a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>
+</span><span id="__span-2-32"><a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a><span class="c1"># Option B: Using CLI script</span>
+</span><span id="__span-2-33"><a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a><span class="c1"># python scripts/run_full_pipeline.py \</span>
+</span><span id="__span-2-34"><a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a><span class="c1">#   --data_path data/tidy_data.jsonl \</span>
+</span><span id="__span-2-35"><a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a><span class="c1">#   --output_dir results/ \</span>
+</span><span id="__span-2-36"><a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a><span class="c1">#   --method side_by_side \</span>
+</span><span id="__span-2-37"><a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a><span class="c1">#   --model_a &quot;gpt-4&quot; \</span>
+</span><span id="__span-2-38"><a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a><span class="c1">#   --model_b &quot;claude-3&quot;</span>
+</span></code></pre></div>
+<p><strong>How Auto-Pairing Works:</strong></p>
+<ol>
+<li>Filters dataset to only the two specified models</li>
+<li>Finds all prompts answered by BOTH models</li>
+<li>Pairs responses for each shared prompt</li>
+<li>Converts to side-by-side format internally</li>
+<li>Runs analysis on paired data</li>
+</ol>
+<p><strong>Note:</strong> Only rows where both models answered the same prompt are kept.</p>
+<h2 id="response-format">Response Format<a class="headerlink" href="#response-format" title="Permanent link">&para;</a></h2>
+<h3 id="automatic-format-detection">Automatic Format Detection<a class="headerlink" href="#automatic-format-detection" title="Permanent link">&para;</a></h3>
+<p>StringSight automatically detects and converts response formats:</p>
+<ol>
+<li><strong>Simple strings</strong> → Converted to OpenAI conversation format</li>
+<li><strong>OpenAI format</strong> (list of message dicts) → Used as-is</li>
+<li><strong>Other types</strong> → Converted to string then processed</li>
+</ol>
+<h3 id="openai-conversation-format">OpenAI Conversation Format<a class="headerlink" href="#openai-conversation-format" title="Permanent link">&para;</a></h3>
+<p>For complex conversations involving multiple turns, tool use, or multimodal content, use OpenAI's conversation format.</p>
+<h4 id="message-structure">Message Structure<a class="headerlink" href="#message-structure" title="Permanent link">&para;</a></h4>
+<p>Each message is a dictionary with:</p>
+<p><strong>Required Fields:</strong>
+- <code>role</code>: <code>"user"</code>, <code>"assistant"</code>, <code>"system"</code>, or <code>"tool"</code>
+- <code>content</code>: Message content (string or dict)</p>
+<p><strong>Optional Fields:</strong>
+- <code>name</code>: Model/tool identifier
+- <code>id</code>: Unique identifier for the message</p>
+<h4 id="simple-text-conversation">Simple Text Conversation<a class="headerlink" href="#simple-text-conversation" title="Permanent link">&para;</a></h4>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">response</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="p">{</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>        <span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;user&quot;</span><span class="p">,</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>        <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;What is machine learning?&quot;</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="p">},</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="p">{</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;assistant&quot;</span><span class="p">,</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>        <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;Machine learning is a subset of artificial intelligence...&quot;</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="p">}</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="p">]</span>
+</span></code></pre></div>
+<h4 id="multi-turn-conversation">Multi-Turn Conversation<a class="headerlink" href="#multi-turn-conversation" title="Permanent link">&para;</a></h4>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">response</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="p">{</span><span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;What is 2+2?&quot;</span><span class="p">},</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="p">{</span><span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;assistant&quot;</span><span class="p">,</span> <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;2+2 equals 4.&quot;</span><span class="p">},</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="p">{</span><span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;What about 3+3?&quot;</span><span class="p">},</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="p">{</span><span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;assistant&quot;</span><span class="p">,</span> <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;3+3 equals 6.&quot;</span><span class="p">}</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="p">]</span>
+</span></code></pre></div>
+<h4 id="tool-augmented-response">Tool-Augmented Response<a class="headerlink" href="#tool-augmented-response" title="Permanent link">&para;</a></h4>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">response</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="p">{</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>        <span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;user&quot;</span><span class="p">,</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>        <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;Search for papers on quantum computing&quot;</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="p">},</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="p">{</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>        <span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;assistant&quot;</span><span class="p">,</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>        <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="p">{</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>            <span class="s2">&quot;tool_calls&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>                <span class="p">{</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>                    <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;search_papers&quot;</span><span class="p">,</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>                    <span class="s2">&quot;arguments&quot;</span><span class="p">:</span> <span class="p">{</span>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>                        <span class="s2">&quot;query&quot;</span><span class="p">:</span> <span class="s2">&quot;quantum computing&quot;</span><span class="p">,</span>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>                        <span class="s2">&quot;year&quot;</span><span class="p">:</span> <span class="mi">2024</span><span class="p">,</span>
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>                        <span class="s2">&quot;max_results&quot;</span><span class="p">:</span> <span class="mi">5</span>
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>                    <span class="p">},</span>
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>                    <span class="s2">&quot;tool_call_id&quot;</span><span class="p">:</span> <span class="s2">&quot;call_abc123&quot;</span>
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>                <span class="p">}</span>
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>            <span class="p">]</span>
+</span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>        <span class="p">}</span>
+</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>    <span class="p">},</span>
+</span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>    <span class="p">{</span>
+</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>        <span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;tool&quot;</span><span class="p">,</span>
+</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>        <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;search_papers&quot;</span><span class="p">,</span>
+</span><span id="__span-5-25"><a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>        <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;Found 5 papers: [1] Quantum Error Correction...&quot;</span>
+</span><span id="__span-5-26"><a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>    <span class="p">},</span>
+</span><span id="__span-5-27"><a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>    <span class="p">{</span>
+</span><span id="__span-5-28"><a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>        <span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;assistant&quot;</span><span class="p">,</span>
+</span><span id="__span-5-29"><a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a>        <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;Based on the search results, here are recent developments...&quot;</span>
+</span><span id="__span-5-30"><a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a>    <span class="p">}</span>
+</span><span id="__span-5-31"><a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a><span class="p">]</span>
+</span></code></pre></div>
+<h4 id="multimodal-input">Multimodal Input<a class="headerlink" href="#multimodal-input" title="Permanent link">&para;</a></h4>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">response</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="p">{</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>        <span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;user&quot;</span><span class="p">,</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>        <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="p">{</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>            <span class="s2">&quot;text&quot;</span><span class="p">:</span> <span class="s2">&quot;What&#39;s in this image?&quot;</span><span class="p">,</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>            <span class="s2">&quot;image&quot;</span><span class="p">:</span> <span class="s2">&quot;data:image/jpeg;base64,iVBORw0KGgo...&quot;</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>        <span class="p">}</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="p">},</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="p">{</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>        <span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;assistant&quot;</span><span class="p">,</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>        <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;I can see a diagram showing neural network architecture...&quot;</span>
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>    <span class="p">}</span>
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="p">]</span>
+</span></code></pre></div>
+<h2 id="score-format">Score Format<a class="headerlink" href="#score-format" title="Permanent link">&para;</a></h2>
+<h3 id="single-metric">Single Metric<a class="headerlink" href="#single-metric" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">df</span><span class="p">[</span><span class="s2">&quot;score&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.85</span><span class="p">,</span> <span class="mf">0.92</span><span class="p">,</span> <span class="mf">0.78</span><span class="p">]</span>  <span class="c1"># Numeric values</span>
+</span></code></pre></div>
+<h3 id="multiple-metrics">Multiple Metrics<a class="headerlink" href="#multiple-metrics" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">df</span><span class="p">[</span><span class="s2">&quot;score&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="p">{</span><span class="s2">&quot;accuracy&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;helpfulness&quot;</span><span class="p">:</span> <span class="mf">4.2</span><span class="p">,</span> <span class="s2">&quot;harmlessness&quot;</span><span class="p">:</span> <span class="mf">4.8</span><span class="p">},</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="p">{</span><span class="s2">&quot;accuracy&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;helpfulness&quot;</span><span class="p">:</span> <span class="mf">3.5</span><span class="p">,</span> <span class="s2">&quot;harmlessness&quot;</span><span class="p">:</span> <span class="mf">4.9</span><span class="p">},</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="p">{</span><span class="s2">&quot;accuracy&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;helpfulness&quot;</span><span class="p">:</span> <span class="mf">4.8</span><span class="p">,</span> <span class="s2">&quot;harmlessness&quot;</span><span class="p">:</span> <span class="mf">4.7</span><span class="p">}</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="p">]</span>
+</span></code></pre></div>
+<h3 id="side-by-side-winner-format">Side-by-Side Winner Format<a class="headerlink" href="#side-by-side-winner-format" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">df</span><span class="p">[</span><span class="s2">&quot;score&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="p">{</span><span class="s2">&quot;winner&quot;</span><span class="p">:</span> <span class="s2">&quot;model_a&quot;</span><span class="p">},</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="p">{</span><span class="s2">&quot;winner&quot;</span><span class="p">:</span> <span class="s2">&quot;model_b&quot;</span><span class="p">},</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="p">{</span><span class="s2">&quot;winner&quot;</span><span class="p">:</span> <span class="s2">&quot;tie&quot;</span><span class="p">}</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="p">]</span>
+</span></code></pre></div>
+<h3 id="combined-format">Combined Format<a class="headerlink" href="#combined-format" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">df</span><span class="p">[</span><span class="s2">&quot;score&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="p">{</span><span class="s2">&quot;winner&quot;</span><span class="p">:</span> <span class="s2">&quot;model_a&quot;</span><span class="p">,</span> <span class="s2">&quot;accuracy&quot;</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">,</span> <span class="s2">&quot;helpfulness&quot;</span><span class="p">:</span> <span class="mf">4.5</span><span class="p">},</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    <span class="p">{</span><span class="s2">&quot;winner&quot;</span><span class="p">:</span> <span class="s2">&quot;model_b&quot;</span><span class="p">,</span> <span class="s2">&quot;accuracy&quot;</span><span class="p">:</span> <span class="mf">0.7</span><span class="p">,</span> <span class="s2">&quot;helpfulness&quot;</span><span class="p">:</span> <span class="mf">3.8</span><span class="p">},</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="p">{</span><span class="s2">&quot;winner&quot;</span><span class="p">:</span> <span class="s2">&quot;tie&quot;</span><span class="p">,</span> <span class="s2">&quot;accuracy&quot;</span><span class="p">:</span> <span class="mf">0.8</span><span class="p">,</span> <span class="s2">&quot;helpfulness&quot;</span><span class="p">:</span> <span class="mf">4.0</span><span class="p">}</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="p">]</span>
+</span></code></pre></div>
+<h3 id="using-separate-score-columns">Using Separate Score Columns<a class="headerlink" href="#using-separate-score-columns" title="Permanent link">&para;</a></h3>
+<p>Instead of providing scores as a dictionary in a single column, you can use the <code>score_columns</code> parameter to specify separate columns for each metric. StringSight will automatically convert them to the required dictionary format.</p>
+<h4 id="single-model-with-score-columns">Single Model with Score Columns<a class="headerlink" href="#single-model-with-score-columns" title="Permanent link">&para;</a></h4>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">stringsight</span><span class="w"> </span><span class="kn">import</span> <span class="n">explain</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># Data with separate score columns</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    <span class="s2">&quot;prompt&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;What is AI?&quot;</span><span class="p">,</span> <span class="s2">&quot;Explain ML&quot;</span><span class="p">,</span> <span class="s2">&quot;What is DL?&quot;</span><span class="p">],</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>    <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span> <span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span> <span class="s2">&quot;gpt-4&quot;</span><span class="p">],</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>    <span class="s2">&quot;model_response&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;AI is...&quot;</span><span class="p">,</span> <span class="s2">&quot;ML is...&quot;</span><span class="p">,</span> <span class="s2">&quot;DL is...&quot;</span><span class="p">],</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>    <span class="s2">&quot;accuracy&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.85</span><span class="p">,</span> <span class="mf">0.95</span><span class="p">],</span>           <span class="c1"># Separate column</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>    <span class="s2">&quot;helpfulness&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">4.2</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">,</span> <span class="mf">4.5</span><span class="p">],</span>          <span class="c1"># Separate column</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>    <span class="s2">&quot;clarity&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">4.8</span><span class="p">,</span> <span class="mf">4.5</span><span class="p">,</span> <span class="mf">4.7</span><span class="p">]</span>               <span class="c1"># Separate column</span>
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="p">})</span>
+</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>
+</span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="c1"># Specify which columns contain scores</span>
+</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="n">clustered_df</span><span class="p">,</span> <span class="n">model_stats</span> <span class="o">=</span> <span class="n">explain</span><span class="p">(</span>
+</span><span id="__span-11-16"><a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a>    <span class="n">df</span><span class="p">,</span>
+</span><span id="__span-11-17"><a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a>    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;single_model&quot;</span><span class="p">,</span>
+</span><span id="__span-11-18"><a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a>    <span class="n">score_columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;accuracy&quot;</span><span class="p">,</span> <span class="s2">&quot;helpfulness&quot;</span><span class="p">,</span> <span class="s2">&quot;clarity&quot;</span><span class="p">]</span>  <span class="c1"># Automatically converted to score dict</span>
+</span><span id="__span-11-19"><a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="side-by-side-with-score-columns">Side-by-Side with Score Columns<a class="headerlink" href="#side-by-side-with-score-columns" title="Permanent link">&para;</a></h4>
+<p>For side-by-side comparisons, score columns should have <code>_a</code> and <code>_b</code> suffixes:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Data with separate score columns for each model</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>    <span class="s2">&quot;prompt&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;What is AI?&quot;</span><span class="p">,</span> <span class="s2">&quot;Explain ML&quot;</span><span class="p">],</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>    <span class="s2">&quot;model_a&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span> <span class="s2">&quot;gpt-4&quot;</span><span class="p">],</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>    <span class="s2">&quot;model_b&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;claude-3&quot;</span><span class="p">,</span> <span class="s2">&quot;claude-3&quot;</span><span class="p">],</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    <span class="s2">&quot;model_a_response&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;AI is...&quot;</span><span class="p">,</span> <span class="s2">&quot;ML is...&quot;</span><span class="p">],</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>    <span class="s2">&quot;model_b_response&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;AI involves...&quot;</span><span class="p">,</span> <span class="s2">&quot;Machine learning...&quot;</span><span class="p">],</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>    <span class="s2">&quot;accuracy_a&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.85</span><span class="p">],</span>               <span class="c1"># Model A accuracy</span>
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>    <span class="s2">&quot;accuracy_b&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.88</span><span class="p">,</span> <span class="mf">0.90</span><span class="p">],</span>              <span class="c1"># Model B accuracy</span>
+</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>    <span class="s2">&quot;helpfulness_a&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">4.2</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">],</span>             <span class="c1"># Model A helpfulness</span>
+</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>    <span class="s2">&quot;helpfulness_b&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">4.3</span><span class="p">,</span> <span class="mf">4.1</span><span class="p">]</span>              <span class="c1"># Model B helpfulness</span>
+</span><span id="__span-12-12"><a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="p">})</span>
+</span><span id="__span-12-13"><a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>
+</span><span id="__span-12-14"><a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a><span class="c1"># Specify base metric names (without _a/_b suffixes)</span>
+</span><span id="__span-12-15"><a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a><span class="n">clustered_df</span><span class="p">,</span> <span class="n">model_stats</span> <span class="o">=</span> <span class="n">explain</span><span class="p">(</span>
+</span><span id="__span-12-16"><a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a>    <span class="n">df</span><span class="p">,</span>
+</span><span id="__span-12-17"><a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a>    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;side_by_side&quot;</span><span class="p">,</span>
+</span><span id="__span-12-18"><a id="__codelineno-12-18" name="__codelineno-12-18" href="#__codelineno-12-18"></a>    <span class="n">score_columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;accuracy&quot;</span><span class="p">,</span> <span class="s2">&quot;helpfulness&quot;</span><span class="p">]</span>  <span class="c1"># Will look for *_a and *_b columns</span>
+</span><span id="__span-12-19"><a id="__codelineno-12-19" name="__codelineno-12-19" href="#__codelineno-12-19"></a><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="tidy-data-with-score-columns">Tidy Data with Score Columns<a class="headerlink" href="#tidy-data-with-score-columns" title="Permanent link">&para;</a></h4>
+<p>When using tidy format with <code>model_a</code> and <code>model_b</code> parameters, specify the score columns and they'll be pivoted automatically:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Tidy format with separate score columns</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="s2">&quot;prompt&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;What is AI?&quot;</span><span class="p">,</span> <span class="s2">&quot;What is AI?&quot;</span><span class="p">,</span> <span class="s2">&quot;Explain ML&quot;</span><span class="p">,</span> <span class="s2">&quot;Explain ML&quot;</span><span class="p">],</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span> <span class="s2">&quot;claude-3&quot;</span><span class="p">,</span> <span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span> <span class="s2">&quot;claude-3&quot;</span><span class="p">],</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="s2">&quot;model_response&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;AI is...&quot;</span><span class="p">,</span> <span class="s2">&quot;AI involves...&quot;</span><span class="p">,</span> <span class="s2">&quot;ML is...&quot;</span><span class="p">,</span> <span class="s2">&quot;ML involves...&quot;</span><span class="p">],</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="s2">&quot;accuracy&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.88</span><span class="p">,</span> <span class="mf">0.85</span><span class="p">,</span> <span class="mf">0.90</span><span class="p">],</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="s2">&quot;helpfulness&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">4.2</span><span class="p">,</span> <span class="mf">4.3</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">,</span> <span class="mf">4.1</span><span class="p">]</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="p">})</span>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>
+</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="c1"># Convert tidy to side-by-side with score columns</span>
+</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="n">clustered_df</span><span class="p">,</span> <span class="n">model_stats</span> <span class="o">=</span> <span class="n">explain</span><span class="p">(</span>
+</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>    <span class="n">df</span><span class="p">,</span>
+</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;side_by_side&quot;</span><span class="p">,</span>
+</span><span id="__span-13-14"><a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>    <span class="n">model_a</span><span class="o">=</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span>
+</span><span id="__span-13-15"><a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>    <span class="n">model_b</span><span class="o">=</span><span class="s2">&quot;claude-3&quot;</span><span class="p">,</span>
+</span><span id="__span-13-16"><a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>    <span class="n">score_columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;accuracy&quot;</span><span class="p">,</span> <span class="s2">&quot;helpfulness&quot;</span><span class="p">]</span>  <span class="c1"># Automatically pivoted to *_a/*_b format</span>
+</span><span id="__span-13-17"><a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>Benefits of using <code>score_columns</code>:</strong>
+- More natural data format (especially when exporting from databases or spreadsheets)
+- No need to manually construct score dictionaries
+- Automatic validation that columns contain numeric values
+- Works seamlessly with tidy data conversion</p>
+<h2 id="output-data-formats">Output Data Formats<a class="headerlink" href="#output-data-formats" title="Permanent link">&para;</a></h2>
+<p>When you specify <code>output_dir</code>, StringSight saves multiple files in different formats.</p>
+<h3 id="main-output-files">Main Output Files<a class="headerlink" href="#main-output-files" title="Permanent link">&para;</a></h3>
+<h4 id="clustered_resultsparquet">clustered_results.parquet<a class="headerlink" href="#clustered_resultsparquet" title="Permanent link">&para;</a></h4>
+<p><strong>Format:</strong> Apache Parquet
+<strong>Description:</strong> Full dataset with all original columns plus extracted properties and clusters</p>
+<p><strong>New Columns Added:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>property_id</code></td>
+<td><code>str</code></td>
+<td>Unique property identifier</td>
+</tr>
+<tr>
+<td><code>property_description</code></td>
+<td><code>str</code></td>
+<td>Extracted behavioral property</td>
+</tr>
+<tr>
+<td><code>category</code></td>
+<td><code>str</code></td>
+<td>Property category</td>
+</tr>
+<tr>
+<td><code>reason</code></td>
+<td><code>str</code></td>
+<td>Why this property was identified</td>
+</tr>
+<tr>
+<td><code>evidence</code></td>
+<td><code>str</code></td>
+<td>Evidence from the response</td>
+</tr>
+<tr>
+<td><code>behavior_type</code></td>
+<td><code>str</code></td>
+<td>Type of behavior</td>
+</tr>
+<tr>
+<td><code>property_description_cluster_id</code></td>
+<td><code>int</code></td>
+<td>Fine-grained cluster ID</td>
+</tr>
+<tr>
+<td><code>property_description_cluster_label</code></td>
+<td><code>str</code></td>
+<td>Human-readable fine cluster name</td>
+</tr>
+<tr>
+<td><code>embedding</code></td>
+<td><code>list[float]</code></td>
+<td>Property embedding vector (if <code>include_embeddings=True</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Loading:</strong>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_parquet</span><span class="p">(</span><span class="s2">&quot;results/clustered_results.parquet&quot;</span><span class="p">)</span>
+</span></code></pre></div></p>
+<h4 id="full_datasetjson">full_dataset.json<a class="headerlink" href="#full_datasetjson" title="Permanent link">&para;</a></h4>
+<p><strong>Format:</strong> JSON
+<strong>Description:</strong> Complete <code>PropertyDataset</code> object with all data structures</p>
+<p><strong>Structure:</strong>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="p">{</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="nt">&quot;conversations&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">...</span><span class="p">],</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="nt">&quot;properties&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">...</span><span class="p">],</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">  </span><span class="nt">&quot;clusters&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">...</span><span class="p">],</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">  </span><span class="nt">&quot;model_stats&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">  </span><span class="nt">&quot;all_models&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">...</span><span class="p">]</span>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="p">}</span>
+</span></code></pre></div></p>
+<p><strong>Loading:</strong>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">stringsight.core.data_objects</span><span class="w"> </span><span class="kn">import</span> <span class="n">PropertyDataset</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="n">dataset</span> <span class="o">=</span> <span class="n">PropertyDataset</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;results/full_dataset.json&quot;</span><span class="p">)</span>
+</span></code></pre></div></p>
+<h4 id="model_cluster_scoresjson">model_cluster_scores.json<a class="headerlink" href="#model_cluster_scoresjson" title="Permanent link">&para;</a></h4>
+<p><strong>Format:</strong> JSON
+<strong>Description:</strong> Per model-cluster performance metrics</p>
+<p><strong>Structure:</strong>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="p">{</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span><span class="nt">&quot;gpt-4&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">    </span><span class="nt">&quot;Reasoning Transparency&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">      </span><span class="nt">&quot;size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">150</span><span class="p">,</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">      </span><span class="nt">&quot;proportion&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.25</span><span class="p">,</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">      </span><span class="nt">&quot;quality&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;accuracy&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.92</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;helpfulness&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">4.5</span><span class="p">},</span>
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="w">      </span><span class="nt">&quot;quality_delta&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;accuracy&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.15</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;helpfulness&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.3</span><span class="p">},</span>
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="w">      </span><span class="nt">&quot;proportion_delta&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.12</span><span class="p">,</span>
+</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="w">      </span><span class="nt">&quot;examples&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;q1&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;q2&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;q3&quot;</span><span class="p">],</span>
+</span><span id="__span-17-10"><a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="w">      </span><span class="nt">&quot;proportion_ci&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;lower&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.22</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;upper&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.28</span><span class="p">},</span>
+</span><span id="__span-17-11"><a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a><span class="w">      </span><span class="nt">&quot;quality_ci&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+</span><span id="__span-17-12"><a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a><span class="w">      </span><span class="nt">&quot;quality_delta_ci&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+</span><span id="__span-17-13"><a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a><span class="w">      </span><span class="nt">&quot;proportion_delta_ci&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+</span><span id="__span-17-14"><a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-17-15"><a id="__codelineno-17-15" name="__codelineno-17-15" href="#__codelineno-17-15"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-17-16"><a id="__codelineno-17-16" name="__codelineno-17-16" href="#__codelineno-17-16"></a><span class="p">}</span>
+</span></code></pre></div></p>
+<h4 id="cluster_scoresjson">cluster_scores.json<a class="headerlink" href="#cluster_scoresjson" title="Permanent link">&para;</a></h4>
+<p><strong>Format:</strong> JSON
+<strong>Description:</strong> Per-cluster aggregated metrics across all models</p>
+<h4 id="model_scoresjson">model_scores.json<a class="headerlink" href="#model_scoresjson" title="Permanent link">&para;</a></h4>
+<p><strong>Format:</strong> JSON
+<strong>Description:</strong> Per-model aggregated metrics across all clusters</p>
+<h4 id="summarytxt">summary.txt<a class="headerlink" href="#summarytxt" title="Permanent link">&para;</a></h4>
+<p><strong>Format:</strong> Plain text
+<strong>Description:</strong> Human-readable analysis summary</p>
+<h3 id="intermediate-files">Intermediate Files<a class="headerlink" href="#intermediate-files" title="Permanent link">&para;</a></h3>
+<p>These are saved during pipeline execution:</p>
+<ul>
+<li><code>raw_properties.jsonl</code> - Raw LLM extraction responses</li>
+<li><code>extraction_stats.json</code> - Extraction stage statistics</li>
+<li><code>parsed_properties.jsonl</code> - Parsed property objects</li>
+<li><code>parsing_stats.json</code> - Parsing success/failure stats</li>
+<li><code>validated_properties.jsonl</code> - Validated properties</li>
+<li><code>validation_stats.json</code> - Validation statistics</li>
+<li><code>embeddings.parquet</code> - Property embeddings data</li>
+</ul>
+<h2 id="loading-data">Loading Data<a class="headerlink" href="#loading-data" title="Permanent link">&para;</a></h2>
+<h3 id="from-files">From Files<a class="headerlink" href="#from-files" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">stringsight.core.data_objects</span><span class="w"> </span><span class="kn">import</span> <span class="n">PropertyDataset</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="c1"># Load clustered results</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_parquet</span><span class="p">(</span><span class="s2">&quot;results/clustered_results.parquet&quot;</span><span class="p">)</span>
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="c1"># Load full dataset</span>
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="n">dataset</span> <span class="o">=</span> <span class="n">PropertyDataset</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;results/full_dataset.json&quot;</span><span class="p">)</span>
+</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>
+</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="c1"># Load metrics</span>
+</span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+</span><span id="__span-18-12"><a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;results/model_cluster_scores.json&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+</span><span id="__span-18-13"><a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a>    <span class="n">metrics</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="from-various-sources">From Various Sources<a class="headerlink" href="#from-various-sources" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># CSV</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s2">&quot;data.csv&quot;</span><span class="p">)</span>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># JSON Lines</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_json</span><span class="p">(</span><span class="s2">&quot;data.jsonl&quot;</span><span class="p">,</span> <span class="n">lines</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>
+</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="c1"># Parquet</span>
+</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_parquet</span><span class="p">(</span><span class="s2">&quot;data.parquet&quot;</span><span class="p">)</span>
+</span><span id="__span-19-9"><a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>
+</span><span id="__span-19-10"><a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="c1"># JSON</span>
+</span><span id="__span-19-11"><a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_json</span><span class="p">(</span><span class="s2">&quot;data.json&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<h2 id="data-validation">Data Validation<a class="headerlink" href="#data-validation" title="Permanent link">&para;</a></h2>
+<p>StringSight automatically validates your data format. You can also validate manually:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">stringsight.formatters</span><span class="w"> </span><span class="kn">import</span> <span class="n">detect_method</span><span class="p">,</span> <span class="n">validate_required_columns</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="c1"># Detect single_model vs side_by_side</span>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="n">method</span> <span class="o">=</span> <span class="n">detect_method</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Detected method: </span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>
+</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="c1"># Validate required columns</span>
+</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a><span class="k">try</span><span class="p">:</span>
+</span><span id="__span-20-9"><a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a>    <span class="n">validate_required_columns</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">method</span><span class="p">)</span>
+</span><span id="__span-20-10"><a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;✅ Data format is valid&quot;</span><span class="p">)</span>
+</span><span id="__span-20-11"><a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a><span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+</span><span id="__span-20-12"><a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Validation error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<h2 id="converting-between-formats">Converting Between Formats<a class="headerlink" href="#converting-between-formats" title="Permanent link">&para;</a></h2>
+<h3 id="tidy-to-side-by-side">Tidy to Side-by-Side<a class="headerlink" href="#tidy-to-side-by-side" title="Permanent link">&para;</a></h3>
+<p>Convert single-model format to side-by-side for comparison:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>python<span class="w"> </span>scripts/run_full_pipeline.py<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">  </span>--data_path<span class="w"> </span>data/tidy_data.jsonl<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">  </span>--output_dir<span class="w"> </span>results/<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">  </span>--method<span class="w"> </span>side_by_side<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="w">  </span>--model_a<span class="w"> </span><span class="s2">&quot;gpt-4&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="w">  </span>--model_b<span class="w"> </span><span class="s2">&quot;claude-3&quot;</span>
+</span></code></pre></div>
+<p>This automatically:
+1. Filters to prompts answered by both models
+2. Pairs responses for each shared prompt
+3. Converts to side-by-side format</p>
+<h3 id="programmatic-conversion">Programmatic Conversion<a class="headerlink" href="#programmatic-conversion" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1"># Example: Convert tidy to side-by-side</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="n">models_a</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;model&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;gpt-4&#39;</span><span class="p">]</span>
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="n">models_b</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;model&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;claude-3&#39;</span><span class="p">]</span>
+</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>
+</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="n">side_by_side</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span>
+</span><span id="__span-22-6"><a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>    <span class="n">models_a</span><span class="p">,</span>
+</span><span id="__span-22-7"><a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>    <span class="n">models_b</span><span class="p">,</span>
+</span><span id="__span-22-8"><a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>    <span class="n">on</span><span class="o">=</span><span class="s1">&#39;prompt&#39;</span><span class="p">,</span>
+</span><span id="__span-22-9"><a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a>    <span class="n">suffixes</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;_a&#39;</span><span class="p">,</span> <span class="s1">&#39;_b&#39;</span><span class="p">)</span>
+</span><span id="__span-22-10"><a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a><span class="p">)</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-22-11"><a id="__codelineno-22-11" name="__codelineno-22-11" href="#__codelineno-22-11"></a>    <span class="s1">&#39;model_a&#39;</span><span class="p">:</span> <span class="s1">&#39;model_a&#39;</span><span class="p">,</span>
+</span><span id="__span-22-12"><a id="__codelineno-22-12" name="__codelineno-22-12" href="#__codelineno-22-12"></a>    <span class="s1">&#39;model_b&#39;</span><span class="p">:</span> <span class="s1">&#39;model_b&#39;</span><span class="p">,</span>
+</span><span id="__span-22-13"><a id="__codelineno-22-13" name="__codelineno-22-13" href="#__codelineno-22-13"></a>    <span class="s1">&#39;model_response_a&#39;</span><span class="p">:</span> <span class="s1">&#39;model_a_response&#39;</span><span class="p">,</span>
+</span><span id="__span-22-14"><a id="__codelineno-22-14" name="__codelineno-22-14" href="#__codelineno-22-14"></a>    <span class="s1">&#39;model_response_b&#39;</span><span class="p">:</span> <span class="s1">&#39;model_b_response&#39;</span>
+</span><span id="__span-22-15"><a id="__codelineno-22-15" name="__codelineno-22-15" href="#__codelineno-22-15"></a><span class="p">})</span>
+</span></code></pre></div>
+<h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
+<h3 id="data-preparation">Data Preparation<a class="headerlink" href="#data-preparation" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Unique IDs</strong>: Use meaningful <code>question_id</code> values for easier tracking</li>
+<li><strong>Consistent Naming</strong>: Use consistent model names across your dataset</li>
+<li><strong>Score Format</strong>: Use dictionaries for multiple evaluation criteria</li>
+<li><strong>Response Format</strong>: Use OpenAI format for complex conversations</li>
+</ol>
+<h3 id="quality-checks">Quality Checks<a class="headerlink" href="#quality-checks" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># Check for missing values</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">isnull</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1"># Check model distribution</span>
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;model&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">())</span>
+</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>
+</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="c1"># Check response lengths</span>
+</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a><span class="n">df</span><span class="p">[</span><span class="s1">&#39;response_length&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;model_response&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span>
+</span><span id="__span-23-9"><a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;response_length&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">describe</span><span class="p">())</span>
+</span><span id="__span-23-10"><a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a>
+</span><span id="__span-23-11"><a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a><span class="c1"># Verify score format</span>
+</span><span id="__span-23-12"><a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a><span class="k">if</span> <span class="s1">&#39;score&#39;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+</span><span id="__span-23-13"><a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;score&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="nb">type</span><span class="p">)</span><span class="o">.</span><span class="n">value_counts</span><span class="p">())</span>
+</span></code></pre></div>
+<h3 id="performance-tips">Performance Tips<a class="headerlink" href="#performance-tips" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Use Parquet</strong>: Faster loading/saving than CSV or JSON</li>
+<li><strong>Sample Large Datasets</strong>: Use sampling for initial exploration</li>
+<li><strong>Cache Results</strong>: Save intermediate results to avoid recomputation</li>
+</ol>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="common-issues">Common Issues<a class="headerlink" href="#common-issues" title="Permanent link">&para;</a></h3>
+<p><strong>"Missing required column"</strong>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># Check your columns</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>
+</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="c1"># Rename if needed</span>
+</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;response&#39;</span><span class="p">:</span> <span class="s1">&#39;model_response&#39;</span><span class="p">})</span>
+</span></code></pre></div></p>
+<p><strong>"Invalid response format"</strong>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="c1"># Convert all responses to strings</span>
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="n">df</span><span class="p">[</span><span class="s1">&#39;model_response&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;model_response&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+</span></code></pre></div></p>
+<p><strong>"Score column not recognized"</strong>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="c1"># Ensure scores are dictionaries</span>
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="n">df</span><span class="p">[</span><span class="s1">&#39;score&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;score&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">)</span>  <span class="c1"># If stored as strings</span>
+</span></code></pre></div></p>
+<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong><a href="../configuration/">Configuration Options</a></strong> - Learn about all available parameters</li>
+<li><strong><a href="../basic-usage/">Basic Usage</a></strong> - See how to use these formats with <code>explain()</code> and <code>label()</code></li>
+<li><strong><a href="../visualization/">Visualization</a></strong> - Explore results in the web interface</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2025 StringSight Team
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.f55a23d4.min.js"></script>
+      
+    
+  </body>
+</html>
