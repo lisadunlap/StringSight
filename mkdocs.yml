@@ -3,8 +3,8 @@ site_description: Extract, cluster, and analyze behavioral properties from Large
 site_author: StringSight Team
 
 # Repository
-repo_name: stringsight
-repo_url: https://github.com/lisabdunlap/stringsight
+repo_name: StringSight
+repo_url: https://github.com/lisabdunlap/StringSight
 edit_uri: edit/main/docs/
 
 # Theme
@@ -28,6 +28,9 @@ theme:
     - navigation.sections
     - navigation.expand
     - navigation.top
+    - navigation.indexes
+    - toc.follow
+    - toc.integrate
     - search.suggest
     - search.highlight
     - content.code.copy

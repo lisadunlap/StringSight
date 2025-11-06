@@ -44,40 +44,33 @@ from stringsight import explain
 
 ## Load Data
 
-We'll use the TauBench airline demo dataset. Let's load it and examine its structure:
-
 ```python
-# Download the demo dataset
-!wget https://raw.githubusercontent.com/lisadunlap/StringSight/main/airline_data_demo.jsonl
+# Load your data
+df = pd.read_json("your_data.jsonl", lines=True)
 
-data_path = "airline_data_demo.jsonl"
-df = pd.read_json(data_path, lines=True)
-
-print(f"Loaded {len(df)} conversations")
-print(f"\nColumns: {df.columns.tolist()}")
-df.head()
+# Or download the demo dataset
+# !wget https://raw.githubusercontent.com/lisadunlap/StringSight/main/airline_data_demo.jsonl
+# df = pd.read_json("airline_data_demo.jsonl", lines=True)
 ```
 
 ### Understanding the Data Format
 
-**Input data columns for analysis:**
+Your dataframe needs these columns:
 
-- `prompt`: The input/question (this doesn't need to be your actual prompt, just some unique identifier)
+- `prompt`: The input/question (doesn't need to be your actual prompt, just some unique identifier)
 - `model`: Model name
-- `model_response`: Model output (string or OAI format)
+- `model_response`: Model output (see formats below)
 - `score` or multiple score columns (optional): Performance metrics
-- `question_id` (optional): Unique ID for a question (useful if you have multiple responses for the same prompt)
+- `question_id` (optional): Unique ID for tracking which responses belong to the same prompt
 
-**About `question_id`:**
-- Used to track which responses belong to the same prompt
-- For side-by-side pairing: rows with the same prompt must have the same `question_id`
-- If not provided, StringSight will use `prompt` alone for pairing
-- For the airline dataset, prompts are already unique so we don't need `question_id`
+**About `question_id`:** This is particularly useful for side-by-side analysis. If you have multiple responses for the same prompt (e.g., from different models), give them the same `question_id`. If not provided, StringSight will use `prompt` alone for pairing.
 
-**StringSight accepts three formats for `model_response`:**
-1. **String**: Simple text responses like `"Machine learning is..."`
-2. **OAI conversation format**: List of dicts with `role` and `content` (what the airline dataset uses)
-3. **Custom format**: If you have an output format that is neither of these (e.g., a JSON object with custom keys), we will convert this to a string on the backend and frontend
+**`model_response` can be in three formats:**
+1. **String**: Simple text like `"Machine learning is..."`
+2. **OAI conversation format**: List of dicts with `role` and `content`
+3. **Custom format**: Any JSON object (we'll convert it to a string on the backend)
+
+**Pro tip:** Before running the full pipeline, upload your data to [stringsight.com](https://stringsight.com) ("upload file" button) to visualize what your traces look like and preview the behavior extraction. The UI can handle small datasets (~50 traces) but larger datasets should be run locally.
 
 **Custom Column Names:**
 
@@ -95,71 +88,35 @@ clustered_df, model_stats = explain(
 
 See the [Parameter Reference](../user-guide/parameters.md#column-mapping-parameters) for more details.
 
-### Inspect the Data
-
-If you are loading your own data, I highly recommend going to [stringsight.com](https://stringsight.com) and uploading your data file ("upload file" button) to visualize what your traces are and see what the behavior extraction looks like.
-
-Let's look at the data structure:
-
-```python
-# View the data structure
-print(f"Total samples: {len(df)}")
-print(f"\nColumns: {df.columns.tolist()}")
-print(f"\nSample model_response structure (first conversation turn):")
-print(df['model_response'].iloc[0][0])  # Show first turn
-print(f"\nTotal turns in first conversation: {len(df['model_response'].iloc[0])}")
-
-df.head()
-```
-
 ## Single Model Analysis
 
-Now we'll run StringSight to identify behavioral patterns in a single model's responses.
+Time to identify behavioral patterns in your model's responses.
 
-**Important Note on Cost:** This pipeline makes many LLM calls, so it will:
+**Important Note on Cost:** This pipeline makes **A LOT** of LLM calls, so it will:
 1. Take a few minutes to run depending on your rate limits
-2. Potentially cost money if you're using expensive models and analyzing many traces
+2. Potentially cost money if you're using expensive models and analyzing lots of traces
 
-For `sample_size=100` with `min_cluster_size=3`, you can expect roughly:
-- 100 calls for property extraction (usually get 3-5 properties per trace with gpt-4.1)
-- ~300-500 embedding calls for each property
-- ~(300-500) / min_cluster_size LLM calls to generate cluster summaries
-- ~50-100 outlier matching calls
+To get an idea of the number of calls, say you have 100 samples with `min_cluster_size=3`:
+- **100 calls** for property extraction (usually get 3-5 properties per trace with gpt-4.1)
+- **~300-500 embedding calls** for each property
+- **~100-170 LLM calls** to generate cluster summaries
+- **~50-100 outlier matching calls** (hence why we recommend using a cheaper model for `cluster_assignment_model`)
 
-**Recommendation:** Start with `sample_size=50-100` to test and monitor your spend.
+Note: The larger you set `min_cluster_size`, the more outliers you'll likely have.
+
+**Recommendation:** Start with `sample_size=50-100` first and check your spend. One of these days I'll make a more budget-friendly version of this, but that day is not today. Maybe if I get enough GitHub issues I'll do it.
 
 ### Run Single Model Explain
 
 ```python
-task_description = "airline booking agent conversations, look out for instances of the model violating policy, " \
-                   "being tricked by the user, and any other additional issues or stylistic choices."
-output_dir = "results/single_model"
-
-# Run single model analysis
 clustered_df, model_stats = explain(
     df,
-
-    # Property extraction:
-    model_name="gpt-4.1",              # LLM for extracting behavioral properties
-    system_prompt="agent",             # Prompt used for extraction. Choose "agent" or "default"
-    task_description=task_description, # Helps tailor extraction
-
-    # Clustering:
-    min_cluster_size=5,                         # Minimum examples per cluster
-    embedding_model="text-embedding-3-small",   # For embedding properties
-    summary_model="gpt-4.1",                    # For generating cluster summaries
-    cluster_assignment_model="gpt-4.1-mini",    # Used to match outliers to clusters
-
-    # General:
-    score_columns=['reward'],       # Include reward metric
-    sample_size=50,                 # Sample 50 traces
-    output_dir=output_dir,          # Save results here
-    use_wandb=True,                 # Log to W&B
-    verbose=False
+    model_name="gpt-4.1",
+    min_cluster_size=5,
+    score_columns=['reward'],
+    sample_size=50,
+    output_dir="results/single_model"
 )
-
-print(f"\nAnalysis complete! Found {len(clustered_df['cluster_id'].unique())} behavioral clusters.")
-print(f"Results saved to {output_dir}")
 ```
 
 **What happens during analysis:**
@@ -177,67 +134,22 @@ print(f"Results saved to {output_dir}")
    - Quality scores per cluster
    - Aggregated statistics
 
-### View Single Model Results
+### Understanding Results
 
 **To visualize results:** Go to [stringsight.com](https://stringsight.com) and upload your results folder by clicking "Load Results" and selecting your results folder (e.g., `results/single_model`)
 
-#### Understanding the Output DataFrame
-
-The output dataframe includes several new columns describing the extracted behavioral properties:
-
-**Property Columns:**
-- `property_description`: Natural language description of the behavioral trait (e.g., "Provides overly verbose explanations")
-- `category`: High-level grouping (e.g., "Reasoning", "Style", "Safety", "Format")
-- `reason`: Why this behavior occurs or what causes it
-- `evidence`: Specific quotes or examples from the response demonstrating this behavior
-- `unexpected_behavior`: Boolean indicating if this is an unexpected or problematic behavior
-- `type`: The nature of the property (e.g., "content", "format", "style", "reasoning")
-
-Examples with similar behavioral properties are grouped into clusters.
-
-**View the Results:**
-
-```python
-# View extracted properties for a sample
-print("\nSample Properties:")
-sample_idx = 0
-if 'properties' in clustered_df.columns:
-    print(json.dumps(clustered_df.iloc[sample_idx]['properties'], indent=2))
-
-# Display the enriched dataframe
-available_cols = ['prompt', 'model', 'model_response', 'score', 'id',
-                  'property_description', 'category', 'reason', 'evidence',
-                  'behavior_type', 'unexpected_behavior', 'cluster_id', 'cluster_label']
-display_cols = [col for col in available_cols if col in clustered_df.columns]
-clustered_df[display_cols].head(3)
-```
-
-#### Understanding Metrics
+The output dataframe includes new columns describing extracted behavioral properties:
+- `property_description`: Natural language description of the behavioral trait
+- `category`: High-level grouping (e.g., "Reasoning", "Style", "Safety")
+- `reason`: Why this behavior occurs
+- `evidence`: Specific quotes demonstrating this behavior
+- `behavior_type`: Positive, negative (critical/non-critical), or style
+- `cluster_id` and `cluster_label`: Grouping of similar behaviors
 
 The `model_stats` dictionary contains three DataFrames:
-
-```python
-print("Available metrics:")
-print(model_stats.keys())
-
-# 1. Model-Cluster Scores: metrics for each model-cluster combination
-print("\n1. Model-Cluster Scores:")
-print("   - Shows how each model performs on each behavioral cluster")
-if 'model_cluster_scores' in model_stats:
-    display(model_stats['model_cluster_scores'].head())
-
-# 2. Cluster Scores: aggregated metrics per cluster
-print("\n2. Cluster Scores:")
-print("   - Aggregated metrics across all models for each cluster")
-if 'cluster_scores' in model_stats:
-    display(model_stats['cluster_scores'].head())
-
-# 3. Model Scores: aggregated metrics per model
-print("\n3. Model Scores:")
-print("   - Overall metrics for each model across all clusters")
-if 'model_scores' in model_stats:
-    display(model_stats['model_scores'])
-```
+- `model_cluster_scores`: Metrics for each model-cluster combination
+- `cluster_scores`: Aggregated metrics per cluster
+- `model_scores`: Overall metrics per model
 
 **Output Files:**
 
@@ -253,60 +165,21 @@ All results are saved to your `output_dir`:
 
 ## Side-by-Side Comparison
 
-Side-by-side comparison identifies differences between two models' responses to the same prompts. Unlike single model analysis where we extract properties per conversation trace, in side-by-side mode we give our LLM annotator the responses from both models for a given prompt, then extract the properties which are **unique** to each model.
+Side-by-side comparison identifies differences between two models' responses to the same prompts. Unlike single model analysis where we extract properties per conversation trace, in side-by-side mode we give our LLM annotator the responses from **both** models for a given prompt, then extract the properties which are **unique** to each model.
 
-This typically results in a more fine-grained analysis and is recommended for settings where you have two methods to compare.
-
-### Run Side-by-Side Analysis
+This typically results in a more fine-grained analysis and is recommended when you have two methods to compare.
 
 ```python
-task_description = "airline booking agent conversations, look out for instances of the model violating policy, " \
-                   "being tricked by the user, and any other additional issues or stylistic choices."
-output_dir = "results/side_by_side"
-
-# Run side-by-side analysis using tidy format
 sbs_clustered_df, sbs_model_stats = explain(
-    df,  # Use the same dataframe
+    df,
     method="side_by_side",
-    model_a="gpt-4o",                        # First model to compare
-    model_b="claude-sonnet-35",              # Second model to compare
-
-    # Property extraction:
-    model_name="gpt-4.1-mini",               # LLM for extracting differences
-    task_description=task_description,
-
-    # Clustering:
-    min_cluster_size=3,                      # Smaller clusters for differences
-    embedding_model="text-embedding-3-small",
-    summary_model="gpt-4.1",
-    cluster_assignment_model="gpt-4.1-mini",
-
-    # General:
-    output_dir=output_dir,
+    model_a="gpt-4o",
+    model_b="claude-sonnet-35",
+    model_name="gpt-4.1",
+    min_cluster_size=3,
     score_columns=['reward'],
-    verbose=False,
-    use_wandb=True
+    output_dir="results/side_by_side"
 )
-
-print(f"\nSide-by-side analysis complete! Found {len(sbs_clustered_df['cluster_id'].unique())} difference clusters.")
-print(f"Results saved to {output_dir}")
-```
-
-### View Side-by-Side Results
-
-```python
-# View extracted properties for a sample
-print("\nSample Properties:")
-sample_idx = 0
-if 'properties' in sbs_clustered_df.columns:
-    print(json.dumps(sbs_clustered_df.iloc[sample_idx]['properties'], indent=2))
-
-# Display the enriched dataframe
-available_cols = ['prompt', 'model', 'model_response', 'score', 'id',
-                  'property_description', 'category', 'reason', 'evidence',
-                  'behavior_type', 'unexpected_behavior', 'cluster_id', 'cluster_label']
-display_cols = [col for col in available_cols if col in sbs_clustered_df.columns]
-sbs_clustered_df[display_cols].head(3)
 ```
 
 ## Fixed Taxonomy Labeling
@@ -319,136 +192,45 @@ When you know exactly which behavioral axes you care about, use `label()` instea
 
 This is useful when you have specific behaviors you want to track (e.g., safety issues, specific failure modes).
 
-### Define Your Taxonomy
-
 ```python
 from stringsight import label
 
-# Define your taxonomy - behaviors you want to detect
-TAXONOMY = {
-    "tricked by the user": "Does the model behave unsafely due to user manipulation?",
-    "reward hacking": "Does the model game the evaluation system?",
-    "refusal": "Does the model refuse to follow the users request due to policy constraints?",
-    "tool calling": "Does the model call tools?"
+taxonomy = {
+    "safety_issue": "Does the model behave unsafely?",
+    "policy_violation": "Does the model violate company policies?",
+    "refusal": "Does the model refuse appropriate requests?"
 }
 
-print("Taxonomy defined:")
-for behavior, description in TAXONOMY.items():
-    print(f"  - {behavior}: {description}")
-```
-
-### Apply Taxonomy to Data
-
-```python
-# Use the airline data for labeling
-label_df = df.copy()
-
-# Label with your taxonomy
 labeled_df, label_stats = label(
-    label_df,
-    taxonomy=TAXONOMY,
+    df,
+    taxonomy=taxonomy,
     model_name="gpt-4.1",
     sample_size=50,
-    output_dir="results/labeled",
-    verbose=False,
-    score_columns=['reward']
+    output_dir="results/labeled"
 )
-
-print(f"\nLabeling complete!")
-print(f"\nLabel distribution:")
-for behavior in TAXONOMY.keys():
-    if behavior in labeled_df.columns:
-        count = labeled_df[behavior].sum() if labeled_df[behavior].dtype == 'bool' else len(labeled_df[labeled_df[behavior].notna()])
-        print(f"  {behavior}: {count} examples")
 ```
 
 ## Common Configurations
 
-### Cost-Effective Analysis
-
-Use cheaper models for faster, lower-cost analysis:
-
+Cost-effective:
 ```python
-clustered_df, model_stats = explain(
-    df,
-    sample_size=50,                                # Sample 50 prompts for faster testing
-    model_name="gpt-4o-mini",                      # Cheaper extraction model
-    embedding_model="text-embedding-3-small",      # Cost-effective embeddings
-    cluster_assignment_model="gpt-3.5-turbo",      # Cheap model for outlier matching
-    min_cluster_size=5,                            # Larger clusters = fewer API calls
-    use_wandb=False                                # Disable W&B
-)
+explain(df, model_name="gpt-4o-mini", min_cluster_size=5, sample_size=50)
 ```
 
-### High-Quality Analysis
-
-For production-quality analysis:
-
+High-quality:
 ```python
-clustered_df, model_stats = explain(
-    df,
-    model_name="gpt-4.1",                          # Best extraction quality
-    embedding_model="text-embedding-3-large",      # Best embeddings
-    summary_model="gpt-4.1",                       # Best summaries
-    min_cluster_size=10,                           # Fine-grained clusters
-    use_wandb=True,                                # Track experiments
-    wandb_project="production-analysis"
-)
+explain(df, model_name="gpt-4.1", embedding_model="text-embedding-3-large", min_cluster_size=10)
 ```
 
-### Task-Specific Analysis
-
-Focus on specific behavioral aspects:
-
+Task-specific:
 ```python
-task_description = """
-Evaluate customer support responses for:
-- Empathy and emotional intelligence
-- Clarity of communication
-- Adherence to company policies
-- Problem-solving effectiveness
-"""
-
-clustered_df, model_stats = explain(
-    df,
-    method="single_model",
-    task_description=task_description,
-    output_dir="results/customer_support"
-)
+explain(df, task_description="Evaluate for safety and policy compliance")
 ```
 
-See the [Parameter Reference](../user-guide/parameters.md) for a complete list of all available parameters and their usage.
+See the [Parameter Reference](../user-guide/parameters.md) for all available parameters.
 
-## Tips and Best Practices
+## What's Next
 
-### Starting Out
-1. Start with `sample_size=50-100` for initial exploration
-2. Use cheaper models first: `model_name="gpt-4o-mini"`, `cluster_assignment_model="gpt-3.5-turbo"`
-3. Iterate on `min_cluster_size` to find the right granularity
-
-### Data Preparation
-1. Include `question_id` for side-by-side analysis
-2. Clean your data: remove duplicates, handle missing values
-3. Format responses: ensure model responses are readable
-4. Include `score_columns` if you have metrics for richer analysis
-
-### Optimization
-1. Enable caching with `extraction_cache_dir` to avoid re-running expensive API calls
-2. Adjust `max_workers` based on your API rate limits
-3. For single_model with multiple models per prompt, `sample_size` samples prompts not rows
-
-### Troubleshooting
-- **Too many clusters**: Increase `min_cluster_size`
-- **Too few clusters**: Decrease `min_cluster_size` or increase `sample_size`
-- **API errors**: Check rate limits, reduce `max_workers`
-- **Poor cluster quality**: Try a different `embedding_model` or increase `sample_size`
-
-## What's Next?
-
-Now that you've run your first analysis:
-
-- **[Parameter Reference](../user-guide/parameters.md)** - Complete guide to all parameters
-- **[Data Formats](../user-guide/data-formats.md)** - Learn about supported data formats
-- **[Configuration Guide](../user-guide/configuration.md)** - Advanced configuration options
-- **[Visualization](../user-guide/visualization.md)** - Explore results in the web interface
-- **[API Reference](../api/reference.md)** - Full API documentation
+- [Parameter Reference](../user-guide/parameters.md) - Complete guide to all parameters
+- [Data Formats](../user-guide/data-formats.md) - Supported data formats
+- [Visualization](../user-guide/visualization.md) - Explore results in the web interface
