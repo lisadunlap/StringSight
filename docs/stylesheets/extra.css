@@ -1,19 +1,64 @@
 /* Custom styles for StringSight documentation */
 
+/* Pastel Dreamland Adventure Color Palette */
+:root {
+  /* Pastel Dreamland Adventure palette colors */
+  --pastel-lavender: #D4B5E8;      /* Light muted lavender/pastel purple */
+  --pastel-pink-soft: #FFD1DC;     /* Soft light pink */
+  --pastel-pink-vibrant: #FFB6C1;  /* Slightly more vibrant pastel pink */
+  --pastel-blue-soft: #B0E0E6;     /* Light soft blue */
+  --pastel-blue-vibrant: #87CEEB;  /* Slightly more vibrant pastel blue */
+  --pastel-white: #FFF8F8;         /* Soft white background */
+  --pastel-dark: #6B5B7D;         /* Dark purple for text */
+}
+
+/* Override Material theme colors with Pastel Dreamland Adventure palette */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: var(--pastel-pink-vibrant);
+  --md-primary-fg-color--light: var(--pastel-pink-soft);
+  --md-primary-fg-color--dark: var(--pastel-pink-vibrant);
+  --md-accent-fg-color: var(--pastel-lavender);
+  --md-default-bg-color: var(--pastel-white);
+  --md-default-fg-color--light: var(--pastel-dark);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: var(--pastel-lavender);
+  --md-primary-fg-color--light: var(--pastel-pink-soft);
+  --md-primary-fg-color--dark: var(--pastel-lavender);
+  --md-accent-fg-color: var(--pastel-pink-vibrant);
+  --md-default-bg-color: #4A3D5C;
+  --md-default-fg-color--light: var(--pastel-white);
+  --md-code-bg-color: #5A4D6C;
+  --md-code-fg-color: var(--pastel-white);
+}
+
 /* Code block styling */
 .md-typeset code {
-    background-color: #f5f5f5;
+    background-color: rgba(212, 181, 232, 0.2);
     border-radius: 3px;
     padding: 2px 4px;
     font-size: 0.85em;
+    color: var(--pastel-dark);
+}
+
+[data-md-color-scheme="slate"] .md-typeset code {
+    background-color: rgba(212, 181, 232, 0.3);
+    color: var(--pastel-white);
 }
 
 /* Inline code styling */
 .md-typeset :not(pre) > code {
-    background-color: #f5f5f5;
+    background-color: rgba(212, 181, 232, 0.2);
     border-radius: 3px;
     padding: 2px 4px;
     font-size: 0.85em;
+    color: var(--pastel-dark);
+}
+
+[data-md-color-scheme="slate"] .md-typeset :not(pre) > code {
+    background-color: rgba(212, 181, 232, 0.3);
+    color: var(--pastel-white);
 }
 
 /* Admonition styling */
@@ -24,31 +69,31 @@
 
 /* Custom callout boxes */
 .callout {
-    background-color: #f8f9fa;
-    border-left: 4px solid #007bff;
+    background-color: rgba(255, 182, 193, 0.15);
+    border-left: 4px solid var(--pastel-pink-vibrant);
     padding: 1rem;
     margin: 1rem 0;
     border-radius: 0 6px 6px 0;
 }
 
 .callout-info {
-    border-left-color: #17a2b8;
-    background-color: #d1ecf1;
+    border-left-color: var(--pastel-blue-vibrant);
+    background-color: rgba(176, 224, 230, 0.2);
 }
 
 .callout-warning {
-    border-left-color: #ffc107;
-    background-color: #fff3cd;
+    border-left-color: var(--pastel-pink-vibrant);
+    background-color: rgba(255, 182, 193, 0.2);
 }
 
 .callout-danger {
-    border-left-color: #dc3545;
-    background-color: #f8d7da;
+    border-left-color: var(--pastel-lavender);
+    background-color: rgba(212, 181, 232, 0.2);
 }
 
 .callout-success {
-    border-left-color: #28a745;
-    background-color: #d4edda;
+    border-left-color: var(--pastel-blue-soft);
+    background-color: rgba(176, 224, 230, 0.2);
 }
 
 /* Table styling */
@@ -58,8 +103,14 @@
 }
 
 .md-typeset table th {
-    background-color: #f8f9fa;
+    background-color: rgba(255, 182, 193, 0.2);
     font-weight: 600;
+    color: var(--pastel-dark);
+}
+
+[data-md-color-scheme="slate"] .md-typeset table th {
+    background-color: rgba(212, 181, 232, 0.3);
+    color: var(--pastel-white);
 }
 
 /* Button styling */
@@ -75,7 +126,11 @@
 }
 
 .md-nav__link:hover {
-    background-color: #f5f5f5;
+    background-color: rgba(255, 182, 193, 0.15);
+}
+
+[data-md-color-scheme="slate"] .md-nav__link:hover {
+    background-color: rgba(212, 181, 232, 0.25);
 }
 
 /* Search styling */
@@ -85,12 +140,24 @@
 
 /* Footer styling */
 .md-footer {
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid rgba(212, 181, 232, 0.3);
+    background-color: #4A3D5C;
+}
+
+[data-md-color-scheme="default"] .md-footer {
+    background-color: var(--pastel-white);
+    border-top-color: rgba(255, 182, 193, 0.3);
 }
 
 /* Custom header styling */
 .md-header {
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(212, 181, 232, 0.2);
+    background-color: var(--pastel-pink-vibrant);
+}
+
+[data-md-color-scheme="slate"] .md-header {
+    background-color: var(--pastel-lavender);
+    box-shadow: 0 2px 4px rgba(74, 61, 92, 0.3);
 }
 
 /* Responsive adjustments */

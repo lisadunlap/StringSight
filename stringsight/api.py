@@ -872,7 +872,7 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             embedding_model=req.params.embeddingModel,
             assign_outliers=False,
             include_embeddings=False,
-            cache_embeddings=False,
+            cache_embeddings=True,
             groupby_column=groupby_column,
         )
         
@@ -1013,6 +1013,32 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
                         if not any(x in metric_name for x in ['_ci_', '_significant']):
                             metrics["quality_delta"][metric_name] = row[col]
                 scores["cluster_scores"][cluster] = metrics
+        
+        # Process model_scores
+        if hasattr(model_scores_dict, 'to_dict'):
+            df = model_scores_dict
+            scores["model_scores"] = {}
+            for _, row in df.iterrows():
+                model = row['model']
+                metrics = {
+                    "size": row.get('size'),
+                    "proportion": row.get('proportion'),
+                    "quality": {},
+                    "quality_delta": {}
+                }
+                for col in df.columns:
+                    if col.startswith('quality_') and not col.startswith('quality_delta_'):
+                        metric_name = col.replace('quality_', '')
+                        if not any(x in metric_name for x in ['_ci_', '_significant']):
+                            metrics["quality"][metric_name] = row[col]
+                    elif col.startswith('quality_delta_'):
+                        metric_name = col.replace('quality_delta_', '')
+                        if not any(x in metric_name for x in ['_ci_', '_significant']):
+                            metrics["quality_delta"][metric_name] = row[col]
+                scores["model_scores"][model] = metrics
+        else:
+            # Already in dict format, just assign it
+            scores["model_scores"] = model_scores_dict
     else:
         # Already in dict format
         scores = {

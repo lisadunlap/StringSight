@@ -7,22 +7,28 @@ repo_name: StringSight
 repo_url: https://github.com/lisabdunlap/StringSight
 edit_uri: edit/main/docs/
 
+# Development server address
+dev_addr: 127.0.0.1:8001
+
 # Theme
 theme:
   name: material
   palette:
     - scheme: default
-      primary: indigo
-      accent: indigo
+      primary: pink
+      accent: purple
       toggle:
         icon: material/brightness-auto
         name: Switch to dark mode
     - scheme: slate
-      primary: indigo
-      accent: indigo
+      primary: purple
+      accent: pink
       toggle:
         icon: material/brightness-7
         name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
   features:
     - navigation.tabs
     - navigation.sections
@@ -49,14 +55,8 @@ nav:
     - Configuration Guide: user-guide/configuration-guide.md
     - Output Files: user-guide/configuration.md
     - Visualization: user-guide/visualization.md
-  - Advanced:
-    - Custom Pipelines: advanced/custom-pipelines.md
-    - Performance Tuning: advanced/performance.md
   - Deployment:
     - Production Setup: deployment/production.md
-  - Development:
-    - Contributing: development/contributing.md
-    - Testing: development/testing.md
   - Troubleshooting: troubleshooting.md
 
 # Plugins

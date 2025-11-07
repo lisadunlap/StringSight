@@ -64,9 +64,6 @@ Analyze how model behavior changes across:
 - Fine-tuning approaches
 - Temperature settings
 
-### 📊 Arena Analysis
-Process head-to-head battle data (like Chatbot Arena) to understand *why* users prefer one model over another, not just win rates.
-
 ### Task-Specific Evaluation
 Focus on behaviors relevant to your domain:
 

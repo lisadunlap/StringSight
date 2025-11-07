@@ -15,6 +15,7 @@ def get_clusterer(
     assign_outliers: bool = False,
     include_embeddings: bool = False,
     use_gpu: bool | None = None,
+    cluster_positive: bool = False,
     **kwargs
 ) -> PipelineStage:
     """
@@ -28,6 +29,8 @@ def get_clusterer(
         include_embeddings: Whether to include embeddings in output
         use_gpu: Enable GPU acceleration for embeddings, UMAP, and HDBSCAN.
                 None (default) = auto-detect based on CUDA availability.
+        cluster_positive: If False and groupby_column is "behavior_type", skip clustering positive behaviors.
+                         Defaults to False.
         **kwargs: Additional configuration
         
     Returns:
@@ -42,6 +45,7 @@ def get_clusterer(
             assign_outliers=assign_outliers,
             include_embeddings=include_embeddings,
             use_gpu=use_gpu,
+            cluster_positive=cluster_positive,
             **kwargs
         )
     # 'hdbscan_stratified' alias has been removed; users should pass

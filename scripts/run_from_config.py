@@ -48,6 +48,14 @@ def _load_config(config_path: str) -> Dict[str, Any]:
         - extraction_model: Optional[str] model for property extraction
         - summary_model: Optional[str] model for cluster summarization
         - cluster_assignment_model: Optional[str] model for cluster matching
+        - prompt_column: Optional[str] name of the prompt column (default: "prompt")
+        - model_column: Optional[str] name of the model column for single_model (default: "model" if None)
+        - model_response_column: Optional[str] name of the model response column for single_model (default: "model_response")
+        - question_id_column: Optional[str] name of the question_id column (default: "question_id" if column exists)
+        - model_a_column: Optional[str] name of the model_a column for side_by_side (default: "model_a")
+        - model_b_column: Optional[str] name of the model_b column for side_by_side (default: "model_b")
+        - model_a_response_column: Optional[str] name of the model_a_response column for side_by_side (default: "model_a_response")
+        - model_b_response_column: Optional[str] name of the model_b_response column for side_by_side (default: "model_b_response")
     """
     conf = OmegaConf.load(config_path)
     return OmegaConf.to_container(conf, resolve=True)  # type: ignore[return-value]
@@ -153,6 +161,14 @@ Examples:
     parser.add_argument("--extraction_model", type=str, default=None, help="Override: model for property extraction (e.g., gpt-4.1)")
     parser.add_argument("--summary_model", type=str, default=None, help="Override: model for cluster summarization (e.g., gpt-4.1)")
     parser.add_argument("--cluster_assignment_model", type=str, default=None, help="Override: model for cluster matching (e.g., gpt-4.1-mini)")
+    parser.add_argument("--prompt_column", type=str, default=None, help="Override: name of the prompt column (default: 'prompt')")
+    parser.add_argument("--model_column", type=str, default=None, help="Override: name of the model column for single_model (default: 'model' if None)")
+    parser.add_argument("--model_response_column", type=str, default=None, help="Override: name of the model response column for single_model (default: 'model_response')")
+    parser.add_argument("--question_id_column", type=str, default=None, help="Override: name of the question_id column (default: 'question_id' if column exists)")
+    parser.add_argument("--model_a_column", type=str, default=None, help="Override: name of the model_a column for side_by_side (default: 'model_a')")
+    parser.add_argument("--model_b_column", type=str, default=None, help="Override: name of the model_b column for side_by_side (default: 'model_b')")
+    parser.add_argument("--model_a_response_column", type=str, default=None, help="Override: name of the model_a_response column for side_by_side (default: 'model_a_response')")
+    parser.add_argument("--model_b_response_column", type=str, default=None, help="Override: name of the model_b_response column for side_by_side (default: 'model_b_response')")
 
     args = parser.parse_args()
 
@@ -221,9 +237,21 @@ Examples:
         "extraction_model": args.extraction_model,
         "summary_model": args.summary_model,
         "cluster_assignment_model": args.cluster_assignment_model,
+        "prompt_column": args.prompt_column,
+        "model_column": args.model_column,
+        "model_response_column": args.model_response_column,
+        "question_id_column": args.question_id_column,
+        "model_a_column": args.model_a_column,
+        "model_b_column": args.model_b_column,
+        "model_a_response_column": args.model_a_response_column,
+        "model_b_response_column": args.model_b_response_column,
     }
 
     cfg = _merge_overrides(base_cfg, overrides)
+
+    # Handle legacy 'response_column' alias -> 'model_response_column'
+    if "response_column" in cfg and "model_response_column" not in cfg:
+        cfg["model_response_column"] = cfg.pop("response_column")
 
     # Required fields validation
     data_path = cfg.get("data_path")
@@ -259,6 +287,14 @@ Examples:
         extraction_model=cfg.get("extraction_model"),
         summary_model=cfg.get("summary_model"),
         cluster_assignment_model=cfg.get("cluster_assignment_model"),
+        prompt_column=cfg.get("prompt_column", "prompt"),
+        model_column=cfg.get("model_column"),
+        model_response_column=cfg.get("model_response_column"),
+        question_id_column=cfg.get("question_id_column"),
+        model_a_column=cfg.get("model_a_column"),
+        model_b_column=cfg.get("model_b_column"),
+        model_a_response_column=cfg.get("model_a_response_column"),
+        model_b_response_column=cfg.get("model_b_response_column"),
     )
 
     return clustered_df, model_stats

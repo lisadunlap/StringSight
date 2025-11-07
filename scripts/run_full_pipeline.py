@@ -58,24 +58,9 @@ def load_dataset(
     # Attach the filename to the DataFrame for wandb naming
     df.name = os.path.basename(data_path)
     
-    # Verify required columns
-    if method == "single_model":
-        required_cols = {"prompt", "model", "model_response"}
-        if not required_cols.issubset(df.columns):
-            raise ValueError(f"Dataset missing required columns: {required_cols - set(df.columns)}")
-    elif method == "side_by_side":
-        if tidy_side_by_side_models is None:
-            required_cols = {"prompt", "model_a", "model_a_response", "model_b", "model_b_response"}
-            if not required_cols.issubset(df.columns):
-                raise ValueError(f"Dataset missing required columns: {required_cols - set(df.columns)}")
-        else:
-            # Tidy single-model-like input; we align by prompt when question_id is absent
-            required_cols = {"prompt", "model", "model_response"}
-            if not required_cols.issubset(df.columns):
-                raise ValueError(
-                    "When using tidy_side_by_side_models, the input must include "
-                    f"columns {sorted(required_cols)}; missing: {sorted(required_cols - set(df.columns))}"
-                )
+    # Note: Column validation is deferred to validate_and_prepare_dataframe()
+    # which handles column mapping. This allows users to specify custom column
+    # names via prompt_column, model_column, etc. parameters.
     
     print(f"Loaded {len(df)} rows")
     print(f"Columns: {list(df.columns)}")
@@ -110,6 +95,15 @@ def run_pipeline(
     extraction_model: Optional[str] = None,
     summary_model: Optional[str] = None,
     cluster_assignment_model: Optional[str] = None,
+    # Column mapping parameters
+    prompt_column: str = "prompt",
+    model_column: Optional[str] = None,
+    model_response_column: Optional[str] = None,
+    question_id_column: Optional[str] = None,
+    model_a_column: Optional[str] = None,
+    model_b_column: Optional[str] = None,
+    model_a_response_column: Optional[str] = None,
+    model_b_response_column: Optional[str] = None,
 ):
     """Run the complete pipeline on a dataset.
 
@@ -126,6 +120,14 @@ def run_pipeline(
             If not provided, uses the default from ClusterConfig.
         cluster_assignment_model: Optional model name for cluster matching (e.g., 'gpt-4.1-mini').
             If not provided, uses the default from ClusterConfig.
+        prompt_column: Name of the prompt column in your dataframe (default: "prompt")
+        model_column: Name of the model column for single_model (default: "model" if None)
+        model_response_column: Name of the model response column for single_model (default: "model_response")
+        question_id_column: Name of the question_id column (default: "question_id" if column exists)
+        model_a_column: Name of the model_a column for side_by_side (default: "model_a")
+        model_b_column: Name of the model_b column for side_by_side (default: "model_b")
+        model_a_response_column: Name of the model_a_response column for side_by_side (default: "model_a_response")
+        model_b_response_column: Name of the model_b_response column for side_by_side (default: "model_b_response")
     """
     
     # Create output directory
@@ -198,6 +200,15 @@ def run_pipeline(
         "model_a": model_a,
         "model_b": model_b,
         "score_columns": score_columns,
+        # Column mapping parameters
+        "prompt_column": prompt_column,
+        "model_column": model_column,
+        "model_response_column": model_response_column,
+        "question_id_column": question_id_column,
+        "model_a_column": model_a_column,
+        "model_b_column": model_b_column,
+        "model_a_response_column": model_a_response_column,
+        "model_b_response_column": model_b_response_column,
     }
 
     # Add model parameters if provided

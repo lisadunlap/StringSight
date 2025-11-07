@@ -62,8 +62,9 @@ class HDBSCANClusterer(BaseClusterer):
         context: Optional[str] = None,
         groupby_column: Optional[str] = None,
         parallel_clustering: bool = True,
+        cluster_positive: bool = False,
         precomputed_embeddings: Optional[object] = None,
-        cache_embeddings: bool = False,
+        cache_embeddings: bool = True,
         input_model_name: Optional[str] = None,
         summary_model: str = "gpt-4.1",
         cluster_assignment_model: str = "gpt-4.1-mini",
@@ -117,6 +118,7 @@ class HDBSCANClusterer(BaseClusterer):
             # groupby
             groupby_column=groupby_column,
             parallel_clustering=parallel_clustering,
+            cluster_positive=cluster_positive,
             # wandb
             use_wandb=use_wandb,
             wandb_project=wandb_project,
@@ -151,6 +153,36 @@ class HDBSCANClusterer(BaseClusterer):
             logger.error(f"Column '{column_name}' not found in DataFrame!")
 
         group_col = getattr(self.config, "groupby_column", None)
+        cluster_positive = getattr(self.config, "cluster_positive", False)
+
+        # Filter out positive behaviors if cluster_positive is False and groupby_column is behavior_type
+        positive_mask = None
+        positive_df = None
+        if group_col == "behavior_type" and not cluster_positive and "behavior_type" in df.columns:
+            positive_mask = df["behavior_type"] == "Positive"
+            positive_df = df[positive_mask].copy()
+            df = df[~positive_mask].copy()
+            if len(positive_df) > 0:
+                self.log(f"Filtering out {len(positive_df)} positive behaviors from clustering (cluster_positive=False)")
+            if len(df) == 0:
+                self.log("All behaviors are positive and cluster_positive=False - skipping clustering")
+
+        # Handle case where all behaviors were filtered out
+        if len(df) == 0:
+            # If we have positive behaviors, return them with special cluster assignment
+            if positive_df is not None and len(positive_df) > 0:
+                id_col = f"{column_name}_cluster_id"
+                label_col = f"{column_name}_cluster_label"
+                positive_df[id_col] = -2
+                positive_df[label_col] = "Positive (not clustered)"
+                if "meta" not in positive_df.columns:
+                    positive_df["meta"] = [{} for _ in range(len(positive_df))]
+                return positive_df
+            # Otherwise return empty DataFrame with required columns
+            id_col = f"{column_name}_cluster_id"
+            label_col = f"{column_name}_cluster_label"
+            df_empty = pd.DataFrame(columns=[column_name, id_col, label_col, "question_id", "id", "meta"])
+            return df_empty
 
         if group_col is not None and group_col in df.columns:
             parallel_clustering = getattr(self.config, "parallel_clustering", False)
@@ -212,6 +244,21 @@ class HDBSCANClusterer(BaseClusterer):
                 column_name=column_name,
                 config=self.config,
             )
+
+        # Add back positive behaviors with special cluster assignment if they were filtered out
+        if positive_df is not None and len(positive_df) > 0:
+            id_col = f"{column_name}_cluster_id"
+            label_col = f"{column_name}_cluster_label"
+            
+            # Assign special cluster ID and label for positive behaviors that weren't clustered
+            positive_df[id_col] = -2
+            positive_df[label_col] = "Positive (not clustered)"
+            if "meta" not in positive_df.columns:
+                positive_df["meta"] = [{} for _ in range(len(positive_df))]
+            
+            # Concatenate back with clustered results
+            clustered_df = pd.concat([clustered_df, positive_df], ignore_index=True)
+            self.log(f"Added back {len(positive_df)} positive behaviors with cluster_id=-2 (not clustered)")
 
         return clustered_df
 

@@ -46,9 +46,10 @@ class ClusterConfig:
     input_model_name: Optional[str] = None
     min_samples: Optional[int] = None
     cluster_selection_epsilon: float = 0.05  # Small epsilon to merge very similar clusters
-    cache_embeddings: bool = False
+    cache_embeddings: bool = True
     groupby_column: Optional[str] = None # if not None, the data will be grouped by this column before clustering
     parallel_clustering: bool = False  # if True, parallelize clustering when groupby_column is set
+    cluster_positive: bool = True  # if False and groupby_column is "behavior_type", skip clustering positive behaviors
 
     # Model settings
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
@@ -100,6 +101,7 @@ class ClusterConfig:
             min_samples=getattr(args, "min_samples", None),
             cluster_selection_epsilon=getattr(args, "cluster_selection_epsilon", 0.0),
             groupby_column=getattr(args, "groupby_column", None),
+            cluster_positive=getattr(args, "cluster_positive", False),
             # Dimension reduction settings
             dim_reduction_method=getattr(args, "dim_reduction_method", "adaptive"),
             umap_n_components=getattr(args, "umap_n_components", 100),

@@ -618,8 +618,14 @@ def validate_and_prepare_dataframe(
         if verbose:
             logger.info(f"After sampling: {len(df)} rows")
     
-    # Step 4: Basic validation
+    # Step 4: Basic validation and default column creation
     if method == "single_model":
+        # Create default model column if model_column was not specified and column doesn't exist
+        if "model" not in df.columns:
+            if verbose:
+                logger.info("No 'model' column found. Creating default model column with value 'model' for all rows.")
+            df["model"] = "model"
+        
         required = ["prompt", "model", "model_response"]
         missing = [col for col in required if col not in df.columns]
         if missing:
