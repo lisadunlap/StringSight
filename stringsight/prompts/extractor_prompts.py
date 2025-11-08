@@ -22,7 +22,7 @@ Prioritize properties that would actually influence a user's model choice or cou
 **Definitions:**
 *   **Behavior Type:** How does this property affect a user's experience or the model's performance?
     *   *Think:* Would someone view this as a positive, negative, or stylistic behavior?
-    *   **Positive:** A positive behavior that helps the model perform the task better or is favorable to the user.
+    *   **Positive:** A positive behavior that helps the model perform the task better or is favorable to the user. Do not list positive behaviors unless it was a model correcting its previous mistakes.
     *   **Negative (non-critical):** A negative behavior that should be fixed but is not the direct cause of failure.
     *   **Negative (critical):** A critical error that is the direct cause of task failure. 
     *   **Style:** A stylistic behavior (tone, types of tools used, formatting, styling, etc.) which does not affect the model's performance but may be interesting to note or may affect the user's experience.
@@ -71,7 +71,7 @@ Prioritize behaviors that would actually influence a user's model choice or coul
 **Definitions:**
 *   **Behavior Type:** How does this property affect a user's experience or the model's performance?
     *   *Think:* Would someone view this as a positive, negative, or stylistic behavior?
-    *   **Positive:** A positive behavior that helps the model perform the task better or is favorable to the user.
+    *   **Positive:** A positive behavior that helps the model perform the task better or is favorable to the user. Do not list positive behaviors unless it was a model correcting its previous mistakes.
     *   **Negative (non-critical):** A negative behavior that should be fixed but is not the direct cause of failure.
     *   **Negative (critical):** A critical error that is the direct cause of task failure. 
     *   **Style:** A stylistic behavior (tone, types of tools used, formatting, styling, etc.) which does not affect the model's performance but may be interesting to note or may affect the user's experience.
@@ -117,7 +117,7 @@ Note that the task description may be incomplete or missing some details. You sh
 **Definitions:**
 *   **Behavior Type:** How does this property affect a user's experience or the model's performance?
     *   *Think:* Would someone view this as a positive, negative, or stylistic behavior?
-    *   **Positive:** A positive behavior that helps the model perform the task better or is favorable to the user.
+    *   **Positive:** A positive behavior that helps the model perform the task better or is favorable to the user. Do not list positive behaviors unless it was a model correcting its previous mistakes.
     *   **Negative (non-critical):** A negative behavior that should be fixed but is not the direct cause of failure.
     *   **Negative (critical):** A critical error that is the direct cause of task failure.
     *   **Style:** A stylistic behavior (tone, types of tools used, formatting, styling, etc.) which does not affect the model's performance but may be interesting to note or may affect the user's experience.
@@ -163,7 +163,7 @@ Note that the task description may be incomplete or missing some details. You sh
 **Definitions:**
 *   **Behavior Type:** How does this property affect a user's experience or the model's performance?
     *   *Think:* Would someone view this as a positive, negative, or stylistic behavior?
-    *   **Positive:** A positive behavior that helps the model perform the task better or is favorable to the user.
+    *   **Positive:** A positive behavior that helps the model perform the task better or is favorable to the user. Do not list positive behaviors unless it was a model correcting its previous mistakes. 
     *   **Negative (non-critical):** A negative behavior that should be fixed but is not the direct cause of failure.
     *   **Negative (critical):** A critical error that is the direct cause of task failure. 
     *   **Style:** A stylistic behavior (tone, types of tools used, formatting, styling, etc.) which does not affect the model's performance but may be interesting to note or may affect the user's experience.
