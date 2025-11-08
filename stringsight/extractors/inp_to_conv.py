@@ -36,11 +36,32 @@ def openai_messages_to_conv(messages: List[Dict[str, Any]]) -> List[Dict[str, An
       - We iterate messages in order.
       - Within a message, we iterate the `content` parts in order, appending
         matching segments.
+    
+    Error handling:
+      - If a message is not in the expected format (not a dict), it will be
+        converted to a string and stored as a text segment with role "user".
     """
     conv: List[Dict[str, Any]] = []
 
+    # Handle non-list input by converting to string
+    if not isinstance(messages, list):
+        return [{"role": "user", "content": {"segments": [{"kind": "text", "text": str(messages)}]}}]
+
     for msg in messages:
-        new_msg: Dict[str, Any] = {"role": msg["role"], "content": {"segments": []}}
+        # Handle non-dict messages by converting to string
+        if not isinstance(msg, dict):
+            conv.append({
+                "role": "user",
+                "content": {"segments": [{"kind": "text", "text": str(msg)}]}
+            })
+            continue
+        
+        # Try to get role, default to "user" if not present
+        role = msg.get("role", "user")
+        if not isinstance(role, str):
+            role = str(role)
+        
+        new_msg: Dict[str, Any] = {"role": role, "content": {"segments": []}}
         segments: List[Dict[str, Any]] = new_msg["content"]["segments"]
 
         # Preserve optional identifiers.
@@ -88,8 +109,13 @@ def openai_messages_to_conv(messages: List[Dict[str, Any]]) -> List[Dict[str, An
                 if isinstance(images, list):
                     for img in images:
                         segments.append({"kind": "image", "image": img})
+        
+        # 4) Handle None or unexpected content types by converting to string
+        else:
+            if content is not None:
+                segments.append({"kind": "text", "text": str(content)})
 
-        # 4) Tool calls (multi-tool and legacy single-function)
+        # 5) Tool calls (multi-tool and legacy single-function)
         tool_calls_out: List[Dict[str, Any]] = []
 
         if "tool_calls" in msg and isinstance(msg["tool_calls"], list):
@@ -115,16 +141,24 @@ def openai_messages_to_conv(messages: List[Dict[str, Any]]) -> List[Dict[str, An
 
         elif "function_call" in msg and msg["function_call"]:
             fc = msg["function_call"]
-            raw_args = fc.get("arguments", "")
-            try:
-                args_val = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
-            except Exception:
-                args_val = raw_args
-            tool_calls_out.append({
-                "name": fc.get("name"),
-                "arguments": args_val,
-                "id": fc.get("id") or msg.get("id"),
-            })
+            if isinstance(fc, dict):
+                raw_args = fc.get("arguments", "")
+                try:
+                    args_val = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+                except Exception:
+                    args_val = raw_args
+                tool_calls_out.append({
+                    "name": fc.get("name"),
+                    "arguments": args_val,
+                    "id": fc.get("id") or msg.get("id"),
+                })
+            else:
+                # Handle non-dict function_call by converting to string
+                tool_calls_out.append({
+                    "name": None,
+                    "arguments": str(fc),
+                    "id": msg.get("id"),
+                })
 
         if tool_calls_out:
             segments.append({"kind": "tool", "tool_calls": tool_calls_out})
