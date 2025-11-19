@@ -43,106 +43,162 @@ class SideBySideMetrics(FunctionalMetrics):
         )
 
     def _prepare_data(self, data) -> pd.DataFrame:
-        """Prepare SxS data: expand each pair into two rows (one per model).
+        """Prepare SxS data as per-model, per-property rows.
 
-        Produces the same schema expected by FunctionalMetrics:
-        columns: [conversation_id, conversation_metadata, property_metadata, model, cluster, property_description, scores]
+        This version respects the *model* associated with each property:
+        clusters are linked to individual properties via ``property_ids``,
+        and properties carry the ``model`` field.  Conversation-level
+        metadata and scores are then joined on ``(conversation_id, model)``.
         """
-        # Extract clusters and properties data
-        if not data.clusters:
+        # Require both clusters and properties. If either is missing, we cannot compute metrics.
+        if not data.clusters or not data.properties:
             return pd.DataFrame()
 
-        clusters = pd.DataFrame([cluster.to_dict() for cluster in data.clusters])
+        # ------------------------------------------------------------------
+        # 1) Cluster information at the property level
+        # ------------------------------------------------------------------
+        clusters_df = pd.DataFrame([cluster.to_dict() for cluster in data.clusters])
 
-        # Explode only aligned columns to avoid mismatched element counts
-        clusters = clusters.explode(["property_descriptions", "question_ids"]).drop_duplicates(
-            subset=["property_descriptions", "question_ids"]
-        )
-        clusters = clusters.dropna(subset=["property_descriptions", "question_ids"])
-        clusters = clusters.rename(
-            {"question_ids": "question_id", "property_descriptions": "property_description"}, axis=1
-        )
+        # Explode aligned list columns so each row corresponds to a single property id
+        list_cols = ["property_ids", "property_descriptions", "question_ids"]
+        existing_list_cols = [c for c in list_cols if c in clusters_df.columns]
+        if existing_list_cols:
+            clusters_df = clusters_df.explode(existing_list_cols, ignore_index=True)
 
-        # Prepare base properties frame directly from clusters
-        properties = clusters.rename({"label": "cluster"}, axis=1)
-
-        # Expand conversations: one row per model with per-model scores
-        expanded_rows: List[Dict[str, Any]] = []
-        for conv in data.conversations:
-            qid = conv.question_id
-            meta = conv.meta
-
-            # Side-by-side: conv.model is a list/tuple of two models
-            model_a, model_b = conv.model[0], conv.model[1]
-            expanded_rows.append(
-                {
-                    "question_id": qid,
-                    "scores": self._transform_scores_for_model(conv.scores, model_a, model_b, conv),
-                    "conversation_metadata": meta,
-                    "model_name": model_a,
-                }
-            )
-            expanded_rows.append(
-                {
-                    "question_id": qid,
-                    "scores": self._transform_scores_for_model(conv.scores, model_b, model_a, conv),
-                    "conversation_metadata": meta,
-                    "model_name": model_b,
-                }
-            )
-
-        conversations = pd.DataFrame(expanded_rows)
-
-        properties = properties.merge(conversations, on="question_id", how="left").rename(
-            {"label": "cluster", "question_id": "conversation_id"},
+        clusters_df = clusters_df.rename(
+            {
+                "property_ids": "property_id",
+                "property_descriptions": "property_description",
+                "question_ids": "conversation_id",
+                "label": "cluster",
+            },
             axis=1,
         )
 
-        # Set model from expanded conversation rows
-        properties["model"] = properties["model_name"]
-        properties = properties.drop("model_name", axis=1)
-        
-        # Ensure conversation_metadata exists - fill missing values with empty dict
-        if "conversation_metadata" not in properties.columns:
-            properties["conversation_metadata"] = {}
-        else:
-            properties["conversation_metadata"] = properties["conversation_metadata"].fillna({})
+        # Keep only the columns needed downstream for metrics
+        cluster_cols = ["property_id", "cluster", "property_description"]
+        if "meta" in clusters_df.columns:
+            clusters_df["cluster_metadata"] = clusters_df["meta"]
+            cluster_cols.append("cluster_metadata")
+        clusters_df = clusters_df[cluster_cols]
 
-        # print(properties['cluster_metadata'].head())
-        
-        # Handle cluster_metadata from the cluster's meta field
-        if "meta" in properties.columns:
-            properties["cluster_metadata"] = properties["meta"]
-            properties = properties.drop("meta", axis=1)
-        else:
-            properties["cluster_metadata"] = {}
-        
-        properties["property_metadata"] = properties["property_description"].apply(
-            lambda x: {"property_description": x}
+        # ------------------------------------------------------------------
+        # 2) Property information (includes the model that owns the property)
+        # ------------------------------------------------------------------
+        properties_df = pd.DataFrame([prop.to_dict() for prop in data.properties])
+        properties_df = properties_df.rename(
+            {"id": "property_id", "question_id": "conversation_id"}, axis=1
         )
 
-        # Match the column selection from functional_metrics exactly
+        # ------------------------------------------------------------------
+        # 3) Conversation-level scores and metadata, expanded per model
+        # ------------------------------------------------------------------
+        expanded_rows: List[Dict[str, Any]] = []
+        for conv in data.conversations:
+            conversation_id = conv.question_id
+            conversation_metadata = conv.meta
+
+            # Side-by-side: conv.model is a pair of models
+            if isinstance(conv.model, (list, tuple)) and len(conv.model) == 2:
+                model_a, model_b = conv.model[0], conv.model[1]
+
+                expanded_rows.append(
+                    {
+                        "conversation_id": conversation_id,
+                        "model": model_a,
+                        "scores": self._transform_scores_for_model(
+                            conv.scores, model_a, model_b, conv
+                        ),
+                        "conversation_metadata": conversation_metadata,
+                    }
+                )
+                expanded_rows.append(
+                    {
+                        "conversation_id": conversation_id,
+                        "model": model_b,
+                        "scores": self._transform_scores_for_model(
+                            conv.scores, model_b, model_a, conv
+                        ),
+                        "conversation_metadata": conversation_metadata,
+                    }
+                )
+
+        conversations_df = pd.DataFrame(expanded_rows)
+
+        # ------------------------------------------------------------------
+        # 4) Join: properties ↔ conversations ↔ clusters
+        # ------------------------------------------------------------------
+        # First, attach per-model scores/metadata to properties via (conversation_id, model)
+        properties_with_conv = properties_df.merge(
+            conversations_df,
+            on=["conversation_id", "model"],
+            how="left",
+        )
+
+        # Then attach cluster labels/metadata via property_id. This may produce
+        # suffixed property_description columns (e.g. _x / _y); we'll reconcile
+        # those immediately afterwards.
+        full_df = properties_with_conv.merge(
+            clusters_df,
+            on="property_id",
+            how="left",
+        )
+
+        # Normalise property_description column name after merge
+        if "property_description" not in full_df.columns:
+            prop_x = full_df.get("property_description_x")
+            prop_y = full_df.get("property_description_y")
+            if prop_x is not None and prop_y is not None:
+                full_df["property_description"] = prop_x.combine_first(prop_y)
+                full_df = full_df.drop(
+                    columns=[c for c in ["property_description_x", "property_description_y"] if c in full_df.columns]
+                )
+            elif prop_x is not None:
+                full_df["property_description"] = prop_x
+                full_df = full_df.drop(columns=["property_description_x"])
+            elif prop_y is not None:
+                full_df["property_description"] = prop_y
+                full_df = full_df.drop(columns=["property_description_y"])
+
+        # Derive property_metadata from the property description if not provided
+        if "property_metadata" not in full_df.columns:
+            full_df["property_metadata"] = full_df["property_description"].apply(
+                lambda x: {"property_description": x}
+            )
+
+        # Ensure conversation_metadata and cluster_metadata columns exist
+        if "conversation_metadata" not in full_df.columns:
+            full_df["conversation_metadata"] = {}
+        if "cluster_metadata" not in full_df.columns:
+            full_df["cluster_metadata"] = {}
+
+        # ------------------------------------------------------------------
+        # 5) Match the schema expected by FunctionalMetrics
+        # ------------------------------------------------------------------
         important_columns = [
-            "conversation_id", "conversation_metadata", "property_metadata", 
-            "model", "cluster", "property_description", "scores", "cluster_metadata"
+            "conversation_id",
+            "conversation_metadata",
+            "property_metadata",
+            "model",
+            "cluster",
+            "property_description",
+            "scores",
+            "cluster_metadata",
         ]
 
-
-        
         # Ensure all required columns exist before filtering
         for col in important_columns:
-            if col not in properties.columns:
+            if col not in full_df.columns:
                 if col == "scores":
-                    properties[col] = {}
+                    full_df[col] = {}
                 elif col == "model":
-                    properties[col] = "unknown"
+                    full_df[col] = "unknown"
                 elif col in ["cluster_metadata", "conversation_metadata"]:
-                    properties[col] = {}
+                    full_df[col] = {}
                 else:
-                    properties[col] = ""
-        
-        properties = properties[important_columns]
-        return properties
+                    full_df[col] = ""
+
+        return full_df[important_columns]
 
     @staticmethod
     def _transform_scores_for_model(all_scores: List[Dict[str, Any]], this_model: str, other_model: str, conversation=None) -> Dict[str, float]:
