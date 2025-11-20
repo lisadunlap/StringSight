@@ -1,54 +1,116 @@
 /* Custom styles for StringSight documentation */
 
+/* StringSight app-aligned color palette */
+:root {
+  --ss-color-primary: #4C6EF5;           /* Indigo primary */
+  --ss-color-primary-light: #647CF7;     /* Lighter indigo for hovers */
+  --ss-color-primary-dark: #364FC7;      /* Darker indigo for focus states */
+  --ss-color-accent: #7C3AED;            /* Purple accent */
+  --ss-color-link: #646CFF;              /* Link accent */
+  --ss-color-bg: #F8FAFC;                /* App background */
+  --ss-color-surface: #FFFFFF;           /* Surfaces/cards */
+  --ss-color-text-primary: #111827;      /* Primary text */
+  --ss-color-text-secondary: #6B7280;    /* Secondary text */
+  --ss-color-border: #E5E7EB;            /* Borders/dividers */
+}
+
+/* Light mode (default scheme) */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: var(--ss-color-primary);
+  --md-primary-fg-color--light: var(--ss-color-primary-light);
+  --md-primary-fg-color--dark: var(--ss-color-primary-dark);
+  --md-accent-fg-color: var(--ss-color-accent);
+
+  --md-default-bg-color: var(--ss-color-bg);
+  --md-default-fg-color: var(--ss-color-text-primary);
+  --md-default-fg-color--light: var(--ss-color-text-secondary);
+  --md-typeset-color: var(--ss-color-text-primary);
+
+  --md-code-bg-color: rgba(229, 231, 235, 0.4);
+  --md-code-fg-color: var(--ss-color-text-primary);
+
+  --md-typeset-a-color: var(--ss-color-link);
+}
+
+/* Dark mode (slate scheme) */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: var(--ss-color-primary);
+  --md-primary-fg-color--light: var(--ss-color-primary-light);
+  --md-primary-fg-color--dark: var(--ss-color-primary-dark);
+  --md-accent-fg-color: var(--ss-color-accent);
+
+  --md-default-bg-color: #020617;
+  --md-default-fg-color: #E5E7EB;
+  --md-default-fg-color--light: #9CA3AF;
+  --md-typeset-color: #E5E7EB;
+
+  --md-code-bg-color: #020617;
+  --md-code-fg-color: #E5E7EB;
+
+  --md-typeset-a-color: var(--ss-color-link);
+}
+
 /* Code block styling */
 .md-typeset code {
-    background-color: #f5f5f5;
+    background-color: rgba(76, 110, 245, 0.08);
     border-radius: 3px;
     padding: 2px 4px;
     font-size: 0.85em;
+    color: inherit;
+}
+
+[data-md-color-scheme="slate"] .md-typeset code {
+    background-color: rgba(15, 23, 42, 0.9);
+    color: inherit;
 }
 
 /* Inline code styling */
 .md-typeset :not(pre) > code {
-    background-color: #f5f5f5;
+    background-color: rgba(76, 110, 245, 0.08);
     border-radius: 3px;
     padding: 2px 4px;
     font-size: 0.85em;
+    color: inherit;
+}
+
+[data-md-color-scheme="slate"] .md-typeset :not(pre) > code {
+    background-color: rgba(15, 23, 42, 0.9);
+    color: inherit;
 }
 
 /* Admonition styling */
 .md-typeset .admonition {
     border-radius: 6px;
-    border-left: 4px solid;
+    border-left: 4px solid var(--ss-color-border);
 }
 
 /* Custom callout boxes */
 .callout {
-    background-color: #f8f9fa;
-    border-left: 4px solid #007bff;
+    background-color: rgba(76, 110, 245, 0.04);
+    border-left: 4px solid var(--ss-color-primary);
     padding: 1rem;
     margin: 1rem 0;
     border-radius: 0 6px 6px 0;
 }
 
 .callout-info {
-    border-left-color: #17a2b8;
-    background-color: #d1ecf1;
+    border-left-color: var(--ss-color-link);
+    background-color: rgba(100, 108, 255, 0.06);
 }
 
 .callout-warning {
-    border-left-color: #ffc107;
-    background-color: #fff3cd;
+    border-left-color: var(--ss-color-accent);
+    background-color: rgba(124, 58, 237, 0.06);
 }
 
 .callout-danger {
-    border-left-color: #dc3545;
-    background-color: #f8d7da;
+    border-left-color: var(--ss-color-primary-dark);
+    background-color: rgba(54, 79, 199, 0.06);
 }
 
 .callout-success {
-    border-left-color: #28a745;
-    background-color: #d4edda;
+    border-left-color: #16A34A;
+    background-color: rgba(22, 163, 74, 0.06);
 }
 
 /* Table styling */
@@ -58,8 +120,14 @@
 }
 
 .md-typeset table th {
-    background-color: #f8f9fa;
+    background-color: rgba(248, 250, 252, 0.9);
     font-weight: 600;
+    color: var(--ss-color-text-primary);
+}
+
+[data-md-color-scheme="slate"] .md-typeset table th {
+    background-color: rgba(15, 23, 42, 0.9);
+    color: #E5E7EB;
 }
 
 /* Button styling */
@@ -75,22 +143,16 @@
 }
 
 .md-nav__link:hover {
-    background-color: #f5f5f5;
+    background-color: rgba(76, 110, 245, 0.06);
+}
+
+[data-md-color-scheme="slate"] .md-nav__link:hover {
+    background-color: rgba(15, 23, 42, 0.9);
 }
 
 /* Search styling */
 .md-search__input {
     border-radius: 6px;
-}
-
-/* Footer styling */
-.md-footer {
-    border-top: 1px solid #e0e0e0;
-}
-
-/* Custom header styling */
-.md-header {
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 /* Responsive adjustments */
@@ -99,4 +161,4 @@
         margin: 0.5rem 0;
         padding: 0.75rem;
     }
-} 
+}
