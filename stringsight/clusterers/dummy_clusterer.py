@@ -59,12 +59,12 @@ class DummyClusterer(BaseClusterer):
         )
 
     def run(self, data: PropertyDataset, column_name: str = "property_description") -> PropertyDataset:
-        """Execute clustering using `category` as the key for fixed-axes.
+        """Execute clustering using `property_description` as the key for fixed-axes.
 
         We intentionally ignore the incoming `column_name` and cluster by
-        the `category` field emitted by the fixed-axes extractor.
+        the `property_description` field emitted by the fixed-axes extractor.
         """
-        return super().run(data, column_name="category")
+        return super().run(data, column_name="property_description")
 
     def cluster(self, data: PropertyDataset, column_name: str) -> pd.DataFrame:
         """Map properties to a fixed taxonomy and return a standardized DataFrame."""

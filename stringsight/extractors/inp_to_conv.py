@@ -118,11 +118,33 @@ def openai_messages_to_conv(messages: List[Dict[str, Any]]) -> List[Dict[str, An
         # 5) Tool calls (multi-tool and legacy single-function)
         tool_calls_out: List[Dict[str, Any]] = []
 
-        if "tool_calls" in msg and isinstance(msg["tool_calls"], list):
-            for tc in msg["tool_calls"]:
+        raw_tool_calls = msg.get("tool_calls", None)
+
+        # Normalize tool_calls which may be:
+        # - a list of dicts (standard)
+        # - a JSON-encoded string of the above
+        # - a single dict
+        # - any other type, which we still preserve as a single call
+        normalized_tool_calls: Any = raw_tool_calls
+        if isinstance(raw_tool_calls, str):
+            try:
+                normalized_tool_calls = json.loads(raw_tool_calls)
+            except Exception:
+                # Keep raw string if not valid JSON
+                normalized_tool_calls = raw_tool_calls
+
+        if isinstance(normalized_tool_calls, dict):
+            normalized_tool_calls = [normalized_tool_calls]
+
+        if isinstance(normalized_tool_calls, list):
+            for tc in normalized_tool_calls:
                 fn = tc.get("function", {}) if isinstance(tc, dict) else {}
-                name = (fn.get("name") if isinstance(fn, dict) else None) or (tc.get("name") if isinstance(tc, dict) else None)
-                raw_args = (fn.get("arguments") if isinstance(fn, dict) else None) or (tc.get("arguments") if isinstance(tc, dict) else "")
+                name = (fn.get("name") if isinstance(fn, dict) else None) or (
+                    tc.get("name") if isinstance(tc, dict) else None
+                )
+                raw_args = (fn.get("arguments") if isinstance(fn, dict) else None) or (
+                    tc.get("arguments") if isinstance(tc, dict) else ""
+                )
                 try:
                     args_val = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
                 except Exception:
@@ -130,7 +152,8 @@ def openai_messages_to_conv(messages: List[Dict[str, Any]]) -> List[Dict[str, An
                 tc_out: Dict[str, Any] = {
                     "name": name,
                     "arguments": args_val,
-                    "id": (tc.get("id") if isinstance(tc, dict) else None) or (tc.get("tool_call_id") if isinstance(tc, dict) else None),
+                    "id": (tc.get("id") if isinstance(tc, dict) else None)
+                    or (tc.get("tool_call_id") if isinstance(tc, dict) else None),
                 }
                 # Preserve any additional, non-standard keys.
                 if isinstance(tc, dict):
@@ -138,6 +161,15 @@ def openai_messages_to_conv(messages: List[Dict[str, Any]]) -> List[Dict[str, An
                         if k not in {"function", "id", "tool_call_id"}:
                             tc_out[k] = v
                 tool_calls_out.append(tc_out)
+        elif normalized_tool_calls is not None:
+            # Preserve any non-standard shape as a single tool call record
+            tool_calls_out.append(
+                {
+                    "name": None,
+                    "arguments": normalized_tool_calls,
+                    "id": msg.get("id"),
+                }
+            )
 
         elif "function_call" in msg and msg["function_call"]:
             fc = msg["function_call"]

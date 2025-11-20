@@ -94,7 +94,8 @@ def get_default_system_prompt(method: str) -> str:
 def get_system_prompt(method: str, system_prompt: str | None = None, task_description: str | None = None) -> str:
     """Resolve and return the final system prompt string.
 
-    Supported values for system_prompt: None, "default", "agent", or a literal prompt string.
+    Supported values for system_prompt: None, "default", "agent", a prompt name (e.g., "agent_system_prompt"),
+    or a literal prompt string.
     """
     if method not in ("single_model", "side_by_side"):
         raise ValueError(f"Unknown method: {method}. Supported methods: 'side_by_side', 'single_model'")
@@ -114,6 +115,28 @@ def get_system_prompt(method: str, system_prompt: str | None = None, task_descri
         default_desc = entry["default_task_description"]
         desc = task_description if task_description is not None else default_desc
         return _format_task_aware(template, desc)
+
+    # Try to resolve as a prompt name from the prompts module
+    # This allows names like "agent_system_prompt" to be resolved
+    import sys
+    current_module = sys.modules[__name__]
+    if hasattr(current_module, system_prompt):
+        template = getattr(current_module, system_prompt)
+        # If the template has {task_description}, format it
+        if isinstance(template, str) and "{task_description}" in template:
+            default_desc = PROMPTS["default"][method]["default_task_description"]
+            desc = task_description if task_description is not None else default_desc
+            return _format_task_aware(template, desc)
+        # Otherwise return as-is (no task description support)
+        if isinstance(template, str):
+            if task_description is not None:
+                # Warn that task_description was provided but won't be used
+                import warnings
+                warnings.warn(
+                    f"task_description was provided but prompt '{system_prompt}' does not support it. "
+                    "The task_description will be ignored."
+                )
+            return template
 
     # Literal string
     template = system_prompt

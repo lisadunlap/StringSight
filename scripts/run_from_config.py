@@ -9,6 +9,8 @@ to the shared `run_pipeline` function used by all dataset runners.
 
 import argparse
 import sys
+import json
+import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, List
 
@@ -17,8 +19,40 @@ sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from omegaconf import OmegaConf
+import pandas as pd
 
-from scripts.run_full_pipeline import run_pipeline
+from scripts.run_full_pipeline import run_pipeline, load_dataset
+from stringsight import label
+
+
+def _load_taxonomy(taxonomy_spec: Any) -> Dict[str, str]:
+    """Load taxonomy from a file path or dictionary.
+    
+    Args:
+        taxonomy_spec: Either a string path to a JSON file, or a dictionary mapping
+            label names to descriptions.
+    
+    Returns:
+        Dictionary mapping label names to descriptions.
+    """
+    if isinstance(taxonomy_spec, str):
+        # Assume it's a file path
+        taxonomy_path = Path(taxonomy_spec)
+        if not taxonomy_path.exists():
+            raise FileNotFoundError(f"Taxonomy file not found: {taxonomy_path}")
+        
+        with open(taxonomy_path, 'r') as f:
+            taxonomy = json.load(f)
+        
+        if not isinstance(taxonomy, dict):
+            raise ValueError(f"Taxonomy file must contain a JSON object/dictionary, got {type(taxonomy)}")
+        
+        return taxonomy
+    elif isinstance(taxonomy_spec, dict):
+        # Already a dictionary
+        return taxonomy_spec
+    else:
+        raise ValueError(f"Taxonomy must be a file path (str) or dictionary, got {type(taxonomy_spec)}")
 
 
 def _load_config(config_path: str) -> Dict[str, Any]:
@@ -33,6 +67,7 @@ def _load_config(config_path: str) -> Dict[str, Any]:
         - output_dir: str, directory for results
         - task_description: Optional[str]
         - method: Optional[str] in {"single_model", "side_by_side"}
+        - taxonomy: Optional[str | Dict[str, str]] - path to JSON file or inline dict (enables label() mode)
         - min_cluster_size: Optional[int]
         - embedding_model: Optional[str]
         - max_workers: Optional[int]
@@ -83,8 +118,105 @@ def _bool_flag(value: bool) -> Optional[bool]:
     return bool(value) if value else None
 
 
+def run_label_pipeline(
+    data_path: str,
+    output_dir: str,
+    taxonomy: Dict[str, str],
+    model_name: str = "gpt-4.1",
+    temperature: float = 0.0,
+    top_p: float = 1.0,
+    max_tokens: int = 2048,
+    max_workers: int = 64,
+    use_wandb: bool = True,
+    verbose: bool = False,
+    sample_size: Optional[int] = None,
+    metrics_kwargs: Optional[Dict[str, Any]] = None,
+    score_columns: Optional[List[str]] = None,
+    prompt_column: str = "prompt",
+    model_column: Optional[str] = None,
+    model_response_column: Optional[str] = None,
+    question_id_column: Optional[str] = None,
+    extraction_cache_dir: Optional[str] = None,
+    metrics_cache_dir: Optional[str] = None,
+) -> Tuple[pd.DataFrame, Dict[str, pd.DataFrame]]:
+    """Run the label pipeline (fixed-taxonomy analysis).
+    
+    Args:
+        data_path: Path to input dataset
+        output_dir: Output directory for results
+        taxonomy: Dictionary mapping label names to descriptions
+        model_name: LLM model for labeling
+        temperature: Temperature for LLM
+        top_p: Top-p for LLM
+        max_tokens: Max tokens for LLM
+        max_workers: Max parallel workers
+        use_wandb: Whether to log to wandb
+        verbose: Whether to print progress
+        sample_size: Optional sample size
+        metrics_kwargs: Additional metrics configuration
+        score_columns: Optional list of score column names
+        prompt_column: Name of prompt column
+        model_column: Name of model column
+        model_response_column: Name of model response column
+        question_id_column: Name of question_id column
+        extraction_cache_dir: Cache directory for extraction
+        metrics_cache_dir: Cache directory for metrics
+    
+    Returns:
+        Tuple of (clustered_df, model_stats)
+    """
+    # Create output directory
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    
+    # Load dataset
+    df = load_dataset(data_path, method="single_model")
+    
+    # Attach filename for wandb naming
+    df.name = os.path.basename(data_path)
+    
+    if verbose:
+        print(f"Loaded dataset with {len(df)} rows")
+        if sample_size:
+            print(f"Will sample to {sample_size} rows (sample_size type: {type(sample_size)}, value: {sample_size})")
+        else:
+            print(f"No sampling requested (sample_size: {sample_size})")
+    
+    # Run label pipeline (label() will handle sampling via validate_and_prepare_dataframe)
+    if verbose:
+        print(f"Calling label() with sample_size={sample_size} (type: {type(sample_size)})")
+    
+    clustered_df, model_stats = label(
+        df,
+        taxonomy=taxonomy,
+        model_name=model_name,
+        temperature=temperature,
+        top_p=top_p,
+        max_tokens=max_tokens,
+        max_workers=max_workers,
+        use_wandb=use_wandb,
+        verbose=verbose,
+        output_dir=str(output_path),
+        sample_size=sample_size,  # Pass through to label() which handles sampling
+        score_columns=score_columns,
+        prompt_column=prompt_column,
+        model_column=model_column,
+        model_response_column=model_response_column,
+        question_id_column=question_id_column,
+        metrics_kwargs=metrics_kwargs,
+        extraction_cache_dir=extraction_cache_dir,
+        metrics_cache_dir=metrics_cache_dir,
+    )
+    
+    return clustered_df, model_stats
+
+
 def main() -> Tuple[Any, Any]:
     """Main entrypoint to run the pipeline from a YAML configuration.
+
+    Supports both explain() and label() modes. If 'taxonomy' is provided in the config
+    or via CLI, runs label() mode (fixed-taxonomy analysis). Otherwise runs explain()
+    mode (clustering-based analysis).
 
     Returns:
         A tuple of (clustered_df, model_stats) from the underlying pipeline.
@@ -94,6 +226,7 @@ def main() -> Tuple[Any, Any]:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Run explain() mode (clustering-based analysis)
   python scripts/run_from_config.py \
       --config scripts/dataset_configs/safety.yaml
 
@@ -102,6 +235,16 @@ Examples:
       --config-name medi_qa \
       --data_path data/medhelm/medi_qa.jsonl \
       --sample_size 200
+
+  # Run label() mode (fixed-taxonomy analysis) with taxonomy from JSON file
+  python scripts/run_from_config.py \
+      --config scripts/dataset_configs/my_config.yaml \
+      --taxonomy path/to/taxonomy.json
+
+  # Run label() mode with inline taxonomy in YAML config
+  python scripts/run_from_config.py \
+      --config scripts/dataset_configs/my_config.yaml \
+      --taxonomy inline
         """,
     )
 
@@ -169,6 +312,20 @@ Examples:
     parser.add_argument("--model_b_column", type=str, default=None, help="Override: name of the model_b column for side_by_side (default: 'model_b')")
     parser.add_argument("--model_a_response_column", type=str, default=None, help="Override: name of the model_a_response column for side_by_side (default: 'model_a_response')")
     parser.add_argument("--model_b_response_column", type=str, default=None, help="Override: name of the model_b_response column for side_by_side (default: 'model_b_response')")
+    
+    # Label function parameters
+    parser.add_argument(
+        "--taxonomy",
+        type=str,
+        default=None,
+        help=(
+            "Path to JSON file containing taxonomy (dict mapping label names to descriptions), "
+            "or 'inline' to use taxonomy from YAML config. When provided, enables label() mode instead of explain()."
+        ),
+    )
+    parser.add_argument("--label_temperature", type=float, default=None, help="Override: temperature for label() LLM (default: 0.0)")
+    parser.add_argument("--label_top_p", type=float, default=None, help="Override: top_p for label() LLM (default: 1.0)")
+    parser.add_argument("--label_max_tokens", type=int, default=None, help="Override: max_tokens for label() LLM (default: 2048)")
 
     args = parser.parse_args()
 
@@ -217,6 +374,12 @@ Examples:
     else:
         task_desc = args.task_description if args.task_description is not None else base_cfg.get("task_description")
 
+    # Handle taxonomy: can come from CLI or config
+    taxonomy_spec = args.taxonomy if args.taxonomy is not None else base_cfg.get("taxonomy")
+    
+    # Determine if we're in label() mode
+    use_label_mode = taxonomy_spec is not None
+    
     overrides: Dict[str, Any] = {
         "data_path": args.data_path,
         "output_dir": args.output_dir,
@@ -245,6 +408,10 @@ Examples:
         "model_b_column": args.model_b_column,
         "model_a_response_column": args.model_a_response_column,
         "model_b_response_column": args.model_b_response_column,
+        "taxonomy": taxonomy_spec,
+        "label_temperature": args.label_temperature,
+        "label_top_p": args.label_top_p,
+        "label_max_tokens": args.label_max_tokens,
     }
 
     cfg = _merge_overrides(base_cfg, overrides)
@@ -259,43 +426,104 @@ Examples:
     if not data_path or not output_dir:
         raise ValueError("Both 'data_path' and 'output_dir' must be provided either in the YAML or via CLI.")
 
-    # Map quiet flag to verbose for run_pipeline
+    # Map quiet flag to verbose
     verbose = not bool(cfg.get("quiet", False))
 
     # Determine wandb toggle: default ON unless explicitly disabled via CLI/YAML
     use_wandb_flag = not bool(cfg.get("disable_wandb", False))
 
-    clustered_df, model_stats = run_pipeline(
-        data_path=data_path,
-        output_dir=output_dir,
-        method=cfg.get("method", "single_model"),
-        system_prompt=None,
-        task_description=cfg.get("task_description"),
-        clusterer=cfg.get("clusterer", "hdbscan"),
-        min_cluster_size=cfg.get("min_cluster_size", 15),
-        embedding_model=cfg.get("embedding_model", "text-embedding-3-small"),
-        max_workers=cfg.get("max_workers", 64),
-        use_wandb=use_wandb_flag,
-        verbose=verbose,
-        sample_size=cfg.get("sample_size"),
-        groupby_column=cfg.get("groupby_column", "behavior_type"),
-        assign_outliers=bool(cfg.get("assign_outliers", False)),
-        model_a=cfg.get("model_a"),
-        model_b=cfg.get("model_b"),
-        filter_models=cfg.get("models"),
-        score_columns=cfg.get("score_columns"),
-        extraction_model=cfg.get("extraction_model"),
-        summary_model=cfg.get("summary_model"),
-        cluster_assignment_model=cfg.get("cluster_assignment_model"),
-        prompt_column=cfg.get("prompt_column", "prompt"),
-        model_column=cfg.get("model_column"),
-        model_response_column=cfg.get("model_response_column"),
-        question_id_column=cfg.get("question_id_column"),
-        model_a_column=cfg.get("model_a_column"),
-        model_b_column=cfg.get("model_b_column"),
-        model_a_response_column=cfg.get("model_a_response_column"),
-        model_b_response_column=cfg.get("model_b_response_column"),
-    )
+    # Route to label() or explain() based on taxonomy presence
+    if use_label_mode:
+        # Load taxonomy
+        taxonomy_spec = cfg.get("taxonomy")
+        if isinstance(taxonomy_spec, dict):
+            # Taxonomy is already a dict (from YAML config)
+            taxonomy = taxonomy_spec
+        elif taxonomy_spec == "inline":
+            # User specified --taxonomy inline, so taxonomy should be in base config as dict
+            taxonomy = base_cfg.get("taxonomy")
+            if not isinstance(taxonomy, dict):
+                raise ValueError("When --taxonomy=inline, taxonomy must be provided as a dictionary in the YAML config")
+        else:
+            # Assume it's a file path (string)
+            taxonomy = _load_taxonomy(taxonomy_spec)
+        
+        if verbose:
+            print(f"Running label() mode with taxonomy: {list(taxonomy.keys())}")
+        
+        # Extract label-specific parameters
+        model_name = cfg.get("extraction_model") or cfg.get("model_name", "gpt-4.1")
+        temperature = cfg.get("label_temperature", 0.0)
+        top_p = cfg.get("label_top_p", 1.0)
+        max_tokens = cfg.get("label_max_tokens", 2048)
+        
+        # Extract metrics_kwargs if provided
+        metrics_kwargs = cfg.get("metrics_kwargs")
+        
+        # Extract and convert sample_size to int if provided
+        sample_size_raw = cfg.get("sample_size")
+        sample_size = int(sample_size_raw) if sample_size_raw is not None else None
+        
+        if verbose and sample_size:
+            print(f"Sample size from config: {sample_size_raw} (type: {type(sample_size_raw)}) -> converted to: {sample_size}")
+        
+        clustered_df, model_stats = run_label_pipeline(
+            data_path=data_path,
+            output_dir=output_dir,
+            taxonomy=taxonomy,
+            model_name=model_name,
+            temperature=temperature,
+            top_p=top_p,
+            max_tokens=max_tokens,
+            max_workers=cfg.get("max_workers", 64),
+            use_wandb=use_wandb_flag,
+            verbose=verbose,
+            sample_size=sample_size,
+            metrics_kwargs=metrics_kwargs,
+            score_columns=cfg.get("score_columns"),
+            prompt_column=cfg.get("prompt_column", "prompt"),
+            model_column=cfg.get("model_column"),
+            model_response_column=cfg.get("model_response_column"),
+            question_id_column=cfg.get("question_id_column"),
+            extraction_cache_dir=cfg.get("extraction_cache_dir"),
+            metrics_cache_dir=cfg.get("metrics_cache_dir"),
+        )
+    else:
+        # Standard explain() mode
+        if verbose:
+            print("Running explain() mode (clustering-based analysis)")
+        
+        clustered_df, model_stats = run_pipeline(
+            data_path=data_path,
+            output_dir=output_dir,
+            method=cfg.get("method", "single_model"),
+            system_prompt=None,
+            task_description=cfg.get("task_description"),
+            clusterer=cfg.get("clusterer", "hdbscan"),
+            min_cluster_size=cfg.get("min_cluster_size", 15),
+            embedding_model=cfg.get("embedding_model", "text-embedding-3-small"),
+            max_workers=cfg.get("max_workers", 64),
+            use_wandb=use_wandb_flag,
+            verbose=verbose,
+            sample_size=cfg.get("sample_size"),
+            groupby_column=cfg.get("groupby_column", "behavior_type"),
+            assign_outliers=bool(cfg.get("assign_outliers", False)),
+            model_a=cfg.get("model_a"),
+            model_b=cfg.get("model_b"),
+            filter_models=cfg.get("models"),
+            score_columns=cfg.get("score_columns"),
+            extraction_model=cfg.get("extraction_model"),
+            summary_model=cfg.get("summary_model"),
+            cluster_assignment_model=cfg.get("cluster_assignment_model"),
+            prompt_column=cfg.get("prompt_column", "prompt"),
+            model_column=cfg.get("model_column"),
+            model_response_column=cfg.get("model_response_column"),
+            question_id_column=cfg.get("question_id_column"),
+            model_a_column=cfg.get("model_a_column"),
+            model_b_column=cfg.get("model_b_column"),
+            model_a_response_column=cfg.get("model_a_response_column"),
+            model_b_response_column=cfg.get("model_b_response_column"),
+        )
 
     return clustered_df, model_stats
 

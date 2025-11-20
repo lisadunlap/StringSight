@@ -9,6 +9,7 @@ from typing import Dict, List, Any, Optional
 import pandas as pd
 from pydantic import BaseModel, Field, validator
 import numpy as np
+import math
 import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from stringsight.logging_config import get_logger
@@ -530,7 +531,16 @@ class PropertyDataset:
 
     def _json_safe(self, obj: Any):
         """Recursively convert *obj* into JSON-safe types (lists, dicts, ints, floats, strings, bool, None)."""
-        if isinstance(obj, (str, int, float, bool)) or obj is None:
+        if obj is None:
+            return obj
+        if isinstance(obj, str):
+            return obj
+        if isinstance(obj, bool):
+            return obj
+        if isinstance(obj, (int, float)):
+            # Handle NaN and infinity values - convert to None for valid JSON
+            if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+                return None
             return obj
         if isinstance(obj, np.ndarray):
             return obj.tolist()

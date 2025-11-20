@@ -141,16 +141,20 @@ def prepare_embeddings(unique_values: List[Any], config: ClusterConfig) -> np.nd
             if config.verbose:
                 device_msg = "on GPU (cuML)" if use_gpu else "on CPU"
                 logger.info(f"Applying UMAP dimensionality reduction {device_msg}...")
-            
+
             # Adaptive parameters with better safeguards
-            n_components = min(config.umap_n_components, n_dims - 1)
+            # n_components must be less than n_points for spectral embedding
+            n_components = min(config.umap_n_components, n_dims - 1, n_points - 1)
             # Ensure n_neighbors is much smaller than n_points to avoid spectral embedding issues
             n_neighbors = min(config.umap_n_neighbors, max(5, n_points // 3))
-            
+
+            # UMAP requires at least n_neighbors + n_components + 1 samples for spectral embedding
+            min_samples_required = max(n_neighbors + n_components + 1, 10)  # Absolute minimum of 10 samples
+
             # Additional safety check
-            if n_neighbors >= n_points:
+            if n_points < min_samples_required:
                 if config.verbose:
-                    logger.warning(f"Dataset too small for UMAP (n_points={n_points}, n_neighbors={n_neighbors}), skipping dimension reduction")
+                    logger.warning(f"Dataset too small for UMAP (n_points={n_points}, need at least {min_samples_required}), skipping dimension reduction")
                 method = "none"
             else:
                 # Try GPU first if requested, fallback to CPU if cuML not available

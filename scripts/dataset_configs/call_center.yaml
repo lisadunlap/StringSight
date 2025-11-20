@@ -1,0 +1,8 @@
+data_path: data/call_center.jsonl
+output_dir: results/call_center_new-2
+method: single_model
+min_cluster_size: 8
+embedding_model: text-embedding-3-small
+max_workers: 16
+groupby_column: behavior_type
+assign_outliers: false

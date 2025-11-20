@@ -1,99 +1,118 @@
 /* Custom styles for StringSight documentation */
 
-/* Pastel Dreamland Adventure Color Palette */
+/* StringSight app-aligned color palette */
 :root {
-  /* Pastel Dreamland Adventure palette colors */
-  --pastel-lavender: #D4B5E8;      /* Light muted lavender/pastel purple */
-  --pastel-pink-soft: #FFD1DC;     /* Soft light pink */
-  --pastel-pink-vibrant: #FFB6C1;  /* Slightly more vibrant pastel pink */
-  --pastel-blue-soft: #B0E0E6;     /* Light soft blue */
-  --pastel-blue-vibrant: #87CEEB;  /* Slightly more vibrant pastel blue */
-  --pastel-white: #FFF8F8;         /* Soft white background */
-  --pastel-dark: #6B5B7D;         /* Dark purple for text */
+  --ss-color-primary: #4C6EF5;           /* Indigo primary */
+  --ss-color-primary-light: #647CF7;     /* Lighter indigo for hovers */
+  --ss-color-primary-dark: #364FC7;      /* Darker indigo for focus states */
+  --ss-color-accent: #7C3AED;            /* Purple accent */
+  --ss-color-link: #646CFF;              /* Link accent */
+  --ss-color-bg: #F8FAFC;                /* App background */
+  --ss-color-surface: #FFFFFF;           /* Surfaces/cards */
+  --ss-color-text-primary: #111827;      /* Primary text */
+  --ss-color-text-secondary: #6B7280;    /* Secondary text */
+  --ss-color-border: #E5E7EB;            /* Borders/dividers */
 }
 
-/* Override Material theme colors with Pastel Dreamland Adventure palette */
+/* Light mode (default scheme) */
 [data-md-color-scheme="default"] {
-  --md-primary-fg-color: var(--pastel-pink-vibrant);
-  --md-primary-fg-color--light: var(--pastel-pink-soft);
-  --md-primary-fg-color--dark: var(--pastel-pink-vibrant);
-  --md-accent-fg-color: var(--pastel-lavender);
-  --md-default-bg-color: var(--pastel-white);
-  --md-default-fg-color--light: var(--pastel-dark);
+  --md-primary-fg-color: var(--ss-color-primary);
+  --md-primary-fg-color--light: var(--ss-color-primary-light);
+  --md-primary-fg-color--dark: var(--ss-color-primary-dark);
+  --md-accent-fg-color: var(--ss-color-accent);
+
+  --md-default-bg-color: var(--ss-color-bg);
+  --md-default-fg-color: var(--ss-color-text-primary);
+  --md-default-fg-color--light: var(--ss-color-text-secondary);
+  --md-typeset-color: var(--ss-color-text-primary);
+
+  --md-code-bg-color: rgba(229, 231, 235, 0.4);
+  --md-code-fg-color: var(--ss-color-text-primary);
+
+  --md-typeset-a-color: var(--ss-color-link);
 }
 
+/* Dark mode (slate scheme) */
 [data-md-color-scheme="slate"] {
-  --md-primary-fg-color: var(--pastel-lavender);
-  --md-primary-fg-color--light: var(--pastel-pink-soft);
-  --md-primary-fg-color--dark: var(--pastel-lavender);
-  --md-accent-fg-color: var(--pastel-pink-vibrant);
-  --md-default-bg-color: #4A3D5C;
-  --md-default-fg-color--light: var(--pastel-white);
-  --md-code-bg-color: #5A4D6C;
-  --md-code-fg-color: var(--pastel-white);
+  --md-primary-fg-color: var(--ss-color-primary);
+  --md-primary-fg-color--light: var(--ss-color-primary-light);
+  --md-primary-fg-color--dark: var(--ss-color-primary-dark);
+  --md-accent-fg-color: var(--ss-color-accent);
+
+  --md-default-bg-color: #020617;
+  --md-default-fg-color: #E5E7EB;
+  --md-default-fg-color--light: #9CA3AF;
+  --md-typeset-color: #E5E7EB;
+
+  --md-code-bg-color: #020617;
+  --md-code-fg-color: #E5E7EB;
+
+  --md-typeset-a-color: var(--ss-color-link);
 }
 
-/* Code block styling */
-.md-typeset code {
-    background-color: rgba(212, 181, 232, 0.2);
-    border-radius: 3px;
-    padding: 2px 4px;
+/* Code styling */
+
+/* Fenced code blocks */
+.md-typeset pre > code {
+    background-color: rgba(248, 250, 252, 0.95); /* lighter background */
+    border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12); /* soft drop shadow */
+    padding: 1rem 1.25rem;
     font-size: 0.85em;
-    color: var(--pastel-dark);
 }
 
-[data-md-color-scheme="slate"] .md-typeset code {
-    background-color: rgba(212, 181, 232, 0.3);
-    color: var(--pastel-white);
+[data-md-color-scheme="slate"] .md-typeset pre > code {
+    background-color: rgba(15, 23, 42, 0.98);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
 }
 
-/* Inline code styling */
+/* Inline code: keep subtle, no shadow */
 .md-typeset :not(pre) > code {
-    background-color: rgba(212, 181, 232, 0.2);
+    background-color: rgba(76, 110, 245, 0.08);
     border-radius: 3px;
     padding: 2px 4px;
     font-size: 0.85em;
-    color: var(--pastel-dark);
+    color: inherit;
 }
 
 [data-md-color-scheme="slate"] .md-typeset :not(pre) > code {
-    background-color: rgba(212, 181, 232, 0.3);
-    color: var(--pastel-white);
+    background-color: rgba(15, 23, 42, 0.9);
+    color: inherit;
 }
 
 /* Admonition styling */
 .md-typeset .admonition {
     border-radius: 6px;
-    border-left: 4px solid;
+    border-left: 4px solid var(--ss-color-border);
 }
 
 /* Custom callout boxes */
 .callout {
-    background-color: rgba(255, 182, 193, 0.15);
-    border-left: 4px solid var(--pastel-pink-vibrant);
+    background-color: rgba(76, 110, 245, 0.04);
+    border-left: 4px solid var(--ss-color-primary);
     padding: 1rem;
     margin: 1rem 0;
     border-radius: 0 6px 6px 0;
 }
 
 .callout-info {
-    border-left-color: var(--pastel-blue-vibrant);
-    background-color: rgba(176, 224, 230, 0.2);
+    border-left-color: var(--ss-color-link);
+    background-color: rgba(100, 108, 255, 0.06);
 }
 
 .callout-warning {
-    border-left-color: var(--pastel-pink-vibrant);
-    background-color: rgba(255, 182, 193, 0.2);
+    border-left-color: var(--ss-color-accent);
+    background-color: rgba(124, 58, 237, 0.06);
 }
 
 .callout-danger {
-    border-left-color: var(--pastel-lavender);
-    background-color: rgba(212, 181, 232, 0.2);
+    border-left-color: var(--ss-color-primary-dark);
+    background-color: rgba(54, 79, 199, 0.06);
 }
 
 .callout-success {
-    border-left-color: var(--pastel-blue-soft);
-    background-color: rgba(176, 224, 230, 0.2);
+    border-left-color: #16A34A;
+    background-color: rgba(22, 163, 74, 0.06);
 }
 
 /* Table styling */
@@ -103,14 +122,14 @@
 }
 
 .md-typeset table th {
-    background-color: rgba(255, 182, 193, 0.2);
+    background-color: rgba(248, 250, 252, 0.9);
     font-weight: 600;
-    color: var(--pastel-dark);
+    color: var(--ss-color-text-primary);
 }
 
 [data-md-color-scheme="slate"] .md-typeset table th {
-    background-color: rgba(212, 181, 232, 0.3);
-    color: var(--pastel-white);
+    background-color: rgba(15, 23, 42, 0.9);
+    color: #E5E7EB;
 }
 
 /* Button styling */
@@ -126,38 +145,16 @@
 }
 
 .md-nav__link:hover {
-    background-color: rgba(255, 182, 193, 0.15);
+    background-color: rgba(76, 110, 245, 0.06);
 }
 
 [data-md-color-scheme="slate"] .md-nav__link:hover {
-    background-color: rgba(212, 181, 232, 0.25);
+    background-color: rgba(15, 23, 42, 0.9);
 }
 
 /* Search styling */
 .md-search__input {
     border-radius: 6px;
-}
-
-/* Footer styling */
-.md-footer {
-    border-top: 1px solid rgba(212, 181, 232, 0.3);
-    background-color: #4A3D5C;
-}
-
-[data-md-color-scheme="default"] .md-footer {
-    background-color: var(--pastel-white);
-    border-top-color: rgba(255, 182, 193, 0.3);
-}
-
-/* Custom header styling */
-.md-header {
-    box-shadow: 0 2px 4px rgba(212, 181, 232, 0.2);
-    background-color: var(--pastel-pink-vibrant);
-}
-
-[data-md-color-scheme="slate"] .md-header {
-    background-color: var(--pastel-lavender);
-    box-shadow: 0 2px 4px rgba(74, 61, 92, 0.3);
 }
 
 /* Responsive adjustments */
@@ -166,4 +163,4 @@
         margin: 0.5rem 0;
         padding: 0.75rem;
     }
-} 
+}

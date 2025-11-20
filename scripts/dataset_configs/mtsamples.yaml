@@ -1,0 +1,8 @@
+data_path: data/medhelm/mtsamples_procedures.jsonl
+output_dir: results/mtsamples
+method: single_model
+min_cluster_size: 8
+embedding_model: text-embedding-3-small
+max_workers: 16
+groupby_column: behavior_type
+assign_outliers: false

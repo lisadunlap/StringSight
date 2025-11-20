@@ -14,7 +14,7 @@ from ..core.stage import PipelineStage
 from ..core.data_objects import PropertyDataset, Property
 from ..core.mixins import LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin
 from ..prompts import extractor_prompts as _extractor_prompts
-from ..core.caching import Cache
+from ..core.caching import UnifiedCache
 from ..core.llm_utils import parallel_completions
 from .conv_to_str import conv_to_str
 from .inp_to_conv import openai_messages_to_conv
@@ -37,13 +37,12 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         top_p: float = 0.95,
         max_tokens: int = 16000,
         max_workers: int = 64,
-        cache_dir: str = ".cache/stringsight",
         include_scores_in_prompt: bool = False,
         **kwargs
     ):
         """
         Initialize the OpenAI extractor.
-        
+
         Args:
             model: OpenAI model name (e.g., "gpt-4o-mini")
             system_prompt: System prompt for property extraction
@@ -52,8 +51,12 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
             top_p: Top-p for LLM
             max_tokens: Max tokens for LLM
             max_workers: Max parallel workers for API calls
-            cache_dir: Directory for on-disk cache
+            include_scores_in_prompt: Whether to include scores in prompts
             **kwargs: Additional configuration
+
+        Note:
+            Caching is handled automatically by UnifiedCache singleton.
+            Configure cache via STRINGSIGHT_* environment variables.
         """
         super().__init__(**kwargs)
         self.model = model
@@ -68,15 +71,9 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         self.top_p = top_p
         self.max_tokens = max_tokens
         self.max_workers = max_workers
-        # Keep cache instance for other potential uses, but LLM calls will go through llm_utils
-        self.cache = Cache(cache_dir=cache_dir)
         # Control whether to include numeric scores/winner context in prompts
         self.include_scores_in_prompt = include_scores_in_prompt
-
-    def __del__(self):
-        """Cleanup cache on deletion."""
-        if hasattr(self, 'cache'):
-            self.cache.close()
+        # Note: Caching is handled by parallel_completions via UnifiedCache singleton
 
     def run(self, data: PropertyDataset, progress_callback=None) -> PropertyDataset:
         """Run OpenAI extraction for all conversations.
@@ -132,22 +129,31 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         )
 
         # ------------------------------------------------------------------
-        # 3️⃣  Wrap raw responses in placeholder Property objects
+        # 3️⃣  Wrap raw responses in placeholder Property objects (filter None)
         # ------------------------------------------------------------------
         properties: List[Property] = []
+        skipped_count = 0
         for conv, raw in zip(data.conversations, raw_responses):
+            # Skip failed LLM calls (None responses)
+            if raw is None:
+                skipped_count += 1
+                continue
+
             # We don't yet know which model(s) the individual properties will
             # belong to; parser will figure it out.  Use a placeholder model
             # name so that validation passes.
             prop = Property(
                 id=str(uuid.uuid4()),
                 question_id=conv.question_id,
-                model=conv.model,   
+                model=conv.model,
                 raw_response=raw,
             )
             properties.append(prop)
 
-        self.log(f"Received {len(properties)} LLM responses")
+        if skipped_count > 0:
+            self.log(f"Skipped {skipped_count} conversations due to failed LLM calls", level="warning")
+
+        self.log(f"Received {len(properties)} valid LLM responses")
 
 
         # Log to wandb if enabled
@@ -399,37 +405,49 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         try:
             import wandb
             # import weave
-            
+
             # Create a table of inputs and outputs
             extraction_data = []
             for i, (msg, response, conv) in enumerate(zip(user_messages, raw_responses, conversations)):
-                extraction_data.append({
-                    "question_id": conv.question_id,
-                    "system_prompt": self.system_prompt,
-                    "input_message": msg,
-                    "raw_response": response,
-                    "response_length": len(response),
-                    "has_error": response.startswith("ERROR:"),
-                })
-            
+                # Handle None responses (failed LLM calls)
+                if response is None:
+                    extraction_data.append({
+                        "question_id": conv.question_id,
+                        "system_prompt": self.system_prompt,
+                        "input_message": msg,
+                        "raw_response": "FAILED: None",
+                        "response_length": 0,
+                        "has_error": True,
+                    })
+                else:
+                    extraction_data.append({
+                        "question_id": conv.question_id,
+                        "system_prompt": self.system_prompt,
+                        "input_message": msg,
+                        "raw_response": response,
+                        "response_length": len(response),
+                        "has_error": False,
+                    })
+
             # Log extraction table (as table, not summary)
             self.log_wandb({
                 "Property_Extraction/extraction_inputs_outputs": wandb.Table(
                     columns=["question_id", "system_prompt", "input_message", "raw_response", "response_length", "has_error"],
-                    data=[[row[col] for col in ["question_id", "system_prompt", "input_message", "raw_response", "response_length", "has_error"]] 
+                    data=[[row[col] for col in ["question_id", "system_prompt", "input_message", "raw_response", "response_length", "has_error"]]
                           for row in extraction_data]
                 )
             })
-            
+
             # Log extraction metrics as summary metrics (not regular metrics)
-            error_count = sum(1 for r in raw_responses if r.startswith("ERROR:"))
+            error_count = sum(1 for r in raw_responses if r is None)
+            valid_responses = [r for r in raw_responses if r is not None]
             extraction_metrics = {
                 "extraction_total_requests": len(raw_responses),
                 "extraction_error_count": error_count,
                 "extraction_success_rate": (len(raw_responses) - error_count) / len(raw_responses) if raw_responses else 0,
-                "extraction_avg_response_length": sum(len(r) for r in raw_responses) / len(raw_responses) if raw_responses else 0,
+                "extraction_avg_response_length": sum(len(r) for r in valid_responses) / len(valid_responses) if valid_responses else 0,
             }
             self.log_wandb(extraction_metrics, is_summary=True)
-            
+
         except Exception as e:
             self.log(f"Failed to log extraction to wandb: {e}", level="warning")        

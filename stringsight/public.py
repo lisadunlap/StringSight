@@ -1099,6 +1099,7 @@ def label(
         raise ValueError("label() currently supports only single-model data.  Use explain() for side-by-side analyses.")
 
     # Preprocess data: handle score_columns, sampling, and column mapping
+    # For label() mode, use row-level sampling to get exact sample_size
     from .core.preprocessing import validate_and_prepare_dataframe
     df = validate_and_prepare_dataframe(
         df,
@@ -1110,6 +1111,7 @@ def label(
         model_response_column=model_response_column,
         question_id_column=question_id_column,
         verbose=verbose,
+        use_row_sampling=True,  # Use row-level sampling for label() to get exact count
     )
 
     # ------------------------------------------------------------------

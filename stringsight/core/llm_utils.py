@@ -18,7 +18,7 @@ from tqdm import tqdm
 import logging
 # Weave removed
 
-from .caching import Cache
+from .caching import UnifiedCache
 
 logger = logging.getLogger(__name__)
 
@@ -134,8 +134,8 @@ class EmbeddingConfig:
 
 class LLMUtils:
     """Utility class for parallel LLM operations with caching."""
-    
-    def __init__(self, cache: Optional[Cache] = None):
+
+    def __init__(self, cache: Optional[UnifiedCache] = None):
         """Initialize with optional cache instance."""
         self.cache = cache
         self._lock = threading.Lock()
@@ -197,11 +197,19 @@ class LLMUtils:
                         request_data["max_completion_tokens"] = config.max_tokens
                     
                     # Check cache first
+                    cached_response = None
                     if self.cache:
                         cached_response = self.cache.get_completion(request_data)
                         if cached_response is not None:
-                            logger.debug("CACHE HIT")
-                            return idx, cached_response["choices"][0]["message"]["content"]
+                            cached_content = cached_response["choices"][0]["message"]["content"]
+                            # Validate cached content - bypass cache if empty/invalid
+                            if not cached_content:
+                                logger.warning(f"⚠️ Invalid cached response (empty content)! Bypassing cache and retrying...")
+                                logger.warning(f"  Model: {config.model}")
+                                cached_response = None  # Force bypass cache
+                            else:
+                                logger.debug("CACHE HIT")
+                                return idx, cached_content
                     
                     # Make API call with graceful fallback for provider-specific unsupported params
                     try:
@@ -243,9 +251,24 @@ class LLMUtils:
                             # Not an unsupported params error, re-raise to outer handler
                             raise
                     
+                    # Extract content with validation
+                    if not response or not response.choices or not response.choices[0].message:
+                        logger.warning(f"⚠️ LLM returned malformed response (skipping)")
+                        logger.warning(f"  Model: {config.model}")
+                        # Don't cache, return None to be filtered out later
+                        return idx, None
+
                     content = response.choices[0].message.content
-                    
-                    # Cache the response
+
+                    # Validate content - if empty/None, return None (don't cache)
+                    if content is None or not content:
+                        logger.warning(f"⚠️ LLM returned empty content (skipping)")
+                        logger.warning(f"  Model: {config.model}")
+                        logger.warning(f"  This usually means invalid model name or API error")
+                        # Don't cache empty responses, return None to be filtered out later
+                        return idx, None
+
+                    # Only cache valid (non-empty) responses
                     if self.cache:
                         response_dict = {
                             "choices": [{
@@ -254,13 +277,16 @@ class LLMUtils:
                         }
                         self.cache.set_completion(request_data, response_dict)
                         logger.debug("CACHE STORE (completion)")
-                    
+
                     return idx, content
                     
                 except Exception as e:
                     if attempt == config.max_retries - 1:
-                        logger.error(f"LLM call failed after {config.max_retries} attempts: {e}")
-                        return idx, f"ERROR: {e}"
+                        logger.warning(f"⚠️ LLM call failed after {config.max_retries} attempts (skipping): {e}")
+                        logger.warning(f"  Model: {config.model}")
+                        logger.warning(f"  Message: {str(request_messages)[:200]}")
+                        # Don't cache, return None to be filtered out later
+                        return idx, None
                     else:
                         # Check if this is a rate limit error
                         is_rate_limit = False
@@ -298,9 +324,7 @@ class LLMUtils:
                             logger.warning(f"LLM call attempt {attempt + 1} failed, retrying in {sleep_time}s: {e}")
                         
                         time.sleep(sleep_time)
-            
-            return idx, "ERROR: Max retries exceeded"
-        
+
         # Execute in parallel
         with ThreadPoolExecutor(max_workers=config.max_workers) as executor:
             futures = {
@@ -321,7 +345,13 @@ class LLMUtils:
                 if progress_callback:
                     progress_callback(completed, len(messages))
             pbar.close()
-        
+
+        # Log summary of failed calls but keep None values to maintain index alignment
+        failed_count = sum(1 for r in results if r is None)
+        if failed_count > 0:
+            logger.warning(f"⚠️ {failed_count}/{len(results)} LLM calls failed (returned None)")
+
+        # Return results with None values preserved - caller must filter
         return results
     
     def parallel_embeddings(
@@ -495,27 +525,24 @@ class LLMUtils:
         return results[0]
 
 
-# Global instance with default cache
-_default_cache = None
+# Global instance with default cache (singleton)
 _default_llm_utils = None
 
 def get_default_llm_utils() -> LLMUtils:
-    """Get default LLMUtils instance with shared cache."""
-    global _default_cache, _default_llm_utils
-    
+    """Get default LLMUtils instance with shared cache.
+
+    Uses UnifiedCache singleton which handles all configuration via
+    environment variables.
+    """
+    global _default_llm_utils
+
     if _default_llm_utils is None:
-        if _default_cache is None:
-            # Always use DiskCache-based Cache by default unless explicitly disabled
-            import os
-            if os.environ.get("STRINGSIGHT_DISABLE_CACHE", "0") in ("1", "true", "True"):
-                _default_cache = None
-                logger.info("LLM caching disabled (STRINGSIGHT_DISABLE_CACHE=1)")
-            else:
-                _default_cache = Cache()
-                embedding_status = "disabled" if os.environ.get("STRINGSIGHT_DISABLE_EMBEDDING_CACHE", "0") in ("1", "true", "True") else "enabled"
-                logger.info(f"LLM caching enabled (embeddings={embedding_status})")
-        _default_llm_utils = LLMUtils(_default_cache)
-    
+        # UnifiedCache is a singleton - same instance across all modules
+        # It handles STRINGSIGHT_DISABLE_CACHE internally
+        cache = UnifiedCache()
+        _default_llm_utils = LLMUtils(cache)
+        logger.info("LLM utilities initialized with UnifiedCache")
+
     return _default_llm_utils
 
 

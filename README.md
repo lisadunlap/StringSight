@@ -1,41 +1,80 @@
-<div align="center">
+<p align="center">
+  <img src="stringsight_github.png" alt="StringSight logo" width="600">
+</p>
 
-# StringSight
-### *Extract, cluster, and analyze behavioral properties from Large Language Models*
+<h1 align="center">StringSight</h1>
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+<p align="center">
+  <em>Extract, cluster, and analyze behavioral properties from Large Multimodal Models</em>
+</p>
 
-[![Docs](https://img.shields.io/badge/docs-Documentation-blue)](https://stringsight.com/docs)
-[![Website](https://img.shields.io/badge/website-stringsight.com-green)](https://stringsight.com)
+<p align="center">
+  <a href="https://www.python.org/downloads/">
+    <img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="Python 3.8+">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License">
+  </a>
+  <a href="https://lisadunlap.github.io/StringSight/">
+    <img src="https://img.shields.io/badge/docs-Documentation-blue" alt="Docs">
+  </a>
+  <a href="https://blog.stringsight.com">
+    <img src="https://img.shields.io/badge/blog-blog.stringsight.com-orange" alt="Blog">
+  </a>
+  <a href="https://stringsight.com">
+    <img src="https://img.shields.io/badge/website-stringsight.com-green" alt="Website">
+  </a>
+</p>
 
-**Understand how different generative models behave by automatically extracting behavioral properties from their responses, grouping similar behaviors together, and quantifying how important these behaviors are.**
-
-</div>
+<p align="center">
+  <strong>Annoyed at having to look through your long model conversations or agentic traces? Fear not, StringSight has come to ease your woes. Understand and compare model behavior by automatically extracting behavioral properties from their responses, grouping similar behaviors together, and quantifying how important these behaviors are.</strong>
+</p>
 
 ## Installation
 
 ```bash
-# Create conda environment
+# (Optional) create and activate a dedicated environment
 conda create -n stringsight python=3.11
 conda activate stringsight
 
-# Install StringSight
-pip install -e ".[full]"
+# Install the core library from PyPI
+pip install stringsight
 
+# Install with all optional extras (recommended for notebooks and advanced workflows)
+pip install "stringsight[full]"
+```
+
+For local development or contributing, you can install from source in editable mode:
+
+```bash
+# Clone the repository
+git clone https://github.com/lisabdunlap/stringsight.git
+cd stringsight
+
+# (Optional) create and activate a dedicated environment
+conda create -n stringsight python=3.11
+conda activate stringsight
+
+# Install StringSight in editable mode with full extras
+pip install -e ".[full]"
 
 # Install StringSight in editable mode with dev dependencies
 pip install -e ".[dev]"
-
-# Set API keys
-export OPENAI_API_KEY="your-openai-key"
-export ANTHROPIC_API_KEY="your-anthropic-key"  # optional
-export GOOGLE_API_KEY="your-google-key"        # optional
 ```
+
+Set your API keys (required for running LLM-backed pipelines):
+
+```bash
+export OPENAI_API_KEY="your-openai-key"
+export ANTHROPIC_API_KEY="your-anthropic-key" 
+export GOOGLE_API_KEY="your-google-key" 
+```
+
+vLLM support coming soon, I promise!
 
 ## Quick Start
 
-For a comprehensive tutorial with detailed explanations, see [starter_notebook.ipynb](starter_notebook.ipynb).
+For a comprehensive tutorial with detailed explanations, see [starter_notebook.ipynb](starter_notebook.ipynb) or open it directly in [Google Colab](https://colab.research.google.com/drive/1XBQqDqTK6-9wopqRB51j8cPfnTS5Wjqh?usp=drive_link).
 
 ### 1. Extract and Cluster Properties with `explain()`
 
@@ -221,30 +260,7 @@ Use the React frontend or other visualization tools to explore your results.
 
 ### Side-by-Side Comparisons
 
-**Option 1: Pre-paired Data**
-
-**Required Columns:**
-| Column | Description | Example |
-|--------|-------------|---------|
-| `prompt` | Question given to both models | `"What is machine learning?"` |
-| `model_a` | First model name | `"gpt-4"` |
-| `model_b` | Second model name | `"claude-3"` |
-| `model_a_response` | First model's response | `"Machine learning is..."` |
-| `model_b_response` | Second model's response | `"ML involves..."` |
-
-**Optional Columns:**
-| Column | Description | Example |
-|--------|-------------|---------|
-| `score` | Winner and metrics | `{"winner": "model_a", "helpfulness_a": 4.2, "helpfulness_b": 3.8}` |
-| `score_columns` | Alternative: separate columns for each metric with `_a` and `_b` suffixes (e.g., `accuracy_a`, `accuracy_b`) | `score_columns=["accuracy_a", "accuracy_b", "helpfulness_a", "helpfulness_b"]` |
-| `prompt_column` | Name of the prompt column in your dataframe (default: `"prompt"`) | `prompt_column="query"` |
-| `model_a_column` | Name of the model_a column (default: `"model_a"`) | `model_a_column="model_1"` |
-| `model_b_column` | Name of the model_b column (default: `"model_b"`) | `model_b_column="model_2"` |
-| `model_a_response_column` | Name of the model_a_response column (default: `"model_a_response"`) | `model_a_response_column="response_1"` |
-| `model_b_response_column` | Name of the model_b_response column (default: `"model_b_response"`) | `model_b_response_column="response_2"` |
-| `question_id_column` | Name of the question_id column (default: `"question_id"` if column exists) | `question_id_column="qid"` |
-
-**Option 2: Tidy Data (Auto-pairing)**
+**Option 1: Tidy Data (Auto-pairing)**
 
 If your data is in tidy single-model format with multiple models, StringSight can automatically pair them:
 
@@ -267,6 +283,29 @@ clustered_df, model_stats = explain(
 ```
 
 The pipeline will automatically pair rows where both models answered the same prompt.
+
+**Option 2: Pre-paired Data**
+
+**Required Columns:**
+| Column | Description | Example |
+|--------|-------------|---------|
+| `prompt` | Question given to both models | `"What is machine learning?"` |
+| `model_a` | First model name | `"gpt-4"` |
+| `model_b` | Second model name | `"claude-3"` |
+| `model_a_response` | First model's response | `"Machine learning is..."` |
+| `model_b_response` | Second model's response | `"ML involves..."` |
+
+**Optional Columns:**
+| Column | Description | Example |
+|--------|-------------|---------|
+| `score` | Winner and metrics | `{"winner": "model_a", "helpfulness_a": 4.2, "helpfulness_b": 3.8}` |
+| `score_columns` | Alternative: separate columns for each metric with `_a` and `_b` suffixes (e.g., `accuracy_a`, `accuracy_b`) | `score_columns=["accuracy_a", "accuracy_b", "helpfulness_a", "helpfulness_b"]` |
+| `prompt_column` | Name of the prompt column in your dataframe (default: `"prompt"`) | `prompt_column="query"` |
+| `model_a_column` | Name of the model_a column (default: `"model_a"`) | `model_a_column="model_1"` |
+| `model_b_column` | Name of the model_b column (default: `"model_b"`) | `model_b_column="model_2"` |
+| `model_a_response_column` | Name of the model_a_response column (default: `"model_a_response"`) | `model_a_response_column="response_1"` |
+| `model_b_response_column` | Name of the model_b_response column (default: `"model_b_response"`) | `model_b_response_column="response_2"` |
+| `question_id_column` | Name of the question_id column (default: `"question_id"` if column exists) | `question_id_column="qid"` |
 
 ## Outputs
 

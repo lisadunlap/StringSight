@@ -26,27 +26,25 @@ conda activate stringsight
 ### 2. Install StringSight
 
 ```bash
-# Clone the repository
-git clone https://github.com/lisabdunlap/stringsight.git
-cd stringsight
+# From PyPI (recommended): install core package + optional ML/embedding tooling
+pip install "stringsight[full]"
 
-# Install in development mode with all dependencies
-pip install -e ".[full]"
+# Or, for local development from source:
+# git clone https://github.com/lisabdunlap/stringsight.git
+# cd stringsight
+# pip install -e ".[full]"
 ```
 
-### 3. Set API Key
+### 3. Set API Key(s)
 
-**Option A: Environment Variable**
 ```bash
 # Add to your shell profile (.bashrc, .zshrc, etc.)
+# We dafult to OAI but we support any litellm compatable api
 export OPENAI_API_KEY="your-api-key-here"
+... # any other provider keys
 ```
 
-**Option B: .env File**
-```bash
-# Create .env file in project root
-echo "OPENAI_API_KEY=your-api-key-here" > .env
-```
+vLLM support coming very soon. I promise!
 
 ### 4. Verify Installation
 
@@ -66,21 +64,28 @@ curl http://127.0.0.1:8000/health
 
 ### Core Package Only
 ```bash
-pip install -e .
-```
+# From PyPI
+pip install stringsight
 
-### With Visualization Tools
-```bash
-pip install -e ".[viz]"
+# From a local clone (development)
+pip install -e .
 ```
 
 ### With Development Tools
 ```bash
+# From PyPI
+pip install "stringsight[dev]"
+
+# From a local clone (development)
 pip install -e ".[dev]"
 ```
 
 ### All Features
 ```bash
+# From PyPI (recommended for most users)
+pip install "stringsight[full]"
+
+# From a local clone (development)
 pip install -e ".[full]"
 ```
 

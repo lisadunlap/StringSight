@@ -15,17 +15,19 @@ theme:
   name: material
   palette:
     - scheme: default
-      primary: pink
-      accent: purple
+      primary: indigo
+      accent: deep purple
       toggle:
         icon: material/brightness-auto
         name: Switch to dark mode
     - scheme: slate
-      primary: purple
-      accent: pink
+      primary: indigo
+      accent: deep purple
       toggle:
         icon: material/brightness-7
         name: Switch to light mode
+  logo: assets/stringsight_logo.png
+  favicon: assets/stringsight_logo.png
   font:
     text: Roboto
     code: Roboto Mono

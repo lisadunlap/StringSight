@@ -1,0 +1,49 @@
+# Test config for label() function using external taxonomy JSON file
+# This demonstrates how to reference a taxonomy from a separate JSON file
+
+data_path: data/your_dataset.jsonl  # Update with your actual data path
+output_dir: results/test_label_external_output
+
+# Reference taxonomy from external JSON file
+# The JSON file should contain a dictionary mapping label names to descriptions
+# Example JSON structure:
+# {
+#   "label1": "Description of label1",
+#   "label2": "Description of label2"
+# }
+taxonomy: taxonomies/example_taxonomy.json  # Path to your taxonomy JSON file
+
+# Label-specific parameters
+extraction_model: gpt-4.1
+label_temperature: 0.0
+label_top_p: 1.0
+label_max_tokens: 2048
+
+# Common parameters
+max_workers: 64
+sample_size: null
+disable_wandb: false
+quiet: false
+
+# Column mapping
+prompt_column: prompt
+model_column: model
+model_response_column: model_response
+question_id_column: question_id
+
+# Score columns
+score_columns:
+  - accuracy
+  - helpfulness
+
+# Metrics configuration
+metrics_kwargs:
+  compute_bootstrap: true
+  bootstrap_samples: 100
+
+
+
+
+
+
+

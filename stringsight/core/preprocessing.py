@@ -606,15 +606,24 @@ def validate_and_prepare_dataframe(
     
     # Step 3: Sample data if requested
     if sample_size is not None and sample_size > 0 and sample_size < len(df):
-        if verbose:
-            logger.info(f"Sampling evenly by prompts for target size {sample_size} from {len(df)} total rows")
-        df = sample_prompts_evenly(
-            df,
-            sample_size=int(sample_size),
-            method=method,
-            prompt_column="prompt",
-            random_state=42
-        )
+        # Check if we should use row-level sampling (for label() mode or when explicitly requested)
+        # For label() mode, we want exact row count, not prompt-based sampling
+        use_row_sampling = kwargs.get("use_row_sampling", False)
+        
+        if use_row_sampling:
+            if verbose:
+                logger.info(f"Sampling {sample_size} rows directly from {len(df)} total rows")
+            df = df.sample(n=int(sample_size), random_state=42)
+        else:
+            if verbose:
+                logger.info(f"Sampling evenly by prompts for target size {sample_size} from {len(df)} total rows")
+            df = sample_prompts_evenly(
+                df,
+                sample_size=int(sample_size),
+                method=method,
+                prompt_column="prompt",
+                random_state=42
+            )
         if verbose:
             logger.info(f"After sampling: {len(df)} rows")
     

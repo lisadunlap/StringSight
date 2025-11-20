@@ -32,35 +32,16 @@ from stringsight.logging_config import get_logger
 
 logger = get_logger(__name__)
 from ..core.llm_utils import parallel_completions
-from ..core.caching import Cache
+from ..core.caching import UnifiedCache
 
-# Global cache instance - use shared cache from llm_utils to avoid duplicate API calls
-def _get_cache_config():
-    """Get cache configuration from environment variables (DiskCache)."""
-    import os
-    
-    # Use the same cache directory as llm_utils.py for consistency
-    # This ensures embeddings computed in one place are available everywhere
-    cache_dir = os.environ.get("STRINGSIGHT_CACHE_DIR", ".cache/stringsight")
-    cache_size = os.environ.get("STRINGSIGHT_CACHE_MAX_SIZE", "50GB")
-    
-    return cache_dir, cache_size
-
-_cache_dir, _cache_size = _get_cache_config()
-
-# Module-level logger (initialize early so we can use it)
-logger = logging.getLogger(__name__)
-
-# Clustering cache is disabled by default, can be enabled via STRINGSIGHT_ENABLE_CLUSTERING_CACHE=1
-# (This is separate from property extraction caching which remains enabled by default)
-import os as _os
-if _os.environ.get("STRINGSIGHT_ENABLE_CLUSTERING_CACHE", "0") in ("1", "true", "True"):
-    _cache = Cache(cache_dir=_cache_dir, max_size=_cache_size)
-    embedding_status = "disabled" if _os.environ.get("STRINGSIGHT_DISABLE_EMBEDDING_CACHE", "0") in ("1", "true", "True") else "enabled"
-    logger.info(f"Caching enabled for clustering (cache_dir={_cache_dir}, embeddings={embedding_status})")
-else:
-    _cache = None
-    logger.info("Clustering cache disabled by default (set STRINGSIGHT_ENABLE_CLUSTERING_CACHE=1 to enable)")
+# ----------------------------------------------------------
+# Shared cache - UnifiedCache singleton used across all modules
+# ----------------------------------------------------------
+# UnifiedCache is now shared with llm_utils to avoid duplicate API calls.
+# Configuration is handled via STRINGSIGHT_* environment variables.
+# No separate STRINGSIGHT_ENABLE_CLUSTERING_CACHE needed - uses same cache.
+_cache = UnifiedCache()
+logger.info("Clustering utilities initialized with shared UnifiedCache")
 
 # -----------------------------------------------------------------------------
 # Ensure deterministic behaviour in sampling helpers and downstream clustering
@@ -333,20 +314,63 @@ def generate_coarse_labels(
         "max_completion_tokens": 2000,
     }
 
+    if verbose:
+        logger.debug(f"🔍 Calling LLM for cluster label generation:")
+        logger.debug(f"  Model: {model}")
+        logger.debug(f"  System prompt length: {len(systems_prompt)} chars")
+        logger.debug(f"  User prompt length: {len(user_prompt)} chars")
+        logger.debug(f"  Valid fine names count: {len(valid_fine_names)}")
+        logger.debug(f"  First 3 cluster names: {valid_fine_names[:3]}")
+
     # Try cache first
     cached = _cache.get_completion(request_data) if _cache else None
     if cached is not None:
         content = cached["choices"][0]["message"]["content"]
-        if verbose:
-            logger.debug("Cache hit for cluster label generation!")
-    else:
-        resp = litellm.completion(**request_data, caching=False)
-        content = resp.choices[0].message.content
-        # Store in cache
-        if _cache:
-            _cache.set_completion(request_data, {
-                "choices": [{"message": {"content": content}}]
-            })
+        # Validate cached content - bypass cache if empty/invalid
+        if not content:
+            logger.warning(f"⚠️ Invalid cached response (empty content)! Bypassing cache and retrying...")
+            logger.warning(f"  Model: {model}")
+            cached = None  # Force bypass cache and make fresh call
+        else:
+            if verbose:
+                logger.debug(f"📦 Cache hit for cluster label generation! Content length: {len(content)}")
+
+    if cached is None:
+        try:
+            resp = litellm.completion(**request_data, caching=False)
+
+            # Extract content with validation
+            if not resp or not resp.choices or not resp.choices[0].message:
+                logger.error(f"❌ LLM returned malformed response!")
+                logger.error(f"  Model: {model}")
+                logger.error(f"  Response: {resp}")
+                raise ValueError(f"LLM returned malformed response structure for model {model}")
+
+            content = resp.choices[0].message.content
+
+            # Validate response immediately - if empty/None, return fallback
+            if content is None or not content:
+                logger.warning(f"⚠️ LLM returned empty content!")
+                logger.warning(f"  Model: {model}")
+                logger.warning(f"  This usually means invalid model name or API error")
+                logger.warning(f"  Falling back to input cluster names")
+                # Don't cache empty responses, return input as fallback
+                return valid_fine_names if valid_fine_names else ["Outliers"]
+
+            if verbose:
+                logger.debug(f"✅ LLM call succeeded, response length: {len(content)} chars")
+
+            # Only cache valid (non-empty) responses
+            if _cache:
+                _cache.set_completion(request_data, {
+                    "choices": [{"message": {"content": content}}]
+                })
+        except Exception as e:
+            logger.warning(f"⚠️ LLM call failed with error: {e}")
+            logger.warning(f"  Model: {model}")
+            logger.warning(f"  Falling back to input cluster names")
+            # Don't cache errors, return fallback
+            return valid_fine_names if valid_fine_names else ["Outliers"]
 
     # Clean and split response into individual labels
     raw_names = [line.strip() for line in content.split("\n") if line.strip()]
@@ -356,6 +380,15 @@ def generate_coarse_labels(
         logger.info("Generated cluster labels:")
         for i, lbl in enumerate(coarse_labels):
             logger.info(f"  {i}: {lbl}")
+
+    # Validate that we got results after cleaning
+    if not coarse_labels:
+        logger.warning(f"⚠️ generate_coarse_labels produced empty list after cleaning!")
+        logger.warning(f"  LLM raw response: {content[:200]}")
+        logger.warning(f"  Raw names after split: {raw_names[:5]}")
+        logger.warning(f"  Falling back to input cluster names")
+        # Fallback to input cluster names if parsing failed
+        return valid_fine_names if valid_fine_names else ["Outliers"]
 
     return coarse_labels
 
@@ -377,6 +410,14 @@ def assign_fine_to_coarse(
         • "llm" – use chat-based matching (thread-pooled, relies on litellm).
         • "embedding" – cosine-similarity in embedding space (fast, no chat calls).
     """
+    # Debug: Check for empty coarse_cluster_names
+    if not coarse_cluster_names:
+        logger.warning(f"⚠️ assign_fine_to_coarse called with empty coarse_cluster_names!")
+        logger.warning(f"  cluster_names count: {len(cluster_names)}")
+        logger.warning(f"  cluster_names: {cluster_names[:10]}")  # Show first 10
+        # Return all as Outliers since there are no coarse clusters to assign to
+        return {name: "Outliers" for name in cluster_names}
+
     if strategy == "embedding":
         return embedding_match(cluster_names, coarse_cluster_names)
     elif strategy == "llm":
@@ -473,17 +514,25 @@ def llm_match(cluster_names, coarse_cluster_names, max_workers=16, model="gpt-4.
     # Build result mapping with validation
     fine_to_coarse = {}
     for fine_name, response in zip(cluster_names, responses):
+        # Handle None responses (failed LLM calls)
+        if response is None:
+            logger.warning(f"LLM call failed for fine cluster '{fine_name}', assigning to 'Outliers'")
+            fine_to_coarse[fine_name] = "Outliers"
+            continue
+
         coarse_label = response.strip()
         coarse_label = match_label_names(coarse_label, coarse_cluster_names)
-        
+
         # Validate the response
         if (coarse_label in coarse_cluster_names) or (coarse_label == "Outliers"):
             fine_to_coarse[fine_name] = coarse_label
         else:
-            # Invalid response, assign to Outliers
-            logger.warning(f"Invalid coarse label '{coarse_label}' for fine name '{fine_name}', setting to 'Outliers'")
+            if coarse_label is None:
+                logger.warning(f"Could not match label '{response.strip()}' for fine name '{fine_name}', assigning to 'Outliers'")
+            else:
+                logger.warning(f"Invalid coarse label '{coarse_label}' for fine name '{fine_name}', assigning to 'Outliers'")
             fine_to_coarse[fine_name] = "Outliers"
-    
+
     return fine_to_coarse
 
 def _setup_embeddings(texts, embedding_model, verbose=False, use_gpu=False):

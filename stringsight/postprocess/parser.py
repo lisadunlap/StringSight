@@ -135,7 +135,8 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
                     self.log(error_msg, level="error")
                     raise RuntimeError(error_msg)
                 
-                self.handle_error(ValueError(f"Failed to parse JSON: {error_details}"), f"property {prop.id}")
+                # Log the parsing error but continue processing (parsing failures should never terminate)
+                self.log(f"Parsing failure for property {prop.id}: {error_details}", level="error")
                 continue
 
             # Successfully parsed JSON - reset consecutive error counter
@@ -179,7 +180,8 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
                     self.log(error_msg, level="error")
                     raise RuntimeError(error_msg)
                     
-                self.handle_error(ValueError(error_details), f"property {prop.id}")
+                # Log the structure error but continue processing (parsing failures should never terminate)
+                self.log(f"Unsupported JSON structure for property {prop.id}: {error_details}", level="error")
                 parse_errors += 1
                 continue
 
@@ -220,7 +222,8 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
                             'index': i
                         })
                         
-                        self.handle_error(e, f"building property from JSON for {prop.question_id}")
+                        # Log the property building error but continue processing (parsing failures should never terminate)
+                        self.log(f"Failed to build property from JSON for {prop.question_id}: {error_details}", level="error")
                 except Exception as e:
                     parse_errors += 1
                     
@@ -237,7 +240,8 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
                         'index': i
                     })
                     
-                    self.handle_error(e, f"building property from JSON for {prop.question_id}")
+                    # Log the general error but continue processing (parsing failures should never terminate)
+                    self.log(f"Unexpected error building property from JSON for {prop.question_id}: {str(e)}", level="error")
 
         self.log(f"Parsed {len(parsed_properties)} properties successfully")
         self.log(f"Filtered out {unknown_model_filtered} properties with unknown models")
@@ -411,7 +415,34 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
                 json_start = response_text.find("```json") + 7
                 json_end = response_text.find("```", json_start)
                 if json_end != -1:
+                    # Found closing ```, extract content between markers
                     json_content = response_text[json_start:json_end].strip()
+                else:
+                    # No closing ``` found, try to extract JSON from content after ```json
+                    # Skip past any newline after ```json
+                    content_start = json_start
+                    if response_text[content_start:content_start+1] == '\n':
+                        content_start += 1
+                    # Try to find JSON starting with { or [ after the marker
+                    remaining_text = response_text[content_start:].strip()
+                    # Use Strategy 3 logic to find complete JSON in remaining text
+                    for start_char in ['{', '[']:
+                        start_pos = remaining_text.find(start_char)
+                        if start_pos != -1:
+                            # Find matching closing bracket
+                            bracket_stack = []
+                            for i, char in enumerate(remaining_text[start_pos:], start_pos):
+                                if char in '{[':
+                                    bracket_stack.append(char)
+                                elif char in ']}':
+                                    if bracket_stack:
+                                        if (char == '}' and bracket_stack[-1] == '{') or (char == ']' and bracket_stack[-1] == '['):
+                                            bracket_stack.pop()
+                                            if not bracket_stack:  # Found complete JSON
+                                                json_content = remaining_text[start_pos:i+1].strip()
+                                                break
+                            if json_content:
+                                break
             except Exception:
                 pass
         
@@ -430,10 +461,31 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
                         content_end = response_text.find("```", content_start)
                         if content_end != -1:
                             json_content = response_text[content_start:content_end].strip()
+                        else:
+                            # No closing ```, try to extract JSON from remaining content
+                            remaining_text = response_text[content_start:].strip()
+                            # Try to find JSON starting with { or [
+                            for start_char in ['{', '[']:
+                                start_pos = remaining_text.find(start_char)
+                                if start_pos != -1:
+                                    # Find matching closing bracket
+                                    bracket_stack = []
+                                    for i, char in enumerate(remaining_text[start_pos:], start_pos):
+                                        if char in '{[':
+                                            bracket_stack.append(char)
+                                        elif char in ']}':
+                                            if bracket_stack:
+                                                if (char == '}' and bracket_stack[-1] == '{') or (char == ']' and bracket_stack[-1] == '['):
+                                                    bracket_stack.pop()
+                                                    if not bracket_stack:  # Found complete JSON
+                                                        json_content = remaining_text[start_pos:i+1].strip()
+                                                        break
+                                    if json_content:
+                                        break
             except Exception:
                 pass
         
-        # Strategy 3: Look for JSON-like content between any markers
+        # Strategy 3: Look for JSON-like content anywhere in the response
         if not json_content:
             # Try to find JSON-like content (starts with { or [)
             for start_char in ['{', '[']:

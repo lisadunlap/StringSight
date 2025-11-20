@@ -34,30 +34,54 @@ def pretty_print_dict(val):
     return str(val)
 
 
-def convert_tool_calls_to_str(tool_calls):
+def convert_tool_calls_to_str(tool_calls: Any) -> str:
     """
-    Convert a list of tool calls to a string.
-    
-    Handles any data format by converting to string as fallback.
+    Convert tool call data into a readable string representation.
+
+    Args:
+        tool_calls:
+            - Preferred: list of dicts, where each dict represents one tool call
+              with at least `name`, `arguments`, and optional `id` and extra keys.
+            - Also accepted:
+              - JSON-encoded string of the above list or a single dict
+              - Single dict representing one tool call
+              - Any other type, which will be stringified as a fallback
+
+    Returns:
+        Human-readable string describing the tool calls, with arguments and any
+        additional metadata pretty-printed when possible.
     """
-    # Handle non-list tool_calls
+    # If we received a JSON string, try to parse it to avoid losing structure.
+    if isinstance(tool_calls, str):
+        try:
+            parsed = json.loads(tool_calls)
+            tool_calls = parsed
+        except Exception:
+            # Fall back to raw string if not valid JSON
+            return str(tool_calls)
+
+    # Normalize a single dict into a list of dicts
+    if isinstance(tool_calls, dict):
+        tool_calls = [tool_calls]
+
+    # Handle non-list tool_calls (after normalization)
     if not isinstance(tool_calls, list):
         return str(tool_calls)
-    
-    # create name and arguments string for each tool call
+
+    # Create name and arguments string for each tool call
     tool_calls_str = []
     for tool_call in tool_calls:
         # Handle non-dict tool calls
         if not isinstance(tool_call, dict):
             tool_calls_str.append(str(tool_call))
             continue
-            
-        name = tool_call.get('name', '<no_name>')
-        args = tool_call.get('arguments', {})
+
+        name = tool_call.get("name", "<no_name>")
+        args = tool_call.get("arguments", {})
         # Pretty print arguments if dict or dict-string
         args_str = pretty_print_dict(args)
         base = f"call {name} with args {args_str} (id: {tool_call.get('id', '<no_id>')})"
-        extra_keys = [key for key in tool_call.keys() if key not in ['name', 'arguments', 'id']]
+        extra_keys = [key for key in tool_call.keys() if key not in ["name", "arguments", "id"]]
         if extra_keys:
             # Show extra key-value pairs, pretty-printed if dict
             extras = {k: tool_call[k] for k in extra_keys}
@@ -97,7 +121,7 @@ def _render_image_value(image: Any) -> str:
     return f"image: {str(image)}"
 
 
-def convert_content_to_str(content):
+def convert_content_to_str(content: Any) -> str:
     """
     Convert the content of a message to a string.
     Pretty print any dictionary values or stringified dictionaries.
@@ -176,46 +200,84 @@ def convert_content_to_str(content):
             return str(content)
 
 
-def conv_to_str(conv):
+def conv_to_str(conv: Any) -> str:
     """
     Convert an OAI conversation object to a string.
     
     Handles any data format by converting to string as fallback.
     """
-    # Handle non-list conversations
+    def _format_message_content(msg: Dict[str, Any]) -> str:
+        """
+        Format the content and any associated tool calls for a single message.
+
+        Args:
+            msg: Message dictionary with optional keys:
+                - "content": arbitrary payload (string, dict, list, or None)
+                - "tool_calls": list/dict/JSON-string describing tool calls
+
+        Returns:
+            Combined string containing the rendered content and, if present,
+            a "Tool calls:" section describing any tool invocations.
+        """
+        content = msg.get("content", "")
+        content_str = convert_content_to_str(content)
+
+        tool_calls_val = msg.get("tool_calls", None)
+        tool_calls_str = ""
+        if tool_calls_val is not None and tool_calls_val != []:
+            tool_calls_str = convert_tool_calls_to_str(tool_calls_val)
+
+        if tool_calls_str:
+            if content_str:
+                return f"{content_str}\n\nTool calls:\n{tool_calls_str}"
+            return tool_calls_str
+        return content_str
+
+    # Handle non-list conversations: still wrap in BEGIN/END markers so that
+    # even fallback string representations are clearly delimited.
     if not isinstance(conv, list):
-        return str(conv)
-    
+        body = str(conv)
+        return (
+            "## BEGINNING OF CONVERSATION TO ANAZLYZE\n"
+            f"{body}\n"
+            "## END OF CONVERSATION TO ANAZLYZE"
+        )
+
     ret = []
     for msg in conv:
         # Handle non-dict messages
         if not isinstance(msg, dict):
             ret.append(f"\n**message:**\n{str(msg)}")
             continue
-        
+
         # Get role with fallback
-        role = str(msg.get('role', 'unknown'))
-        
+        role = str(msg.get("role", "unknown"))
+
         # Special handling for tool messages
-        if role == 'tool':
-            name = msg.get('name', '<unnamed_tool>')
-            content = msg.get('content', '')
-            ret.append(f"**output of tool {name}**\n{convert_content_to_str(content)}")
+        if role == "tool":
+            name = msg.get("name", "<unnamed_tool>")
+            body = _format_message_content(msg)
+            ret.append(f"**output of tool {name}**\n{body}")
         else:
             # Regular message formatting
-            content = msg.get('content', '')
-            
-            if 'name' in msg:
-                name = str(msg['name'])
-                if 'id' in msg:
-                    msg_id = str(msg['id'])
-                    ret.append(f"\n**{role} {name} (id: {msg_id}):**\n{convert_content_to_str(content)}")
+            body = _format_message_content(msg)
+
+            if "name" in msg:
+                name = str(msg["name"])
+                if "id" in msg:
+                    msg_id = str(msg["id"])
+                    ret.append(f"\n**{role} {name} (id: {msg_id}):**\n{body}")
                 else:
-                    ret.append(f"\n**{role} {name}**\n{convert_content_to_str(content)}")
+                    ret.append(f"\n**{role} {name}**\n{body}")
             else:
-                ret.append(f"\n**{role}:**\n{convert_content_to_str(content)}")
-    
-    return "\n\n".join(ret)
+                ret.append(f"\n**{role}:**\n{body}")
+
+    body = "\n\n".join(ret)
+    return (
+        "## BEGINNING OF CONVERSATION TO ANAZLYZE\n"
+        f"{body}\n"
+        "## END OF CONVERSATION TO ANAZLYZE"
+    )
 
 
 def simple_to_oai_format(prompt: str, response: str) -> list:
