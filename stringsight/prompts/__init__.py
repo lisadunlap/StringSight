@@ -12,6 +12,7 @@ from .extractor_prompts import (
     # Default task descriptions for extractor prompts
     sbs_default_task_description,
     single_model_default_task_description,
+    single_model_system_prompt_custom_revised,
 )
 
 # Import agent-specific prompts for agentic environments
@@ -27,7 +28,8 @@ from .agents import (
     agent_sbs_system_prompt_custom,
     # Default task descriptions for agent prompts
     agent_system_prompt_custom_task_description,
-    agent_sbs_system_prompt_custom_task_description
+    agent_sbs_system_prompt_custom_task_description,
+    agent_system_prompt_custom_revised
 )
 
 
@@ -42,7 +44,7 @@ from .fixed_axes import (
 
 DEFAULT_PROMPTS = {
     "single_model": {
-        "template": single_model_system_prompt_custom,
+        "template": single_model_system_prompt_custom_revised,
         "default_task_description": single_model_default_task_description,
     },
     "side_by_side": {
@@ -53,7 +55,7 @@ DEFAULT_PROMPTS = {
 
 AGENT_PROMPTS = {
     "single_model": {
-        "template": agent_system_prompt_custom,
+        "template": agent_system_prompt_custom_revised,
         "default_task_description": agent_system_prompt_custom_task_description,
     },
     "side_by_side": {
@@ -158,9 +160,11 @@ __all__ = [
     "PROMPTS",
     # Supported prompt templates (limited set)
     "single_model_system_prompt_custom",
+    "single_model_system_prompt_custom_revised",
     "sbs_system_prompt_custom",
     "agent_system_prompt_custom",
     "agent_sbs_system_prompt_custom",
+    "agent_system_prompt_custom_revised",
     # Fixed-axis prompts
     "fixed_axis_prompt",
 ]

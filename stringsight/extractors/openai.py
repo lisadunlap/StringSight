@@ -7,6 +7,7 @@ This stage migrates the logic from generate_differences.py into the pipeline arc
 from typing import Callable, Optional, List, Dict, Any, Union
 import uuid
 import json
+import asyncio
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import litellm
@@ -15,7 +16,7 @@ from ..core.data_objects import PropertyDataset, Property
 from ..core.mixins import LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin
 from ..prompts import extractor_prompts as _extractor_prompts
 from ..core.caching import UnifiedCache
-from ..core.llm_utils import parallel_completions
+from ..core.llm_utils import parallel_completions_async
 from .conv_to_str import conv_to_str
 from .inp_to_conv import openai_messages_to_conv
 
@@ -75,11 +76,11 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         self.include_scores_in_prompt = include_scores_in_prompt
         # Note: Caching is handled by parallel_completions via UnifiedCache singleton
 
-    def run(self, data: PropertyDataset, progress_callback=None) -> PropertyDataset:
+    async def run(self, data: PropertyDataset, progress_callback=None) -> PropertyDataset:
         """Run OpenAI extraction for all conversations.
 
         Each conversation is formatted with ``prompt_builder`` and sent to the
-        OpenAI model in parallel using a thread pool.  The raw LLM response is
+        OpenAI model in parallel using async.  The raw LLM response is
         stored inside a *placeholder* ``Property`` object (one per
         conversation).  Down-stream stages (``LLMJsonParser``) will parse these
         raw strings into fully-formed properties.
@@ -113,9 +114,9 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
                 user_messages[idx] = prompt
 
         # ------------------------------------------------------------------
-        # 2️⃣  Call the OpenAI API in parallel batches via shared LLM utils
+        # 2️⃣  Call the OpenAI API in parallel batches via shared async LLM utils
         # ------------------------------------------------------------------
-        raw_responses = parallel_completions(
+        raw_responses = await parallel_completions_async(
             user_messages,
             model=self.model,
             system_prompt=self.system_prompt,

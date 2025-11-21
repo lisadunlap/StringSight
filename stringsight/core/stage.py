@@ -65,14 +65,22 @@ class PipelineStage(ABC):
         if not isinstance(data, PropertyDataset):
             raise ValueError(f"Output must be a PropertyDataset, got {type(data)}")
     
-    def __call__(self, data: PropertyDataset) -> PropertyDataset:
+    async def __call__(self, data: PropertyDataset) -> PropertyDataset:
         """
         Convenience method to run the stage.
         
-        This allows stages to be called directly: stage(data)
+        This allows stages to be called directly: stage(data) or await stage(data)
+        Handles both sync and async run() methods automatically.
         """
+        import inspect
         self.validate_input(data)
-        result = self.run(data)
+        
+        # Check if run() is a coroutine function (async)
+        if inspect.iscoroutinefunction(self.run):
+            result = await self.run(data)
+        else:
+            result = self.run(data)
+            
         self.validate_output(result)
         return result
     

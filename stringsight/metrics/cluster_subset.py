@@ -18,7 +18,10 @@ def _build_property_maps(properties: List[Dict[str, Any]]) -> Tuple[Dict[str, Di
     prop_ids_by_q_model: Dict[Tuple[str, str], List[str]] = {}
     for p in properties:
         pid = str(p.get("id"))
-        qid = str(p.get("question_id"))
+        raw_qid = str(p.get("question_id"))
+        # Strip property index suffix to get base conversation ID
+        # Handle cases where properties might have compound IDs like "48-0"
+        qid = raw_qid.split('-')[0] if '-' in raw_qid else raw_qid
         model = str(p.get("model"))
         prop_by_id[pid] = {
             "property_id": pid,
@@ -38,7 +41,10 @@ def _build_score_map(operational_rows: List[Dict[str, Any]]) -> Dict[Tuple[str, 
     """Create a map from (question_id, model) to consolidated score dict."""
     score_map: Dict[Tuple[str, str], Dict[str, float]] = {}
     for r in operational_rows:
-        qid = str(r.get("question_id"))
+        raw_qid = str(r.get("question_id"))
+        # Strip property index suffix to get base conversation ID
+        # Operational rows might have compound IDs like "48-0" from frontend
+        qid = raw_qid.split('-')[0] if '-' in raw_qid else raw_qid
         # operationalRows are standardized to single model in this UI; if side-by-side appears later, extend mapping
         model = str(r.get("model"))
         score = r.get("score") or {}

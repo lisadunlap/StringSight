@@ -58,40 +58,12 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
         for i, prop in enumerate(tqdm(data.properties, desc="Parsing properties", disable=not getattr(self, 'verbose', False))):
             # We only process properties that still have raw_response
             if not prop.raw_response:
-                # Debug: Print information about the property with empty raw_response
-                self.log(f"⚠️  Property {i+1}/{len(data.properties)} has empty raw_response:", level="error")
-                self.log(f"   • Property ID: {prop.id}", level="error")
-                self.log(f"   • Question ID: {prop.question_id}", level="error")
-                self.log(f"   • Model: {prop.model}", level="error")
-                self.log(f"   • Raw response: {repr(prop.raw_response)}", level="error")
-                
-                # Find the corresponding conversation to get more context
-                matching_conv = None
-                for conv in data.conversations:
-                    if conv.question_id == prop.question_id:
-                        matching_conv = conv
-                        break
-                
-                if matching_conv:
-                    self.log(f"   • Matching conversation found:", level="error")
-                    self.log(f"     - Question ID: {matching_conv.question_id}", level="error")
-                    self.log(f"     - Model: {matching_conv.model}", level="error")
-                    if hasattr(matching_conv, 'model_response'):
-                        response_snippet = str(matching_conv.model_response)[:200] if matching_conv.model_response else "None"
-                        self.log(f"     - Model response snippet: {response_snippet}", level="error")
-                    if hasattr(matching_conv, 'prompt'):
-                        prompt_snippet = str(matching_conv.prompt)[:200] if matching_conv.prompt else "None"
-                        self.log(f"     - Prompt snippet: {prompt_snippet}", level="error")
-                else:
-                    self.log(f"   • No matching conversation found for question_id: {prop.question_id}", level="error")
-                
                 # Throw an error to help debug the extraction issue
+                total_empty = sum(1 for p in data.properties if not p.raw_response)
+                self.log(f"⚠️  {total_empty}/{len(data.properties)} properties have empty raw_response", level="error")
                 raise ValueError(
-                    f"Property {i+1}/{len(data.properties)} (ID: {prop.id}) has empty raw_response. "
-                    f"This indicates the extraction stage failed to get a response from the LLM for "
-                    f"question_id: {prop.question_id}, model: {prop.model}. "
-                    f"Check your API connectivity, rate limits, or extraction stage configuration. "
-                    f"Total properties with empty responses: {sum(1 for p in data.properties if not p.raw_response)}"
+                    f"ERROR: {total_empty}/{len(data.properties)} properties have empty raw_response. "
+                    f"Extraction stage failed - check API connectivity, rate limits, or model name."
                 )
 
             parsed_json = self._parse_json_response(prop.raw_response)
@@ -126,12 +98,18 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
                 
                 # Check if we've exceeded consecutive error limit
                 if consecutive_errors > max_consecutive_errors:
+                    # Save failures before raising error so user can inspect them
+                    if self.output_dir:
+                        self._save_failures_immediately()
+                    
                     error_msg = (
                         f"ERROR: More than {max_consecutive_errors} consecutive parsing errors detected "
                         f"(currently {consecutive_errors}). This indicates a systematic issue with "
                         f"the LLM responses. Check your API connectivity, model configuration, "
                         f"or system prompts. Failed at property {i+1}/{len(data.properties)}."
                     )
+                    if self.output_dir:
+                        error_msg += f"\n\nParsing failures have been saved to: {self.output_dir}/parsing_failures.jsonl"
                     self.log(error_msg, level="error")
                     raise RuntimeError(error_msg)
                 
@@ -171,12 +149,18 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
                 self.log(f"Parse failure input qid={prop.question_id} model={prop.model} raw={prop.raw_response}", level="error")
 
                 if consecutive_errors > max_consecutive_errors:
+                    # Save failures before raising error so user can inspect them
+                    if self.output_dir:
+                        self._save_failures_immediately()
+                    
                     error_msg = (
                         f"ERROR: More than {max_consecutive_errors} consecutive parsing errors detected "
                         f"(currently {consecutive_errors}). This indicates a systematic issue with "
                         f"the LLM responses. Check your API connectivity, model configuration, "
                         f"or system prompts. Failed at property {i+1}/{len(data.properties)}."
                     )
+                    if self.output_dir:
+                        error_msg += f"\n\nParsing failures have been saved to: {self.output_dir}/parsing_failures.jsonl"
                     self.log(error_msg, level="error")
                     raise RuntimeError(error_msg)
                     
@@ -198,7 +182,8 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
             
             for j, p_dict in enumerate(prop_dicts):
                 try:
-                    parsed_properties.append(self._to_property(p_dict, prop))
+                    new_prop = self._to_property(p_dict, prop)
+                    parsed_properties.append(new_prop)
                 except ValueError as e:
                     if "unknown or invalid model" in str(e):
                         unknown_model_filtered += 1
@@ -269,13 +254,15 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
     def _save_stage_results(self, data: PropertyDataset, parsed_properties: List[Property], parse_errors: int, unknown_model_filtered: int, empty_list_responses: int):
         """Save parsing results to the specified output directory."""
         # Create output directory if it doesn't exist
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        from pathlib import Path
+        output_path = Path(self.output_dir) if isinstance(self.output_dir, str) else self.output_dir
+        output_path.mkdir(parents=True, exist_ok=True)
         
-        self.log(f"✅ Auto-saving parsing results to: {self.output_dir}")
+        self.log(f"✅ Auto-saving parsing results to: {output_path}")
         
         # 1. Save parsed properties as JSONL
         properties_df = pd.DataFrame([prop.to_dict() for prop in parsed_properties])
-        properties_path = self.output_dir / "parsed_properties.jsonl"
+        properties_path = output_path / "parsed_properties.jsonl"
         properties_df.to_json(properties_path, orient="records", lines=True)
         self.log(f"  • Parsed properties: {properties_path}")
         
@@ -290,14 +277,14 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
             "failures_count": len(self.parsing_failures),
         }
         
-        stats_path = self.output_dir / "parsing_stats.json"
+        stats_path = output_path / "parsing_stats.json"
         with open(stats_path, 'w') as f:
             json.dump(stats, f, indent=2)
         self.log(f"  • Parsing stats: {stats_path}")
         
         # 3. Save parsing failures if any
         if self.parsing_failures:
-            failures_path = self.output_dir / "parsing_failures.jsonl"
+            failures_path = output_path / "parsing_failures.jsonl"
             pd.DataFrame(self.parsing_failures).to_json(failures_path, orient="records", lines=True)
             self.log(f"  • Parsing failures: {failures_path}")
             
@@ -307,10 +294,34 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
                 error_type = failure['error_type']
                 error_types[error_type] = error_types.get(error_type, 0) + 1
             
-            error_summary_path = self.output_dir / "parsing_error_summary.json"
+            error_summary_path = output_path / "parsing_error_summary.json"
             with open(error_summary_path, 'w') as f:
                 json.dump(error_types, f, indent=2)
             self.log(f"  • Error summary: {error_summary_path}")
+    
+    def _save_failures_immediately(self):
+        """Save parsing failures immediately (e.g., when consecutive error limit is reached)."""
+        if not self.parsing_failures:
+            return
+        
+        output_path = Path(self.output_dir) if isinstance(self.output_dir, str) else self.output_dir
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        # Save parsing failures
+        failures_path = output_path / "parsing_failures.jsonl"
+        pd.DataFrame(self.parsing_failures).to_json(failures_path, orient="records", lines=True)
+        self.log(f"  • Parsing failures saved to: {failures_path}")
+        
+        # Save error summary
+        error_types = {}
+        for failure in self.parsing_failures:
+            error_type = failure['error_type']
+            error_types[error_type] = error_types.get(error_type, 0) + 1
+        
+        error_summary_path = output_path / "parsing_error_summary.json"
+        with open(error_summary_path, 'w') as f:
+            json.dump(error_types, f, indent=2)
+        self.log(f"  • Error summary saved to: {error_summary_path}")
     
     def get_parsing_failures(self) -> List[Dict[str, Any]]:
         """Get the collected parsing failures."""
@@ -320,38 +331,76 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
         """Analyze a raw response to determine why JSON parsing failed."""
         if not raw_response:
             return "Raw response is empty or None"
-        
-        raw_response = raw_response.strip()
-        
-        # Check if it looks like JSON at all
-        if not (raw_response.startswith('{') or raw_response.startswith('[')):
+
+        raw_response_stripped = raw_response.strip()
+
+        # Check if we have a markdown code block
+        if '```json' in raw_response or '```' in raw_response:
+            # Try to extract the JSON content from the code block
+            json_content = None
+
             if '```json' in raw_response:
-                return "Response contains ```json markdown block but JSON extraction failed (missing closing ``` or malformed block)"
+                json_start = raw_response.find("```json") + 7
+                json_end = raw_response.find("```", json_start)
+                if json_end != -1:
+                    json_content = raw_response[json_start:json_end].strip()
+                else:
+                    return "Response contains ```json but missing closing ``` marker"
             elif '```' in raw_response:
-                return "Response contains code block but JSON extraction failed (missing closing ``` or malformed block)"
-            else:
-                return "Response is not formatted as JSON (doesn't start with { or [)"
-        
+                start_marker = raw_response.find("```")
+                first_line_end = raw_response.find("\n", start_marker)
+                if first_line_end != -1:
+                    content_start = first_line_end + 1
+                    content_end = raw_response.find("```", content_start)
+                    if content_end != -1:
+                        json_content = raw_response[content_start:content_end].strip()
+                    else:
+                        return "Response contains ``` but missing closing ``` marker"
+
+            # Now analyze the extracted JSON content
+            if json_content:
+                # Check for the malformed evidence field pattern
+                import re
+                if re.search(r'"evidence"\s*:\s*"[^"]*"\s*,\s*"[^"]*"', json_content):
+                    return "Malformed 'evidence' field: multiple quoted strings instead of array (should be [\"quote1\", \"quote2\"] not \"quote1\", \"quote2\")"
+
+                # Try to parse and get specific error
+                try:
+                    import json
+                    json.loads(json_content)
+                    return "JSON extraction succeeded but parsing failed (unknown reason)"
+                except json.JSONDecodeError as e:
+                    return f"JSON syntax error in code block: {str(e)}"
+
+        # Check if it looks like JSON at all
+        if not (raw_response_stripped.startswith('{') or raw_response_stripped.startswith('[')):
+            return "Response is not formatted as JSON (doesn't start with { or [)"
+
         # Try to identify common JSON syntax errors
         try:
+            # Check for the malformed evidence field pattern
+            import re
+            if re.search(r'"evidence"\s*:\s*"[^"]*"\s*,\s*"[^"]*"', raw_response_stripped):
+                return "Malformed 'evidence' field: multiple quoted strings instead of array (should be [\"quote1\", \"quote2\"] not \"quote1\", \"quote2\")"
+
             # Check for unclosed brackets/braces
-            brace_count = raw_response.count('{') - raw_response.count('}')
-            bracket_count = raw_response.count('[') - raw_response.count(']')
-            
+            brace_count = raw_response_stripped.count('{') - raw_response_stripped.count('}')
+            bracket_count = raw_response_stripped.count('[') - raw_response_stripped.count(']')
+
             if brace_count != 0:
                 return f"Unmatched braces: {brace_count} more opening braces than closing braces"
             if bracket_count != 0:
                 return f"Unmatched brackets: {bracket_count} more opening brackets than closing brackets"
-            
+
             # Check for common syntax issues
-            if raw_response.count('"') % 2 != 0:
+            if raw_response_stripped.count('"') % 2 != 0:
                 return "Unmatched quotes in JSON"
-            
+
             # Try to parse and see what the specific error is
             import json
-            json.loads(raw_response)
+            json.loads(raw_response_stripped)
             return "JSON appears valid but parsing still failed (unknown reason)"
-            
+
         except json.JSONDecodeError as e:
             return f"JSON syntax error: {str(e)}"
         except Exception as e:
@@ -395,6 +444,59 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
         # If no specific issues found, return the original error
         return f"Property validation failed: {original_error}"
     
+    def _find_complete_json(self, text: str, start_pos: int = 0) -> Optional[str]:
+        """
+        Find complete JSON starting at start_pos, properly handling strings and escaped characters.
+        
+        This function correctly tracks brackets only when they're outside of strings,
+        accounting for escaped quotes and backslashes.
+        """
+        if start_pos >= len(text):
+            return None
+            
+        # Find the first opening bracket
+        for start_char in ['{', '[']:
+            pos = text.find(start_char, start_pos)
+            if pos == -1:
+                continue
+                
+            bracket_stack = []
+            in_string = False
+            escape_next = False
+            i = pos
+            
+            while i < len(text):
+                char = text[i]
+                
+                if escape_next:
+                    escape_next = False
+                    i += 1
+                    continue
+                    
+                if char == '\\':
+                    escape_next = True
+                    i += 1
+                    continue
+                    
+                if char == '"' and not escape_next:
+                    in_string = not in_string
+                    i += 1
+                    continue
+                    
+                # Only count brackets when not inside a string
+                if not in_string:
+                    if char in '{[':
+                        bracket_stack.append(char)
+                    elif char in ']}':
+                        if bracket_stack:
+                            if (char == '}' and bracket_stack[-1] == '{') or (char == ']' and bracket_stack[-1] == '['):
+                                bracket_stack.pop()
+                                if not bracket_stack:  # Found complete JSON
+                                    return text[pos:i+1].strip()
+                i += 1
+                
+        return None
+    
     def _parse_json_response(self, response_text: str) -> Optional[Any]:
         """
         Parse JSON response from model, handling potential formatting issues.
@@ -423,26 +525,8 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
                     content_start = json_start
                     if response_text[content_start:content_start+1] == '\n':
                         content_start += 1
-                    # Try to find JSON starting with { or [ after the marker
-                    remaining_text = response_text[content_start:].strip()
-                    # Use Strategy 3 logic to find complete JSON in remaining text
-                    for start_char in ['{', '[']:
-                        start_pos = remaining_text.find(start_char)
-                        if start_pos != -1:
-                            # Find matching closing bracket
-                            bracket_stack = []
-                            for i, char in enumerate(remaining_text[start_pos:], start_pos):
-                                if char in '{[':
-                                    bracket_stack.append(char)
-                                elif char in ']}':
-                                    if bracket_stack:
-                                        if (char == '}' and bracket_stack[-1] == '{') or (char == ']' and bracket_stack[-1] == '['):
-                                            bracket_stack.pop()
-                                            if not bracket_stack:  # Found complete JSON
-                                                json_content = remaining_text[start_pos:i+1].strip()
-                                                break
-                            if json_content:
-                                break
+                    # Use improved bracket matching that handles strings correctly
+                    json_content = self._find_complete_json(response_text, content_start)
             except Exception:
                 pass
         
@@ -463,48 +547,15 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
                             json_content = response_text[content_start:content_end].strip()
                         else:
                             # No closing ```, try to extract JSON from remaining content
-                            remaining_text = response_text[content_start:].strip()
-                            # Try to find JSON starting with { or [
-                            for start_char in ['{', '[']:
-                                start_pos = remaining_text.find(start_char)
-                                if start_pos != -1:
-                                    # Find matching closing bracket
-                                    bracket_stack = []
-                                    for i, char in enumerate(remaining_text[start_pos:], start_pos):
-                                        if char in '{[':
-                                            bracket_stack.append(char)
-                                        elif char in ']}':
-                                            if bracket_stack:
-                                                if (char == '}' and bracket_stack[-1] == '{') or (char == ']' and bracket_stack[-1] == '['):
-                                                    bracket_stack.pop()
-                                                    if not bracket_stack:  # Found complete JSON
-                                                        json_content = remaining_text[start_pos:i+1].strip()
-                                                        break
-                                    if json_content:
-                                        break
+                            # Use improved bracket matching that handles strings correctly
+                            json_content = self._find_complete_json(response_text, content_start)
             except Exception:
                 pass
         
         # Strategy 3: Look for JSON-like content anywhere in the response
         if not json_content:
-            # Try to find JSON-like content (starts with { or [)
-            for start_char in ['{', '[']:
-                start_pos = response_text.find(start_char)
-                if start_pos != -1:
-                    # Find matching closing bracket
-                    bracket_stack = []
-                    for i, char in enumerate(response_text[start_pos:], start_pos):
-                        if char in '{[':
-                            bracket_stack.append(char)
-                        elif char in ']}':
-                            if bracket_stack:
-                                if (char == '}' and bracket_stack[-1] == '{') or (char == ']' and bracket_stack[-1] == '['):
-                                    bracket_stack.pop()
-                                    if not bracket_stack:  # Found complete JSON
-                                        json_content = response_text[start_pos:i+1].strip()
-                                        break
-                    if json_content:
-                        break
+            # Use improved bracket matching that handles strings correctly
+            json_content = self._find_complete_json(response_text, 0)
         
         # Strategy 4: Use the entire response if it looks like JSON
         if not json_content:
@@ -517,12 +568,12 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
                 # Clean up common issues
                 json_content = self._clean_json_content(json_content)
                 return json.loads(json_content)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
                 # Try to fix common JSON issues
                 fixed_content = self._fix_common_json_issues(json_content)
                 try:
                     return json.loads(fixed_content)
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as e2:
                     pass
         
         return None
@@ -530,15 +581,37 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
     def _clean_json_content(self, content: str) -> str:
         """Clean up common issues in JSON content."""
         import re
+        import json
+
+        # Fix malformed evidence field pattern: "evidence": "quote1", "quote2", "quote3"
+        # This should be: "evidence": ["quote1", "quote2", "quote3"]
+        # The pattern matches quoted strings after "evidence": and stops at the next field name
+        def fix_quotes_to_array(quotes_text):
+            """Convert a sequence of quoted strings like '"a", "b", ' to a JSON array."""
+            # Find all quoted strings
+            quotes = re.findall(r'"((?:[^"\\]|\\.)*)"', quotes_text)
+            # Rebuild as JSON array, properly escaping
+            return '[' + ', '.join([json.dumps(q) for q in quotes]) + ']'
+
+        # Match: "evidence": followed by quoted strings, stopping before next field
+        # Pattern: "evidence": "str1", "str2", ... , "next_field":
+        pattern = r'"evidence"\s*:\s*((?:"(?:[^"\\]|\\.)*"\s*,\s*)+)"(\w+)"\s*:'
+        content = re.sub(
+            pattern,
+            lambda m: f'"evidence": {fix_quotes_to_array(m.group(1))},\n    "{m.group(2)}":',
+            content
+        )
+
+        # Remove trailing commas before closing braces/brackets
         content = re.sub(r',(\s*[}\]])', r'\1', content)
-        
+
         # Remove any trailing commas
         content = re.sub(r',\s*$', '', content)
-        
+
         # Fix common quote issues
         content = content.replace('"', '"').replace('"', '"')
         content = content.replace(''', "'").replace(''', "'")
-        
+
         return content.strip()
     
     def _fix_common_json_issues(self, content: str) -> str:

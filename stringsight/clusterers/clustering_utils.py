@@ -11,6 +11,7 @@ main algorithm file focussed on clustering logic.
 
 from __future__ import annotations
 
+import asyncio
 import concurrent.futures
 import random
 import time
@@ -31,7 +32,7 @@ from .clustering_prompts import clustering_systems_prompt, coarse_clustering_sys
 from stringsight.logging_config import get_logger
 
 logger = get_logger(__name__)
-from ..core.llm_utils import parallel_completions
+from ..core.llm_utils import parallel_completions_async
 from ..core.caching import UnifiedCache
 
 # ----------------------------------------------------------
@@ -256,7 +257,8 @@ def _clean_list_item(text: str) -> str:
         r'^\s*[ivxlc]+\.\s*',      # Roman numerals "i. ", "iv. ", etc.
         r'^\s*[IVXLC]+\.\s*',      # "I. ", "IV. ", etc.
         r'^\s*[•·◦▪▫‣⁃]\s*',       # Bullet characters
-        r'^\s*[-*+]\s*',           # Dash, asterisk, plus bullets
+        r'^\s*[-+]\s*',            # Dash, plus bullets
+        r'^\s*\*(?!\*)\s*',        # Single asterisk bullet (not double ** for bold)
         r'^\s*[→⟶]\s*',            # Arrow bullets
     ]
     
@@ -393,7 +395,7 @@ def generate_coarse_labels(
     return coarse_labels
 
 
-def assign_fine_to_coarse(
+async def assign_fine_to_coarse(
     cluster_names: List[str],
     coarse_cluster_names: List[str],
     *,
@@ -407,7 +409,7 @@ def assign_fine_to_coarse(
     Parameters
     ----------
     strategy : "llm" | "embedding"
-        • "llm" – use chat-based matching (thread-pooled, relies on litellm).
+        • "llm" – use chat-based matching (async, relies on litellm).
         • "embedding" – cosine-similarity in embedding space (fast, no chat calls).
     """
     # Debug: Check for empty coarse_cluster_names
@@ -421,12 +423,12 @@ def assign_fine_to_coarse(
     if strategy == "embedding":
         return embedding_match(cluster_names, coarse_cluster_names)
     elif strategy == "llm":
-        return llm_match(cluster_names, coarse_cluster_names, max_workers=max_workers, model=model)
+        return await llm_match(cluster_names, coarse_cluster_names, max_workers=max_workers, model=model)
     else:
         raise ValueError(f"Unknown assignment strategy: {strategy}")
 
 
-def llm_coarse_cluster_with_centers(
+async def llm_coarse_cluster_with_centers(
     cluster_names: List[str],
     max_coarse_clusters: int,
     verbose: bool = True,
@@ -447,7 +449,7 @@ def llm_coarse_cluster_with_centers(
         verbose=verbose,
     )
 
-    fine_to_coarse = assign_fine_to_coarse(
+    fine_to_coarse = await assign_fine_to_coarse(
         valid_fine_names,
         coarse_labels,
         model=cluster_assignment_model,
@@ -484,7 +486,7 @@ def match_label_names(label_name, label_options):
             return option
     return None
 
-def llm_match(cluster_names, coarse_cluster_names, max_workers=16, model="gpt-4.1-mini"):
+async def llm_match(cluster_names, coarse_cluster_names, max_workers=16, model="gpt-4.1-mini"):
     """Match fine-grained cluster names to coarse-grained cluster names using an LLM with parallel processing."""
     coarse_names_text = "\n".join(coarse_cluster_names)
     
@@ -502,7 +504,7 @@ def llm_match(cluster_names, coarse_cluster_names, max_workers=16, model="gpt-4.
         messages.append(user_prompt)
     
     # Use parallel processing with built-in caching and retries
-    responses = parallel_completions(
+    responses = await parallel_completions_async(
         messages,
         model=model,
         system_prompt=system_prompt,

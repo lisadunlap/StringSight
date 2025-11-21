@@ -13,6 +13,7 @@ This module is isolated from the Gradio app. It can be run independently:
 from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
+import asyncio
 import io
 import os
 import time
@@ -592,7 +593,7 @@ class ClusterRunRequest(BaseModel):
 
 
 @app.post("/cluster/run")
-def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
+async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
     """Run clustering directly on existing properties without re-running extraction.
     
     This is much more efficient than the full explain() pipeline since it skips
@@ -653,7 +654,7 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
                     score_columns_to_use = None
                     # Normalize to 'score' for consistency
                     if score_column_name == 'scores':
-                        operational_df['score'] = operational_df['scores']
+                        operational_df.rename(columns={'scores': 'score'}, inplace=True)
             else:
                 # Try to detect score columns based on naming patterns
                 # Look for columns like: score_X, X_score, helpfulness, accuracy, etc.
@@ -722,9 +723,14 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
         properties: List[Property] = []
         for p in req.properties:
             try:
+                # Strip property index suffix from question_id to get base conversation ID
+                # Frontend sends compound IDs like "48-0", "48-1" but we need base ID "48" for matching
+                raw_question_id = str(p.get("question_id", ""))
+                base_question_id = raw_question_id.split('-')[0] if '-' in raw_question_id else raw_question_id
+
                 prop = Property(
                     id=str(p.get("id", "")),
-                    question_id=str(p.get("question_id", "")),
+                    question_id=base_question_id,
                     model=str(p.get("model", "")),
                     property_description=p.get("property_description"),
                     category=p.get("category"),
@@ -780,9 +786,12 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
                     break
                 
                 # If no exact match, try matching on base question_id (strip suffix after '-')
-                # This handles side-by-side format where question_id might be "0-0" vs "0"
+                # This handles formats like "48-0" vs "48" or "0-0" vs "0"
+                # Try stripping from both sides
                 row_qid_base = row_qid.split('-')[0] if '-' in row_qid else row_qid
-                if row_qid_base == question_id and row_model == model:
+                question_id_base = question_id.split('-')[0] if '-' in question_id else question_id
+
+                if (row_qid_base == question_id or row_qid == question_id_base) and row_model == model:
                     matching_row = row
                     matches_found += 1
                     break
@@ -798,14 +807,31 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             # Try both 'score' and 'scores' fields for compatibility
             if matching_row:
                 scores = matching_row.get("score") or matching_row.get("scores") or {}
+                # Debug logging for first match
+                if matches_found == 1:
+                    logger.info(f"🔍 First matching_row debug:")
+                    logger.info(f"  - Keys in matching_row: {list(matching_row.keys())}")
+                    logger.info(f"  - 'score' value: {matching_row.get('score')}")
+                    logger.info(f"  - 'scores' value: {matching_row.get('scores')}")
+                    logger.info(f"  - Final scores used: {scores}")
             else:
                 scores = {}
-            
+
+            # Try both 'model_response' and 'responses' for compatibility
+            response_value = ""
+            if matching_row:
+                response_value = matching_row.get("responses") or matching_row.get("model_response") or ""
+
+            # Strip property index suffix from question_id to get base conversation ID
+            # Properties have compound IDs like "48-0", "48-1" (conversation-property_index)
+            # Conversations should only have the base ID like "48"
+            base_question_id = question_id.split('-')[0] if '-' in question_id else question_id
+
             conv = ConversationRecord(
-                question_id=question_id,
+                question_id=base_question_id,
                 model=model,
                 prompt=matching_row.get("prompt", "") if matching_row else "",
-                responses=matching_row.get("model_response", "") if matching_row else "",
+                responses=response_value,
                 scores=scores,
                 meta={}
             )
@@ -877,7 +903,7 @@ def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
         )
         
         # Run clustering
-        clustered_dataset = clusterer.run(dataset, column_name="property_description")
+        clustered_dataset = await clusterer.run(dataset, column_name="property_description")
         
     finally:
         # Restore original cache/env settings (no-op for DiskCache)
@@ -1424,15 +1450,26 @@ def cluster_metrics(req: ClusterMetricsRequest) -> Dict[str, Any]:
     if not score_columns_to_use and req.operationalRows:
         import pandas as pd
         operational_df = pd.DataFrame(req.operationalRows)
-        
-        # Check if 'score' column already exists (nested dict format)
-        if 'score' in operational_df.columns:
-            sample_score = operational_df['score'].iloc[0] if len(operational_df) > 0 else None
+
+        # Frontend may send either 'score' (singular) or 'scores' (plural)
+        score_column_name = None
+        if 'scores' in operational_df.columns:
+            score_column_name = 'scores'
+        elif 'score' in operational_df.columns:
+            score_column_name = 'score'
+
+        if score_column_name:
+            # Check if it's actually a dict (not a string or number)
+            sample_score = operational_df[score_column_name].iloc[0] if len(operational_df) > 0 else None
             if not isinstance(sample_score, dict):
-                logger.info("'score' column exists but is not a dict - will attempt to detect score columns")
+                logger.info(f"'{score_column_name}' column exists but is not a dict - will attempt to detect score columns")
             else:
-                logger.info("'score' column already in nested dict format - no conversion needed")
+                logger.info(f"'{score_column_name}' column already in nested dict format - no conversion needed")
                 score_columns_to_use = None
+                # Normalize to 'score' for consistency
+                if score_column_name == 'scores':
+                    operational_df.rename(columns={'scores': 'score'}, inplace=True)
+                    req.operationalRows = operational_df.to_dict('records')
         else:
             # Try to detect score columns based on naming patterns
             potential_score_cols = []
@@ -2204,7 +2241,7 @@ class ExplainSideBySideTidyRequest(BaseModel):
 
 
 @app.post("/api/explain/side-by-side")
-def explain_side_by_side_tidy(req: ExplainSideBySideTidyRequest) -> Dict[str, Any]:
+async def explain_side_by_side_tidy(req: ExplainSideBySideTidyRequest) -> Dict[str, Any]:
     """Convert tidy data to side-by-side, run explain(), and return results.
 
     Returns a dictionary with:
@@ -2242,7 +2279,7 @@ def explain_side_by_side_tidy(req: ExplainSideBySideTidyRequest) -> Dict[str, An
 
     # Delegate tidy→SxS conversion and full pipeline to library
     t0 = time.perf_counter()
-    clustered_df, model_stats = public_api.explain(
+    clustered_df, model_stats = await public_api.explain_async(
         df=df,
         method="side_by_side",
         model_a=req.model_a,
@@ -2265,7 +2302,7 @@ app.add_api_route("/explain/side-by-side", explain_side_by_side_tidy, methods=["
 
 
 @app.post("/extract/single")
-def extract_single(req: ExtractSingleRequest) -> Dict[str, Any]:
+async def extract_single(req: ExtractSingleRequest) -> Dict[str, Any]:
     """Run extraction→parsing→validation for a single row."""
     # Build a one-row DataFrame
     df = pd.DataFrame([req.row])
@@ -2282,7 +2319,7 @@ def extract_single(req: ExtractSingleRequest) -> Dict[str, Any]:
             "available": list(df.columns),
         })
 
-    result = public_api.extract_properties_only(
+    result = await public_api.extract_properties_only_async(
         df,
         method=method,
         system_prompt=req.system_prompt,
@@ -2313,7 +2350,7 @@ def extract_single(req: ExtractSingleRequest) -> Dict[str, Any]:
 
 
 @app.post("/extract/batch")
-def extract_batch(req: ExtractBatchRequest) -> Dict[str, Any]:
+async def extract_batch(req: ExtractBatchRequest) -> Dict[str, Any]:
     """Run extraction→parsing→validation for all rows and return properties table."""
     df = pd.DataFrame(req.rows)
 
@@ -2335,7 +2372,7 @@ def extract_batch(req: ExtractBatchRequest) -> Dict[str, Any]:
             "available": list(df.columns),
         })
 
-    result = public_api.extract_properties_only(
+    result = await public_api.extract_properties_only_async(
         df,
         method=method,
         system_prompt=req.system_prompt,
@@ -2431,6 +2468,15 @@ class ExtractJobStartRequest(ExtractBatchRequest):
 
 
 def _run_extract_job(job: ExtractJob, req: ExtractJobStartRequest):
+    """Sync wrapper for async extraction - runs in background thread."""
+    try:
+        asyncio.run(_run_extract_job_async(job, req))
+    except Exception as e:
+        logger.error(f"Error in background extract job: {e}")
+        job.state = "error"
+        job.error = str(e)
+
+async def _run_extract_job_async(job: ExtractJob, req: ExtractJobStartRequest):
     try:
         with _JOBS_LOCK:
             job.state = "running"
@@ -2491,13 +2537,25 @@ def _run_extract_job(job: ExtractJob, req: ExtractJobStartRequest):
         )
 
         # Run extraction with progress callback
-        extracted_dataset = extractor.run(dataset, progress_callback=update_progress)
+        extracted_dataset = await extractor.run(dataset, progress_callback=update_progress)
+
+        # Determine output directory for saving parsing failures
+        # Use req.output_dir if provided, otherwise create a directory in results
+        base_results_dir = _get_results_dir()
+        if req.output_dir:
+            output_dir = str(base_results_dir / req.output_dir)
+        else:
+            # Create a directory for this extract job to save parsing failures
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_dir = str(base_results_dir / f"extract_{job.id}_{timestamp}")
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        logger.info(f"Parsing failures will be saved to: {output_dir}")
 
         # Run parsing and validation
-        parser = LLMJsonParser(fail_fast=False, verbose=False, use_wandb=False)
+        parser = LLMJsonParser(fail_fast=False, verbose=False, use_wandb=False, output_dir=output_dir)
         parsed_dataset = parser.run(extracted_dataset)
 
-        validator = PropertyValidator(verbose=False, use_wandb=False)
+        validator = PropertyValidator(verbose=False, use_wandb=False, output_dir=output_dir)
         result = validator.run(parsed_dataset)
 
         # result is a PropertyDataset (or (PropertyDataset, failures) in other contexts)
@@ -2667,7 +2725,7 @@ async def extract_stream(req: ExtractBatchRequest):
         )
 
         # Extract properties (this runs in parallel internally)
-        extracted_dataset = extractor.run(dataset)
+        extracted_dataset = await extractor.run(dataset)
 
         # Parse properties
         parser = LLMJsonParser(fail_fast=False, verbose=False, use_wandb=False)

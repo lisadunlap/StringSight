@@ -6,6 +6,7 @@ into pipeline stages.
 """
 
 from typing import Optional
+import asyncio
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
@@ -62,7 +63,7 @@ class HDBSCANClusterer(BaseClusterer):
         context: Optional[str] = None,
         groupby_column: Optional[str] = None,
         parallel_clustering: bool = True,
-        cluster_positive: bool = False,
+        cluster_positive: bool = True,
         precomputed_embeddings: Optional[object] = None,
         cache_embeddings: bool = True,
         input_model_name: Optional[str] = None,
@@ -125,7 +126,7 @@ class HDBSCANClusterer(BaseClusterer):
         )
 
 
-    def cluster(self, data: PropertyDataset, column_name: str) -> pd.DataFrame:
+    async def cluster(self, data: PropertyDataset, column_name: str) -> pd.DataFrame:
         """Cluster the dataset.
 
         If ``self.config.groupby_column`` is provided and present in the data, the
@@ -188,36 +189,40 @@ class HDBSCANClusterer(BaseClusterer):
             parallel_clustering = getattr(self.config, "parallel_clustering", False)
 
             if parallel_clustering:
-                # Parallelize clustering per group for better performance
+                # Parallelize clustering per group for better performance (using async)
                 groups = list(df.groupby(group_col))
 
-                def _cluster_group(group_info):
+                async def _cluster_group_async(group_info):
                     group, group_df = group_info
                     if getattr(self, "verbose", False):
                         logger.info(f"--------------------------------\nClustering group {group}\n--------------------------------")
-                    part = hdbscan_cluster_categories(
+                    part = await hdbscan_cluster_categories(
                         group_df,
                         column_name=column_name,
                         config=self.config,
                     )
                     return group, part
 
-                # Process groups in parallel
+                # Process groups in parallel using async
                 clustered_parts = []
                 max_workers = min(len(groups), getattr(self.config, 'llm_max_workers', 64))
-                with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    futures = {executor.submit(_cluster_group, group_info): idx
-                              for idx, group_info in enumerate(groups)}
+                
+                # Create coroutines (not tasks yet - we're not in event loop)
+                coros = [_cluster_group_async(group_info) for group_info in groups]
+                
+                # Use gather to run them all - this works even if not in event loop yet
+                # We'll iterate with as_completed for progress tracking
+                tasks = [asyncio.ensure_future(coro) for coro in coros]
 
-                    # Add progress bar for parallel clustering
-                    with tqdm(total=len(groups), desc=f"Clustering {len(groups)} groups in parallel", disable=not getattr(self, "verbose", False)) as pbar:
-                        for future in as_completed(futures):
-                            group, part = future.result()
-                            # Add meta column with group information as a dictionary
-                            # Use list comprehension to create independent dict objects for each row
-                            part["meta"] = [{"group": group} for _ in range(len(part))]
-                            clustered_parts.append(part)
-                            pbar.update(1)
+                # Add progress bar for parallel clustering
+                with tqdm(total=len(groups), desc=f"Clustering {len(groups)} groups in parallel", disable=not getattr(self, "verbose", False)) as pbar:
+                    for task in asyncio.as_completed(tasks):
+                        group, part = await task
+                        # Add meta column with group information as a dictionary
+                        # Use list comprehension to create independent dict objects for each row
+                        part["meta"] = [{"group": group} for _ in range(len(part))]
+                        clustered_parts.append(part)
+                        pbar.update(1)
                 clustered_df = pd.concat(clustered_parts, ignore_index=True)
             else:
                 # Process groups sequentially (default behavior)
@@ -228,7 +233,7 @@ class HDBSCANClusterer(BaseClusterer):
                 for group, group_df in tqdm(groups, desc=f"Clustering {len(groups)} groups sequentially", disable=not getattr(self, "verbose", False)):
                     if getattr(self, "verbose", False):
                         logger.info(f"--------------------------------\nClustering group {group}\n--------------------------------")
-                    part = hdbscan_cluster_categories(
+                    part = await hdbscan_cluster_categories(
                         group_df,
                         column_name=column_name,
                         config=self.config,
@@ -239,7 +244,7 @@ class HDBSCANClusterer(BaseClusterer):
                     clustered_parts.append(part)
                 clustered_df = pd.concat(clustered_parts, ignore_index=True)
         else:
-            clustered_df = hdbscan_cluster_categories(
+            clustered_df = await hdbscan_cluster_categories(
                 df,
                 column_name=column_name,
                 config=self.config,
@@ -262,13 +267,13 @@ class HDBSCANClusterer(BaseClusterer):
 
         return clustered_df
 
-    def postprocess_clustered_df(self, df: pd.DataFrame, column_name: str, prettify_labels: bool = False) -> pd.DataFrame:
+    async def postprocess_clustered_df(self, df: pd.DataFrame, column_name: str, prettify_labels: bool = False) -> pd.DataFrame:
         """Standard post-processing plus stratified ID re-assignment when needed."""
 
         label_col = f"{column_name}_cluster_label"
         id_col = f"{column_name}_cluster_id"
 
-        df = super().postprocess_clustered_df(df, label_col, prettify_labels)
+        df = await super().postprocess_clustered_df(df, label_col, prettify_labels)
 
         # 1️⃣  Move tiny clusters to Outliers
         label_counts = df[label_col].value_counts()

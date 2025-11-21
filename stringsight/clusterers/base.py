@@ -3,9 +3,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 import os
+import asyncio
 import pandas as pd
 import litellm
-from ..core.llm_utils import parallel_completions, LLMConfig
+from ..core.llm_utils import parallel_completions_async, LLMConfig
 
 from ..core.stage import PipelineStage
 from ..core.data_objects import PropertyDataset, Cluster
@@ -104,7 +105,7 @@ class BaseClusterer(LoggingMixin, TimingMixin, WandbMixin, PipelineStage, ABC):
         ...
 
     @staticmethod
-    def prettify_labels(df: pd.DataFrame, column_name: str, config: ClusterConfig) -> pd.DataFrame:
+    async def prettify_labels(df: pd.DataFrame, column_name: str, config: ClusterConfig) -> pd.DataFrame:
         """Use an LLM to highlight key parts of cluster names in bold for improved readability."""
         # Filter out outliers and collect labels to process
         labels_to_process = []
@@ -128,7 +129,7 @@ Respond with the summary along with the original property in the following forma
 Do not include any other text in your response."""
 
         # Process labels in parallel with caching
-        prettified_labels = parallel_completions(
+        prettified_labels = await parallel_completions_async(
             labels_to_process,
             model=config.summary_model,
             system_prompt=system_prompt,
@@ -143,7 +144,7 @@ Do not include any other text in your response."""
             
         return df
 
-    def postprocess_clustered_df(self, df: pd.DataFrame, column_name: str, prettify_labels: bool = False) -> pd.DataFrame:
+    async def postprocess_clustered_df(self, df: pd.DataFrame, column_name: str, prettify_labels: bool = False) -> pd.DataFrame:
         """Optional hook to modify the clustered DataFrame.
 
         Called after `cluster` and before converting to `Cluster` objects.
@@ -167,7 +168,7 @@ Do not include any other text in your response."""
         """
         if prettify_labels:
             config = self.get_config()
-            df = self.prettify_labels(df, column_name, config)
+            df = await self.prettify_labels(df, column_name, config)
         return df
 
     def get_config(self) -> ClusterConfig:
@@ -190,7 +191,7 @@ Do not include any other text in your response."""
         )
         return self.config
 
-    def run(self, data: PropertyDataset, column_name: str = "property_description") -> PropertyDataset:
+    async def run(self, data: PropertyDataset, column_name: str = "property_description") -> PropertyDataset:
         """Execute the clustering pipeline and return an updated dataset.
 
         Expected orchestration steps:
@@ -210,10 +211,15 @@ Do not include any other text in your response."""
         if not data.properties:
             raise ValueError("No properties to cluster")
 
-        clustered_df = self.cluster(data, column_name)
+        # Handle both sync and async cluster() methods
+        import inspect
+        if inspect.iscoroutinefunction(self.cluster):
+            clustered_df = await self.cluster(data, column_name)
+        else:
+            clustered_df = self.cluster(data, column_name)
         if "meta" not in clustered_df.columns:
             clustered_df["meta"] = [{} for _ in range(len(clustered_df))]
-        clustered_df = self.postprocess_clustered_df(clustered_df, column_name, prettify_labels=self.prettify_labels)
+        clustered_df = await self.postprocess_clustered_df(clustered_df, column_name, prettify_labels=self.prettify_labels)
 
         clusters = self._build_clusters_from_df(clustered_df, column_name)
         self.add_no_properties_cluster(data, clusters)

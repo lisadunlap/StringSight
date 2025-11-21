@@ -8,6 +8,7 @@ and robust error handling.
 
 import time
 import os
+import asyncio
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any, Optional, Callable, Union, Tuple
@@ -565,6 +566,32 @@ def parallel_completions(
     config = LLMConfig(model=model, max_workers=max_workers, **config_kwargs)
     utils = get_default_llm_utils()
     return utils.parallel_completions(messages, config, system_prompt, show_progress, progress_desc, progress_callback)
+
+
+async def parallel_completions_async(
+    messages: List[Union[str, List[Dict[str, Any]]]],
+    model: str = "gpt-4o-mini",
+    system_prompt: Optional[str] = None,
+    max_workers: int = 64,
+    show_progress: bool = True,
+    progress_desc: str = "LLM calls",
+    progress_callback: Optional[Callable[[int, int], None]] = None,
+    **kwargs
+) -> List[str]:
+    """Async wrapper for parallel completions with default settings."""
+    # Run the synchronous function in an executor to avoid blocking
+    loop = asyncio.get_event_loop()
+    config_kwargs = {k: v for k, v in kwargs.items()
+                    if k in ['max_retries', 'base_sleep_time', 'timeout', 'temperature', 'top_p', 'max_tokens']}
+
+    config = LLMConfig(model=model, max_workers=max_workers, **config_kwargs)
+    utils = get_default_llm_utils()
+    
+    # Use run_in_executor to run the sync function without blocking the event loop
+    return await loop.run_in_executor(
+        None, 
+        lambda: utils.parallel_completions(messages, config, system_prompt, show_progress, progress_desc, progress_callback)
+    )
 
 
 def parallel_embeddings(

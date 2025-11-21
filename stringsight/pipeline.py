@@ -71,7 +71,7 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
         """Remove and return a stage at a specific position."""
         return self.stages.pop(index)
         
-    def run(self, data: PropertyDataset) -> PropertyDataset:
+    async def run(self, data: PropertyDataset) -> PropertyDataset:
         """
         Execute all stages in the pipeline.
         
@@ -108,8 +108,8 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
             # try:
             self.log(f"Running stage {i+1}/{len(self.stages)}: {stage.name}")
             
-            # Execute the stage
-            current_data = stage(current_data)
+            # Execute the stage (__call__ handles both async and sync automatically)
+            current_data = await stage(current_data)
             
             # Track timing
             stage_execution_time = time.time() - stage_start_time

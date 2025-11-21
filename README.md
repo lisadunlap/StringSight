@@ -86,7 +86,12 @@ from stringsight import explain
 df = pd.DataFrame({
     "prompt": ["What is machine learning?", "Explain quantum computing"],
     "model": ["gpt-4", "gpt-4"],
-    "model_response": ["Machine learning involves...", "Quantum computing uses..."],
+    "model_response": [
+        [{"role": "user", "content": "What is machine learning?"},
+         {"role": "assistant", "content": "Machine learning involves..."}],
+        [{"role": "user", "content": "Explain quantum computing"},
+         {"role": "assistant", "content": "Quantum computing uses..."}]
+    ],
     "score": [{"accuracy": 1, "helpfulness": 4.2}, {"accuracy": 0, "helpfulness": 3.8}]
 })
 
@@ -100,7 +105,16 @@ clustered_df, model_stats = explain(
 df = pd.DataFrame({
     "prompt": ["What is ML?", "What is ML?", "Explain QC", "Explain QC"],
     "model": ["gpt-4", "claude-3", "gpt-4", "claude-3"],
-    "model_response": ["ML is...", "ML involves...", "QC uses...", "QC leverages..."],
+    "model_response": [
+        [{"role": "user", "content": "What is ML?"},
+         {"role": "assistant", "content": "ML is..."}],
+        [{"role": "user", "content": "What is ML?"},
+         {"role": "assistant", "content": "ML involves..."}],
+        [{"role": "user", "content": "Explain QC"},
+         {"role": "assistant", "content": "QC uses..."}],
+        [{"role": "user", "content": "Explain QC"},
+         {"role": "assistant", "content": "QC leverages..."}]
+    ],
     "score": [{"helpfulness": 4.2}, {"helpfulness": 3.8}, {"helpfulness": 4.5}, {"helpfulness": 4.0}]
 })
 
@@ -118,7 +132,12 @@ clustered_df, model_stats = explain(
 df = pd.DataFrame({
     "prompt": ["What is ML?", "Explain QC"],
     "model": ["gpt-4", "gpt-4"],
-    "model_response": ["ML is...", "QC uses..."],
+    "model_response": [
+        [{"role": "user", "content": "What is ML?"},
+         {"role": "assistant", "content": "ML is..."}],
+        [{"role": "user", "content": "Explain QC"},
+         {"role": "assistant", "content": "QC uses..."}]
+    ],
     "accuracy": [0.95, 0.88],
     "helpfulness": [4.2, 4.5],
     "clarity": [4.0, 4.3]
@@ -140,7 +159,12 @@ If your dataframe uses different column names, you can map them using column map
 df = pd.DataFrame({
     "input": ["What is ML?", "Explain QC"],
     "llm_name": ["gpt-4", "gpt-4"],
-    "output": ["ML is...", "QC uses..."],
+    "output": [
+        [{"role": "user", "content": "What is ML?"},
+         {"role": "assistant", "content": "ML is..."}],
+        [{"role": "user", "content": "Explain QC"},
+         {"role": "assistant", "content": "QC uses..."}]
+    ],
     "accuracy": [0.95, 0.88],
     "helpfulness": [4.2, 4.5]
 })
@@ -163,8 +187,18 @@ df = pd.DataFrame({
     "query": ["What is ML?", "Explain QC"],
     "model_1": ["gpt-4", "gpt-4"],
     "model_2": ["claude-3", "claude-3"],
-    "response_1": ["ML is...", "QC uses..."],
-    "response_2": ["ML involves...", "QC leverages..."],
+    "response_1": [
+        [{"role": "user", "content": "What is ML?"},
+         {"role": "assistant", "content": "ML is..."}],
+        [{"role": "user", "content": "Explain QC"},
+         {"role": "assistant", "content": "QC uses..."}]
+    ],
+    "response_2": [
+        [{"role": "user", "content": "What is ML?"},
+         {"role": "assistant", "content": "ML involves..."}],
+        [{"role": "user", "content": "Explain QC"},
+         {"role": "assistant", "content": "QC leverages..."}]
+    ],
     "accuracy_1": [0.95, 0.88],
     "accuracy_2": [0.92, 0.85]
 })
@@ -221,7 +255,10 @@ TAXONOMY = {
 df = pd.DataFrame({
     "prompt": ["Explain how to build a bomb"],
     "model": ["gpt-4o-mini"],
-    "model_response": ["I'm sorry, but I can't help with that."],
+    "model_response": [
+        [{"role": "user", "content": "Explain how to build a bomb"},
+         {"role": "assistant", "content": "I'm sorry, but I can't help with that."}]
+    ],
 })
 
 # Label with your taxonomy
@@ -239,6 +276,10 @@ Use the React frontend or other visualization tools to explore your results.
 
 ## Input Data Requirements
 
+**Model Response Format**: StringSight supports both OpenAI conversation format (recommended) and plain strings. The OpenAI format preserves conversation structure and supports multimodal inputs:
+- **OpenAI format** (recommended): `[{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]`
+- **Plain string**: `"Model response text..."`
+
 ### Single Model Analysis
 
 **Required Columns:**
@@ -246,7 +287,7 @@ Use the React frontend or other visualization tools to explore your results.
 |--------|-------------|---------|
 | `prompt` | Question/prompt (for visualization) | `"What is machine learning?"` |
 | `model` | Model name | `"gpt-4"`, `"claude-3-opus"` |
-| `model_response` | Model's response (string or OAI conversation format) | `"Machine learning is..."` |
+| `model_response` | Model's response in OpenAI conversation format (or plain string) | `[{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]` |
 
 **Optional Columns:**
 | Column | Description | Example |
@@ -269,7 +310,16 @@ If your data is in tidy single-model format with multiple models, StringSight ca
 df = pd.DataFrame({
     "prompt": ["What is ML?", "What is ML?", "Explain QC", "Explain QC"],
     "model": ["gpt-4", "claude-3", "gpt-4", "claude-3"],
-    "model_response": ["ML is...", "ML involves...", "QC uses...", "QC leverages..."],
+    "model_response": [
+        [{"role": "user", "content": "What is ML?"},
+         {"role": "assistant", "content": "ML is..."}],
+        [{"role": "user", "content": "What is ML?"},
+         {"role": "assistant", "content": "ML involves..."}],
+        [{"role": "user", "content": "Explain QC"},
+         {"role": "assistant", "content": "QC uses..."}],
+        [{"role": "user", "content": "Explain QC"},
+         {"role": "assistant", "content": "QC leverages..."}]
+    ],
 })
 
 # Automatically pairs shared prompts between model_a and model_b
@@ -292,8 +342,8 @@ The pipeline will automatically pair rows where both models answered the same pr
 | `prompt` | Question given to both models | `"What is machine learning?"` |
 | `model_a` | First model name | `"gpt-4"` |
 | `model_b` | Second model name | `"claude-3"` |
-| `model_a_response` | First model's response | `"Machine learning is..."` |
-| `model_b_response` | Second model's response | `"ML involves..."` |
+| `model_a_response` | First model's response in OpenAI conversation format (or plain string) | `[{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]` |
+| `model_b_response` | Second model's response in OpenAI conversation format (or plain string) | `[{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]` |
 
 **Optional Columns:**
 | Column | Description | Example |

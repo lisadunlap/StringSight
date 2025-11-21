@@ -12,6 +12,7 @@ Supports multiple clustering algorithms including HDBSCAN, and traditional metho
 
 import pandas as pd
 import numpy as np
+import asyncio
 import time
 from collections import defaultdict
 from ..core.llm_utils import parallel_completions
@@ -347,7 +348,7 @@ def format_clustering_results(df: pd.DataFrame, column_name: str,
 # MAIN CLUSTERING FUNCTIONS
 # =============================================================================
 
-def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.DataFrame:
+async def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.DataFrame:
     """
     Fast HDBSCAN clustering for medium to large datasets.
     Now supports BERTopic-based outlier reduction if config.assign_outliers is True.
@@ -382,6 +383,15 @@ def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.Dat
         effective_min_cluster_size = 5
     else:
         effective_min_cluster_size = int(config.min_cluster_size)
+    
+    # Ensure min_cluster_size is at least 2 (HDBSCAN requirement)
+    if effective_min_cluster_size < 2:
+        if config.verbose:
+            logger.warning(
+                f"min_cluster_size ({effective_min_cluster_size}) is less than 2. "
+                f"HDBSCAN requires min_cluster_size >= 2. Setting to 2."
+            )
+        effective_min_cluster_size = 2
 
     if config.verbose:
         logger.info(f"Parameters: min_cluster_size={effective_min_cluster_size}, data_shape={embeddings.shape}")
@@ -389,7 +399,7 @@ def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.Dat
     # 🛡️ Guard against small datasets ------------------------------------
     if n_points <= effective_min_cluster_size:
         if config.verbose:
-            print(
+            logger.warning(
                 f"Number of points ({n_points}) is less than or equal to min_cluster_size "
                 f"({effective_min_cluster_size}). Assigning all items to outliers (-1)."
             )
@@ -416,10 +426,22 @@ def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.Dat
                     cluster_selection_epsilon=config.cluster_selection_epsilon
                 )
                 with tqdm(total=1, desc=f"HDBSCAN clustering (GPU) - {len(embeddings)} items", disable=not config.verbose) as pbar:
-                    cluster_labels_gpu = clusterer.fit_predict(embeddings_gpu)
-                    pbar.update(1)
-                # Convert back to numpy
-                cluster_labels = cp.asnumpy(cluster_labels_gpu).astype(int)
+                    try:
+                        cluster_labels_gpu = clusterer.fit_predict(embeddings_gpu)
+                        pbar.update(1)
+                        # Convert back to numpy
+                        cluster_labels = cp.asnumpy(cluster_labels_gpu).astype(int)
+                    except ValueError as e:
+                        if "Min cluster size must be greater than one" in str(e):
+                            if config.verbose:
+                                logger.warning(
+                                    f"HDBSCAN error: {e}. Dataset too small for clustering. "
+                                    f"Assigning all items to outliers (-1)."
+                                )
+                            cluster_labels = np.full(n_points, -1, dtype=int)
+                            clusterer = None
+                        else:
+                            raise
             except ImportError as e:
                 clusterer = hdbscan.HDBSCAN(
                     min_cluster_size=effective_min_cluster_size,
@@ -432,8 +454,20 @@ def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.Dat
                     cluster_selection_epsilon=config.cluster_selection_epsilon
                 )
                 with tqdm(total=1, desc=f"HDBSCAN clustering (CPU) - {len(embeddings)} items", disable=not config.verbose) as pbar:
-                    cluster_labels = clusterer.fit_predict(embeddings)
-                    pbar.update(1)
+                    try:
+                        cluster_labels = clusterer.fit_predict(embeddings)
+                        pbar.update(1)
+                    except ValueError as e:
+                        if "Min cluster size must be greater than one" in str(e):
+                            if config.verbose:
+                                logger.warning(
+                                    f"HDBSCAN error: {e}. Dataset too small for clustering. "
+                                    f"Assigning all items to outliers (-1)."
+                                )
+                            cluster_labels = np.full(n_points, -1, dtype=int)
+                            clusterer = None
+                        else:
+                            raise
         else:
             clusterer = hdbscan.HDBSCAN(
                 min_cluster_size=effective_min_cluster_size,
@@ -445,9 +479,33 @@ def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.Dat
                 core_dist_n_jobs=-1,
                 cluster_selection_epsilon=config.cluster_selection_epsilon
             )
-            with tqdm(total=1, desc=f"HDBSCAN clustering (CPU) - {len(embeddings)} items", disable=not config.verbose) as pbar:
-                cluster_labels = clusterer.fit_predict(embeddings)
-                pbar.update(1)
+            # Run CPU-intensive HDBSCAN in thread pool to avoid blocking event loop
+            if config.verbose:
+                logger.info(f"HDBSCAN clustering (CPU) - {len(embeddings)} items...")
+            
+            def _run_hdbscan():
+                try:
+                    return clusterer.fit_predict(embeddings), False
+                except ValueError as e:
+                    if "Min cluster size must be greater than one" in str(e):
+                        # Return all outliers if clustering fails, along with error flag
+                        return np.full(n_points, -1, dtype=int), True
+                    else:
+                        raise
+            
+            cluster_labels, error_occurred = await asyncio.to_thread(_run_hdbscan)
+            
+            # If an error occurred, set clusterer to None
+            if error_occurred:
+                if config.verbose:
+                    logger.warning(
+                        f"HDBSCAN error: Min cluster size must be greater than one. "
+                        f"Dataset too small for clustering. Assigning all items to outliers (-1)."
+                    )
+                clusterer = None
+            
+            if config.verbose:
+                logger.info("HDBSCAN clustering complete")
 
     if config.verbose:
         n_initial_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
@@ -513,7 +571,7 @@ def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.Dat
         )
         
         # Assign outlier items to outlier clusters
-        outlier_assignments = assign_fine_to_coarse(
+        outlier_assignments = await assign_fine_to_coarse(
             outlier_items,
             outlier_cluster_names,
             model=config.cluster_assignment_model,
@@ -590,7 +648,7 @@ def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.Dat
         )
 
         # Assign fine labels to deduplicated labels
-        fine_to_dedupe = assign_fine_to_coarse(
+        fine_to_dedupe = await assign_fine_to_coarse(
             cluster_names,
             deduped_names,
             model=config.cluster_assignment_model,

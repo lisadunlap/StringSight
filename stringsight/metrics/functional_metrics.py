@@ -274,17 +274,45 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         if not data.clusters:
             return pd.DataFrame()
 
-        properties = pd.DataFrame([cluster.to_dict() for cluster in data.clusters])
-        
-        # Explode property_descriptions and question_ids
-        properties = properties.explode(["property_descriptions", "question_ids"])
-        properties = properties.drop_duplicates(subset=["property_descriptions", "question_ids"])
-        properties = properties.dropna(subset=["property_descriptions", "question_ids"])
-        properties.rename(
-            {"question_ids": "question_id", "property_descriptions": "property_description"},
-            axis=1,
-            inplace=True
-        )
+        # Create a property_id -> Property object lookup
+        property_lookup = {prop.id: prop for prop in data.properties}
+
+        # Build properties dataframe from clusters, preserving model info via property lookups
+        cluster_rows = []
+        for cluster in data.clusters:
+            for prop_id, prop_desc, question_id in zip(
+                cluster.property_ids,
+                cluster.property_descriptions,
+                cluster.question_ids
+            ):
+                # Look up the full property object to get model info
+                prop = property_lookup.get(prop_id)
+                if prop:
+                    cluster_rows.append({
+                        "property_id": prop_id,
+                        "property_description": prop_desc,
+                        "question_id": question_id,
+                        "model": prop.model,  # ← Preserve model info!
+                        "cluster": cluster.label,
+                        "cluster_metadata": cluster.meta,
+                    })
+                else:
+                    # Fallback if property not found (shouldn't happen)
+                    cluster_rows.append({
+                        "property_id": prop_id,
+                        "property_description": prop_desc,
+                        "question_id": question_id,
+                        "model": "unknown",
+                        "cluster": cluster.label,
+                        "cluster_metadata": cluster.meta,
+                    })
+
+        properties = pd.DataFrame(cluster_rows)
+        if properties.empty:
+            return pd.DataFrame()
+
+        properties = properties.drop_duplicates(subset=["property_description", "question_id", "model"])
+        properties = properties.dropna(subset=["property_description", "question_id"])
 
         # Extract conversations data
         conversations = pd.DataFrame([
@@ -297,10 +325,11 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
             for conv in data.conversations
         ])
 
-        # Join conversations with properties
-        properties = properties.merge(conversations, on="question_id", how="left")
+        # Join conversations with properties on BOTH question_id and model
+        # This ensures correct matching when same question_id has multiple models
+        properties = properties.merge(conversations, on=["question_id", "model"], how="left")
         properties.rename(
-            {"conversation_meta": "conversation_metadata", "label": "cluster", "meta": "cluster_metadata", "question_id": "conversation_id"},
+            {"conversation_meta": "conversation_metadata", "question_id": "conversation_id"},
             axis=1,
             inplace=True
         )

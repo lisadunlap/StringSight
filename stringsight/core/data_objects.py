@@ -277,8 +277,10 @@ class PropertyDataset:
                 if winner is not None:
                     meta_with_winner['winner'] = winner
                 
+                # Use question_id column if present and not None, else fall back to row index
+                qid = row.get('question_id') if row.get('question_id') is not None else idx
                 conversation = ConversationRecord(
-                    question_id=str(idx),  # Auto-generate as row index
+                    question_id=str(qid),
                     prompt=prompt,
                     model=[row.get('model_a', 'model_a'), row.get('model_b', 'model_b')],
                     responses=[oai_response_a, oai_response_b],
@@ -343,8 +345,10 @@ class PropertyDataset:
                 scores = parse_single_score_field(row.get('score'))
                 prompt = str(row.get('prompt', row.get('user_prompt', '')))
 
+                # Use question_id column if present and not None, else fall back to row index
+                qid = row.get('question_id') if row.get('question_id') is not None else idx
                 conversation = ConversationRecord(
-                    question_id=str(idx),  # Auto-generate as row index
+                    question_id=str(qid),
                     prompt=prompt,
                     model=str(row.get('model', 'model')),
                     responses=oai_response,

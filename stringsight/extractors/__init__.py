@@ -52,30 +52,20 @@ def get_extractor(
         "bedrock/",     # AWS Bedrock
     )
 
-    if lower_name.startswith(litellm_prefixes):
-        from .openai import OpenAIExtractor
-        return OpenAIExtractor(
-            model=model_name,
-            system_prompt=system_prompt,
-            prompt_builder=prompt_builder,
-            temperature=temperature,
-            top_p=top_p,
-            max_tokens=max_tokens,
-            max_workers=max_workers,
-            include_scores_in_prompt=include_scores_in_prompt,
-            **kwargs
-        )
-    else:
-        from .vllm import VLLMExtractor
-        return VLLMExtractor(
-            model=model_name,
-            system_prompt=system_prompt,
-            prompt_builder=prompt_builder,
-            temperature=temperature,
-            top_p=top_p,
-            max_tokens=max_tokens,
-            **kwargs
-        )
+    # All models go through OpenAIExtractor which uses LiteLLM
+    # LiteLLM handles routing to OpenAI, Anthropic, vLLM, etc.
+    from .openai import OpenAIExtractor
+    return OpenAIExtractor(
+        model=model_name,
+        system_prompt=system_prompt,
+        prompt_builder=prompt_builder,
+        temperature=temperature,
+        top_p=top_p,
+        max_tokens=max_tokens,
+        max_workers=max_workers,
+        include_scores_in_prompt=include_scores_in_prompt,
+        **kwargs
+    )
 
 
 # Re-export key classes
