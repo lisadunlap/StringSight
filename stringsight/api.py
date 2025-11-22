@@ -1174,6 +1174,24 @@ async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
         clustered_dataset.save(str(full_dataset_path))
         logger.info(f"✓ Saved full dataset: {full_dataset_path}")
         
+        # Save conversations in proper format (conversation.jsonl)
+        # Convert PropertyDataset to DataFrame and then format conversations
+        try:
+            import pandas as pd
+            # Get the method from the dataset (check if it's side_by_side or single_model)
+            method = "side_by_side" if any(isinstance(conv.model, list) for conv in clustered_dataset.conversations) else "single_model"
+            conv_df = clustered_dataset.to_dataframe(type="base", method=method)
+            # Format conversations using the formatter
+            formatted_conversations = format_conversations(conv_df, method)
+            # Save as JSONL
+            conversation_path = results_dir / "conversation.jsonl"
+            with open(conversation_path, 'w') as f:
+                for conv in formatted_conversations:
+                    f.write(json.dumps(conv, default=str) + '\n')
+            logger.info(f"✓ Saved conversations: {conversation_path}")
+        except Exception as e:
+            logger.warning(f"Failed to save conversation.jsonl: {e}")
+        
         # Save clusters as JSON
         clusters_path = results_dir / "clusters.json"
         with open(clusters_path, 'w') as f:
@@ -1264,7 +1282,7 @@ async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             quality_delta = metrics.get("quality_delta")
             if quality_delta and isinstance(quality_delta, dict):
                 for metric_name, metric_value in quality_delta.items():
-                    row[f"quality_{metric_name}_delta"] = metric_value
+                    row[f"quality_delta_{metric_name}"] = metric_value
             else:
                 logger.debug(f"No quality_delta dict for {model_name}/{cluster_name}: {quality_delta}")
             
@@ -1300,7 +1318,7 @@ async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
         quality_delta = metrics.get("quality_delta")
         if quality_delta and isinstance(quality_delta, dict):
             for metric_name, metric_value in quality_delta.items():
-                row[f"quality_{metric_name}_delta"] = metric_value
+                row[f"quality_delta_{metric_name}"] = metric_value
         
         # Add metadata
         row["metadata"] = metrics.get("metadata", {})
@@ -1366,7 +1384,7 @@ async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             quality_delta = metrics.get("quality_delta")
             if quality_delta and isinstance(quality_delta, dict):
                 for metric_name, metric_value in quality_delta.items():
-                    row[f"quality_{metric_name}_delta"] = metric_value
+                    row[f"quality_delta_{metric_name}"] = metric_value
 
             # Add confidence intervals if they exist
             quality_ci = metrics.get("quality_ci", {})

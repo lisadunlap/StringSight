@@ -37,7 +37,12 @@ from stringsight import explain
 df = pd.DataFrame({
     "prompt": ["What is machine learning?", "Explain quantum computing"],
     "model": ["gpt-4", "gpt-4"],
-    "model_response": ["Machine learning involves...", "Quantum computing uses..."],
+    "model_response": [
+        [{"role": "user", "content": "What is machine learning?"},
+         {"role": "assistant", "content": "Machine learning involves..."}],
+        [{"role": "user", "content": "Explain quantum computing"},
+         {"role": "assistant", "content": "Quantum computing uses..."}]
+    ],
     "score": [{"accuracy": 1, "helpfulness": 4.2}, {"accuracy": 0, "helpfulness": 3.8}]
 })
 

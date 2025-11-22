@@ -67,14 +67,21 @@ Set your API keys (required for running LLM-backed pipelines):
 ```bash
 export OPENAI_API_KEY="your-openai-key"
 export ANTHROPIC_API_KEY="your-anthropic-key" 
-export GOOGLE_API_KEY="your-google-key" 
+export GOOGLE_API_KEY="your-google-key"
 ```
-
-vLLM support coming soon, I promise!
 
 ## Quick Start
 
 For a comprehensive tutorial with detailed explanations, see [starter_notebook.ipynb](starter_notebook.ipynb) or open it directly in [Google Colab](https://colab.research.google.com/drive/1XBQqDqTK6-9wopqRB51j8cPfnTS5Wjqh?usp=drive_link).
+
+### Supported Models
+
+StringSight uses **LiteLLM** under the hood, supporting 100+ LLM providers including:
+- **Cloud APIs**: OpenAI, Anthropic, Google, Cohere, Mistral, etc.
+- **Local models**: vLLM, Ollama, LM Studio, or any OpenAI-compatible server
+- **Custom endpoints**: Azure OpenAI, AWS Bedrock, self-hosted inference
+
+See the [LiteLLM docs](https://docs.litellm.ai/docs/providers) for the full list of supported providers.
 
 ### 1. Extract and Cluster Properties with `explain()`
 
@@ -97,6 +104,7 @@ df = pd.DataFrame({
 
 clustered_df, model_stats = explain(
     df,
+    model_name="gpt-4o-mini",  # Or: "claude-3-5-sonnet", "vllm/llama-2-7b", etc.
     sample_size=100,  # Optional: sample before processing
     output_dir="results/test"
 )

@@ -159,11 +159,21 @@ clustered_df, model_stats = label(
 
 ```python
 df = pd.DataFrame({
-    "prompt": ["What is machine learning?", "Explain quantum computing"], 
+    "prompt": ["What is machine learning?", "Explain quantum computing"],
     "model_a": ["gpt-4", "gpt-4"],
     "model_b": ["claude-3", "claude-3"],
-    "model_a_response": ["ML is a subset of AI...", "Quantum computing uses..."],
-    "model_b_response": ["Machine learning involves...", "QC leverages quantum..."],
+    "model_a_response": [
+        [{"role": "user", "content": "What is machine learning?"},
+         {"role": "assistant", "content": "ML is a subset of AI..."}],
+        [{"role": "user", "content": "Explain quantum computing"},
+         {"role": "assistant", "content": "Quantum computing uses..."}]
+    ],
+    "model_b_response": [
+        [{"role": "user", "content": "What is machine learning?"},
+         {"role": "assistant", "content": "Machine learning involves..."}],
+        [{"role": "user", "content": "Explain quantum computing"},
+         {"role": "assistant", "content": "QC leverages quantum..."}]
+    ],
     "score": [{"winner": "gpt-4", "helpfulness": 4.2}, {"winner": "claude-3", "helpfulness": 3.8}]
 })
 ```
@@ -181,8 +191,13 @@ df = pd.DataFrame({
 ```python
 df = pd.DataFrame({
     "prompt": ["What is machine learning?", "Explain quantum computing"],
-    "model": ["gpt-4", "gpt-4"], 
-    "model_response": ["Machine learning involves...", "QC leverages quantum..."],
+    "model": ["gpt-4", "gpt-4"],
+    "model_response": [
+        [{"role": "user", "content": "What is machine learning?"},
+         {"role": "assistant", "content": "Machine learning involves..."}],
+        [{"role": "user", "content": "Explain quantum computing"},
+         {"role": "assistant", "content": "QC leverages quantum..."}]
+    ],
     "score": [{"accuracy": 1, "helpfulness": 4.2}, {"accuracy": 0, "helpfulness": 3.8}]
 })
 ```
@@ -191,12 +206,14 @@ df = pd.DataFrame({
 
 StringSight supports flexible response formats to accommodate various data sources and conversation structures.
 
+**Recommended**: Use OpenAI conversation format for all model responses. This preserves conversation structure, supports multimodal inputs, and enables better trace visualization.
+
 ### Automatic Format Detection
 
 The system automatically detects and converts response formats:
 
-1. **Simple string responses** → converted to OpenAI conversation format
-2. **OpenAI conversation format** (list of message dictionaries) → used as-is  
+1. **OpenAI conversation format** (list of message dictionaries) → used as-is (recommended)
+2. **Simple string responses** → automatically converted to OpenAI conversation format
 3. **Other types** → converted to strings then processed
 
 ### OpenAI Conversation Format Specification

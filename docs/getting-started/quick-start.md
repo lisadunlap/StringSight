@@ -65,10 +65,13 @@ Your dataframe needs these columns:
 
 **About `question_id`:** This is particularly useful for side-by-side analysis. If you have multiple responses for the same prompt (e.g., from different models), give them the same `question_id`. If not provided, StringSight will use `prompt` alone for pairing.
 
-**`model_response` can be in three formats:**
-1. **String**: Simple text like `"Machine learning is..."`
-2. **OAI conversation format**: List of dicts with `role` and `content`
-3. **Custom format**: Any JSON object (we'll convert it to a string on the backend)
+**`model_response` format (recommended: OpenAI conversation format):**
+1. **OpenAI conversation format** (recommended): List of dicts with `role` and `content`
+   - Example: `[{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]`
+   - Preserves conversation structure and supports multimodal inputs
+   - Enables better trace visualization in the UI
+2. **Simple string**: Plain text like `"Machine learning is..."` (automatically converted)
+3. **Custom format**: Any JSON object (converted to string on backend)
 
 **Pro tip:** Before running the full pipeline, upload your data to [stringsight.com](https://stringsight.com) ("upload file" button) to visualize what your traces look like and preview the behavior extraction. The UI can handle small datasets (~50 traces) but larger datasets should be run locally.
 

@@ -39,12 +39,12 @@ pip install "stringsight[full]"
 
 ```bash
 # Add to your shell profile (.bashrc, .zshrc, etc.)
-# We dafult to OAI but we support any litellm compatable api
+# We use LiteLLM, supporting 100+ providers
 export OPENAI_API_KEY="your-api-key-here"
-... # any other provider keys
+# ... any other provider keys
 ```
 
-vLLM support coming very soon. I promise!
+**Local Models**: StringSight uses LiteLLM, so you can use vLLM, Ollama, or any OpenAI-compatible server. See the [LiteLLM docs](https://docs.litellm.ai/docs/providers) for provider-specific setup. 
 
 ### 4. Verify Installation
 
@@ -130,7 +130,10 @@ import pandas as pd
 df = pd.DataFrame({
     "prompt": ["What is ML?"],
     "model": ["gpt-4"],
-    "model_response": ["Machine learning is..."]
+    "model_response": [
+        [{"role": "user", "content": "What is ML?"},
+         {"role": "assistant", "content": "Machine learning is..."}]
+    ]
 })
 
 # Should run without errors

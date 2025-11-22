@@ -39,9 +39,12 @@ df = pd.DataFrame({
     ],
     "model": ["gpt-4", "gpt-4", "gpt-4"],
     "model_response": [
-        "Machine learning is a subset of AI...",
-        "Quantum computing uses quantum bits...",
-        "In circuits of light, intelligence grows..."
+        [{"role": "user", "content": "What is machine learning?"},
+         {"role": "assistant", "content": "Machine learning is a subset of AI..."}],
+        [{"role": "user", "content": "Explain quantum computing"},
+         {"role": "assistant", "content": "Quantum computing uses quantum bits..."}],
+        [{"role": "user", "content": "Write a poem about AI"},
+         {"role": "assistant", "content": "In circuits of light, intelligence grows..."}]
     ],
     "score": [
         {"accuracy": 1, "helpfulness": 4.5},
@@ -92,14 +95,20 @@ df = pd.DataFrame({
     "model_a": ["gpt-4", "gpt-4", "gpt-4"],
     "model_b": ["claude-3", "claude-3", "claude-3"],
     "model_a_response": [
-        "ML is a subset of AI...",
-        "Quantum computing uses qubits...",
-        "In circuits of light..."
+        [{"role": "user", "content": "What is machine learning?"},
+         {"role": "assistant", "content": "ML is a subset of AI..."}],
+        [{"role": "user", "content": "Explain quantum computing"},
+         {"role": "assistant", "content": "Quantum computing uses qubits..."}],
+        [{"role": "user", "content": "Write a poem about AI"},
+         {"role": "assistant", "content": "In circuits of light..."}]
     ],
     "model_b_response": [
-        "Machine learning involves...",
-        "QC leverages quantum phenomena...",
-        "Silicon dreams awaken..."
+        [{"role": "user", "content": "What is machine learning?"},
+         {"role": "assistant", "content": "Machine learning involves..."}],
+        [{"role": "user", "content": "Explain quantum computing"},
+         {"role": "assistant", "content": "QC leverages quantum phenomena..."}],
+        [{"role": "user", "content": "Write a poem about AI"},
+         {"role": "assistant", "content": "Silicon dreams awaken..."}]
     ],
     "score": [
         {"winner": "model_a", "helpfulness": 4.2},
@@ -144,12 +153,18 @@ df_tidy = pd.DataFrame({
     ],
     "model": ["gpt-4", "claude-3", "gpt-4", "claude-3", "gpt-4", "claude-3"],
     "model_response": [
-        "ML is a subset of AI...",
-        "Machine learning involves...",
-        "Quantum computing uses qubits...",
-        "QC leverages quantum phenomena...",
-        "In circuits of light...",
-        "Silicon dreams awaken..."
+        [{"role": "user", "content": "What is machine learning?"},
+         {"role": "assistant", "content": "ML is a subset of AI..."}],
+        [{"role": "user", "content": "What is machine learning?"},
+         {"role": "assistant", "content": "Machine learning involves..."}],
+        [{"role": "user", "content": "Explain quantum computing"},
+         {"role": "assistant", "content": "Quantum computing uses qubits..."}],
+        [{"role": "user", "content": "Explain quantum computing"},
+         {"role": "assistant", "content": "QC leverages quantum phenomena..."}],
+        [{"role": "user", "content": "Write a poem about AI"},
+         {"role": "assistant", "content": "In circuits of light..."}],
+        [{"role": "user", "content": "Write a poem about AI"},
+         {"role": "assistant", "content": "Silicon dreams awaken..."}]
     ]
 })
 
@@ -184,12 +199,14 @@ clustered_df, model_stats = explain(
 
 ## Response Format
 
+**Recommended Format**: Use OpenAI conversation format for all model responses. This format preserves conversation structure, supports multimodal inputs, and enables better trace visualization in the UI.
+
 ### Automatic Format Detection
 
 StringSight automatically detects and converts response formats:
 
-1. **Simple strings** → Converted to OpenAI conversation format
-2. **OpenAI format** (list of message dicts) → Used as-is
+1. **OpenAI format** (list of message dicts) → Used as-is (recommended)
+2. **Simple strings** → Automatically converted to OpenAI conversation format
 3. **Other types** → Converted to string then processed
 
 ### OpenAI Conversation Format
@@ -340,7 +357,14 @@ from stringsight import explain
 df = pd.DataFrame({
     "prompt": ["What is AI?", "Explain ML", "What is DL?"],
     "model": ["gpt-4", "gpt-4", "gpt-4"],
-    "model_response": ["AI is...", "ML is...", "DL is..."],
+    "model_response": [
+        [{"role": "user", "content": "What is AI?"},
+         {"role": "assistant", "content": "AI is..."}],
+        [{"role": "user", "content": "Explain ML"},
+         {"role": "assistant", "content": "ML is..."}],
+        [{"role": "user", "content": "What is DL?"},
+         {"role": "assistant", "content": "DL is..."}]
+    ],
     "accuracy": [0.9, 0.85, 0.95],           # Separate column
     "helpfulness": [4.2, 4.0, 4.5],          # Separate column
     "clarity": [4.8, 4.5, 4.7]               # Separate column
@@ -364,8 +388,18 @@ df = pd.DataFrame({
     "prompt": ["What is AI?", "Explain ML"],
     "model_a": ["gpt-4", "gpt-4"],
     "model_b": ["claude-3", "claude-3"],
-    "model_a_response": ["AI is...", "ML is..."],
-    "model_b_response": ["AI involves...", "Machine learning..."],
+    "model_a_response": [
+        [{"role": "user", "content": "What is AI?"},
+         {"role": "assistant", "content": "AI is..."}],
+        [{"role": "user", "content": "Explain ML"},
+         {"role": "assistant", "content": "ML is..."}]
+    ],
+    "model_b_response": [
+        [{"role": "user", "content": "What is AI?"},
+         {"role": "assistant", "content": "AI involves..."}],
+        [{"role": "user", "content": "Explain ML"},
+         {"role": "assistant", "content": "Machine learning..."}]
+    ],
     "accuracy_a": [0.9, 0.85],               # Model A accuracy
     "accuracy_b": [0.88, 0.90],              # Model B accuracy
     "helpfulness_a": [4.2, 4.0],             # Model A helpfulness
@@ -389,7 +423,16 @@ When using tidy format with `model_a` and `model_b` parameters, specify the scor
 df = pd.DataFrame({
     "prompt": ["What is AI?", "What is AI?", "Explain ML", "Explain ML"],
     "model": ["gpt-4", "claude-3", "gpt-4", "claude-3"],
-    "model_response": ["AI is...", "AI involves...", "ML is...", "ML involves..."],
+    "model_response": [
+        [{"role": "user", "content": "What is AI?"},
+         {"role": "assistant", "content": "AI is..."}],
+        [{"role": "user", "content": "What is AI?"},
+         {"role": "assistant", "content": "AI involves..."}],
+        [{"role": "user", "content": "Explain ML"},
+         {"role": "assistant", "content": "ML is..."}],
+        [{"role": "user", "content": "Explain ML"},
+         {"role": "assistant", "content": "ML involves..."}]
+    ],
     "accuracy": [0.9, 0.88, 0.85, 0.90],
     "helpfulness": [4.2, 4.3, 4.0, 4.1]
 })
