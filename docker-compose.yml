@@ -48,6 +48,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile # Uses the optimized Dockerfile
+      network: host
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     volumes:
       - ./results:/app/results
       - ./data:/app/data
@@ -75,6 +79,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      network: host
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     volumes:
       - ./results:/app/results
       - ./data:/app/data
