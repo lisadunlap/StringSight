@@ -9,6 +9,7 @@ import time
 from .core.stage import PipelineStage
 from .core.data_objects import PropertyDataset
 from .core.mixins import LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin
+from .storage.adapter import StorageAdapter, get_storage_adapter
 
 
 class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
@@ -19,13 +20,20 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
     handles error recovery, and provides logging and timing information.
     """
     
-    def __init__(self, name: str, stages: List[PipelineStage] = None, **kwargs):
+    def __init__(
+        self,
+        name: str,
+        stages: List[PipelineStage] = None,
+        storage: Optional[StorageAdapter] = None,
+        **kwargs
+    ):
         """
         Initialize a new Pipeline.
-        
+
         Args:
             name: Name of the pipeline
             stages: List of pipeline stages to execute
+            storage: Storage adapter for file I/O (defaults to configured adapter)
             **kwargs: Additional configuration options
         """
         # Set name first, before calling parent __init__ methods that might use it
@@ -38,7 +46,8 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
         # such as compute_metrics_only() to pick up from any point in the
         # pipeline without the caller having to remember to save explicitly.
         self.output_dir = kwargs.get('output_dir')
-        
+        self.storage = storage or get_storage_adapter()
+
         # Now call parent __init__ methods safely
         super().__init__(**kwargs)
         
@@ -128,8 +137,8 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
                 import os
                 import json
 
-                # Ensure the directory exists (mkdir ‑p semantics)
-                Path(self.output_dir).mkdir(parents=True, exist_ok=True)
+                # Ensure the directory exists
+                self.storage.ensure_directory(self.output_dir)
 
                 # File name pattern: full_dataset_after_<idx>_<stage>.json
                 # snapshot_name = (
@@ -139,67 +148,63 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
                 snapshot_path = os.path.join(self.output_dir, snapshot_name)
 
                 # Persist using the JSON format for maximum portability
-                current_data.save(snapshot_path)
+                current_data.save(snapshot_path, storage=self.storage)
 
                 # Also save conversations separately as JSONL
                 conversation_path = os.path.join(self.output_dir, "conversation.jsonl")
-                with open(conversation_path, 'w', encoding='utf-8') as f:
-                    for conv in current_data.conversations:
-                        # Build base conversation dict
-                        conv_dict = {
-                            "question_id": conv.question_id,
-                            "prompt": conv.prompt,
-                        }
+                conv_records = []
+                for conv in current_data.conversations:
+                    # Build base conversation dict
+                    conv_dict = {
+                        "question_id": conv.question_id,
+                        "prompt": conv.prompt,
+                    }
 
-                        # Handle side-by-side vs single model format
-                        if isinstance(conv.model, list):
-                            # Side-by-side format
-                            conv_dict["model_a"] = conv.model[0]
-                            conv_dict["model_b"] = conv.model[1]
-                            conv_dict["model_a_response"] = conv.responses[0]
-                            conv_dict["model_b_response"] = conv.responses[1]
+                    # Handle side-by-side vs single model format
+                    if isinstance(conv.model, list):
+                        # Side-by-side format
+                        conv_dict["model_a"] = conv.model[0]
+                        conv_dict["model_b"] = conv.model[1]
+                        conv_dict["model_a_response"] = conv.responses[0]
+                        conv_dict["model_b_response"] = conv.responses[1]
 
-                            # Convert scores list to score_a/score_b
-                            if isinstance(conv.scores, list) and len(conv.scores) == 2:
-                                conv_dict["score_a"] = conv.scores[0]
-                                conv_dict["score_b"] = conv.scores[1]
-                            else:
-                                conv_dict["score_a"] = {}
-                                conv_dict["score_b"] = {}
-
-                            # Add meta fields (includes winner)
-                            conv_dict.update(conv.meta)
+                        # Convert scores list to score_a/score_b
+                        if isinstance(conv.scores, list) and len(conv.scores) == 2:
+                            conv_dict["score_a"] = conv.scores[0]
+                            conv_dict["score_b"] = conv.scores[1]
                         else:
-                            # Single model format
-                            conv_dict["model"] = conv.model
-                            conv_dict["model_response"] = conv.responses
-                            conv_dict["score"] = conv.scores
+                            conv_dict["score_a"] = {}
+                            conv_dict["score_b"] = {}
 
-                            # Add meta fields
-                            conv_dict.update(conv.meta)
+                        # Add meta fields (includes winner)
+                        conv_dict.update(conv.meta)
+                    else:
+                        # Single model format
+                        conv_dict["model"] = conv.model
+                        conv_dict["model_response"] = conv.responses
+                        conv_dict["score"] = conv.scores
 
-                        # Make JSON-safe and write
-                        conv_dict = current_data._json_safe(conv_dict)
-                        json.dump(conv_dict, f, ensure_ascii=False)
-                        f.write('\n')
+                        # Add meta fields
+                        conv_dict.update(conv.meta)
+
+                    # Make JSON-safe and add to records
+                    conv_dict = current_data._json_safe(conv_dict)
+                    conv_records.append(conv_dict)
+
+                # Write all conversations at once
+                self.storage.write_jsonl(conversation_path, conv_records)
 
                 # Save properties separately as JSONL
                 if current_data.properties:
                     properties_path = os.path.join(self.output_dir, "properties.jsonl")
-                    with open(properties_path, 'w', encoding='utf-8') as f:
-                        for prop in current_data.properties:
-                            prop_dict = current_data._json_safe(prop.to_dict())
-                            json.dump(prop_dict, f, ensure_ascii=False)
-                            f.write('\n')
+                    prop_records = [current_data._json_safe(prop.to_dict()) for prop in current_data.properties]
+                    self.storage.write_jsonl(properties_path, prop_records)
 
                 # Save clusters separately as JSONL
                 if current_data.clusters:
                     clusters_path = os.path.join(self.output_dir, "clusters.jsonl")
-                    with open(clusters_path, 'w', encoding='utf-8') as f:
-                        for cluster in current_data.clusters:
-                            cluster_dict = current_data._json_safe(cluster.to_dict())
-                            json.dump(cluster_dict, f, ensure_ascii=False)
-                            f.write('\n')
+                    cluster_records = [current_data._json_safe(cluster.to_dict()) for cluster in current_data.clusters]
+                    self.storage.write_jsonl(clusters_path, cluster_records)
 
                 if getattr(self, "verbose", False):
                     print(f"   • Saved dataset snapshot: {snapshot_path}")

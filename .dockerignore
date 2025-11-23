@@ -1,0 +1,45 @@
+# Large data directories
+results/
+data/
+wandb/
+*.egg-info/
+dist/
+build/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints
+notebooks/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+venv/
+env/
+
+# Documentation build
+site/
+
+# Misc
+*.log
+.DS_Store

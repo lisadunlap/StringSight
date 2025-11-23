@@ -11,6 +11,7 @@ from typing import Optional, List
 from ..core.stage import PipelineStage
 from ..core.data_objects import PropertyDataset, Property
 from ..core.mixins import LoggingMixin
+from ..storage.adapter import StorageAdapter, get_storage_adapter
 
 
 class PropertyValidator(LoggingMixin, PipelineStage):
@@ -21,10 +22,16 @@ class PropertyValidator(LoggingMixin, PipelineStage):
     any properties that don't meet quality criteria.
     """
     
-    def __init__(self, output_dir: Optional[str] = None, **kwargs):
+    def __init__(
+        self,
+        output_dir: Optional[str] = None,
+        storage: Optional[StorageAdapter] = None,
+        **kwargs
+    ):
         """Initialize the property validator."""
         super().__init__(**kwargs)
-        self.output_dir = Path(output_dir) if output_dir else None
+        self.output_dir = output_dir
+        self.storage = storage or get_storage_adapter()
         
     def run(self, data: PropertyDataset) -> PropertyDataset:
         """
@@ -76,25 +83,24 @@ class PropertyValidator(LoggingMixin, PipelineStage):
     def _save_stage_results(self, data: PropertyDataset, valid_properties: List[Property], invalid_properties: List[Property]):
         """Save validation results to the specified output directory."""
         # Create output directory if it doesn't exist
-        from pathlib import Path
-        output_path = Path(self.output_dir) if isinstance(self.output_dir, str) else self.output_dir
-        output_path.mkdir(parents=True, exist_ok=True)
-        
+        output_path = self.output_dir
+        self.storage.ensure_directory(output_path)
+
         self.log(f"✅ Auto-saving validation results to: {output_path}")
-        
+
         # 1. Save validated properties as JSONL
-        valid_df = pd.DataFrame([prop.to_dict() for prop in valid_properties])
-        valid_path = output_path / "validated_properties.jsonl"
-        valid_df.to_json(valid_path, orient="records", lines=True)
+        valid_records = [prop.to_dict() for prop in valid_properties]
+        valid_path = f"{output_path}/validated_properties.jsonl"
+        self.storage.write_jsonl(valid_path, valid_records)
         self.log(f"  • Validated properties: {valid_path}")
-        
+
         # 2. Save invalid properties as JSONL (for debugging)
         if invalid_properties:
-            invalid_df = pd.DataFrame([prop.to_dict() for prop in invalid_properties])
-            invalid_path = output_path / "invalid_properties.jsonl"
-            invalid_df.to_json(invalid_path, orient="records", lines=True)
+            invalid_records = [prop.to_dict() for prop in invalid_properties]
+            invalid_path = f"{output_path}/invalid_properties.jsonl"
+            self.storage.write_jsonl(invalid_path, invalid_records)
             self.log(f"  • Invalid properties: {invalid_path}")
-        
+
         # 3. Save validation statistics
         stats = {
             "total_input_properties": len(data.properties),
@@ -102,10 +108,9 @@ class PropertyValidator(LoggingMixin, PipelineStage):
             "total_invalid_properties": len(invalid_properties),
             "validation_success_rate": len(valid_properties) / len(data.properties) if data.properties else 0,
         }
-        
-        stats_path = output_path / "validation_stats.json"
-        with open(stats_path, 'w') as f:
-            json.dump(stats, f, indent=2)
+
+        stats_path = f"{output_path}/validation_stats.json"
+        self.storage.write_json(stats_path, stats)
         self.log(f"  • Validation stats: {stats_path}")
     
     def _is_valid_property(self, prop: Property) -> bool:

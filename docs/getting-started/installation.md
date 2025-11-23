@@ -104,6 +104,48 @@ npm run dev
 # Open browser to http://localhost:5173
 ```
 
+## Docker Setup (Optional)
+
+For multi-user deployments or to run StringSight with all infrastructure dependencies (PostgreSQL, Redis, MinIO), use Docker Compose.
+
+### Basic Usage (Production)
+
+```bash
+# Clone the repository
+git clone https://github.com/lisabdunlap/stringsight.git
+cd stringsight
+
+# Copy the environment template and add your API key
+cp .env.example .env
+# Edit .env and add your OPENAI_API_KEY
+
+# Start all services (API, workers, database, Redis, MinIO)
+docker compose up
+
+# The API will be available at http://localhost:8000
+```
+
+This runs the complete stack with persistent storage for database and object storage.
+
+### Docker Development
+
+For active development where you want code changes to reflect immediately:
+
+```bash
+# Option 1: Use the dev compose file explicitly
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+# Option 2: Copy to override file (auto-loaded by docker compose)
+cp docker-compose.dev.yml docker-compose.override.yml
+docker compose up
+```
+
+The development setup mounts your local code into the containers, so changes to Python files will automatically reload the API (thanks to `uvicorn --reload`).
+
+**Note for Mac/Windows users:** Volume mounts can have slower I/O performance on non-Linux systems. If you experience performance issues, you can either:
+- Use the basic setup (rebuild containers when you make changes)
+- Run the API locally: `pip install -e . && uvicorn stringsight.api:app --reload`
+
 ## Verify Full Setup
 
 ### Backend API Test

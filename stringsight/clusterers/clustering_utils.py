@@ -204,7 +204,7 @@ def _get_embeddings(texts: List[str], embedding_model: str, verbose: bool = Fals
     """
 
     # Treat OpenAI models either as "openai" keyword or provider-prefixed names
-    if embedding_model == "openai" or str(embedding_model).startswith("openai/") or embedding_model in {"text-embedding-3-large", "text-embedding-3-small", "e3-large", "e3-small"}:
+    if embedding_model == "openai" or str(embedding_model).startswith("openai/") or embedding_model in {"text-embedding-3-large", "text-embedding-3-large", "e3-large", "e3-small"}:
         return _get_openai_embeddings(texts, model=_normalize_embedding_model_name(embedding_model))
 
     # Lazy import of sentence-transformers (optional dependency)
@@ -549,7 +549,7 @@ def _setup_embeddings(texts, embedding_model, verbose=False, use_gpu=False):
     Returns:
         Tuple of (embeddings array or None, model or None)
     """
-    if embedding_model == "openai" or str(embedding_model).startswith("openai/") or embedding_model in {"text-embedding-3-large", "text-embedding-3-small", "e3-large", "e3-small"}:
+    if embedding_model == "openai" or str(embedding_model).startswith("openai/") or embedding_model in {"text-embedding-3-large", "text-embedding-3-large", "e3-large", "e3-small"}:
         if verbose:
             logger.info("Using OpenAI embeddings (with disk caching)...")
         embeddings = _get_openai_embeddings(texts, model=_normalize_embedding_model_name(embedding_model))

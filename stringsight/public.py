@@ -187,7 +187,7 @@ async def explain_async(
     include_scores_in_prompt: bool = False,
     clusterer: Union[str, "PipelineStage"] = "hdbscan",
     min_cluster_size: int | None = 5,
-    embedding_model: str = "text-embedding-3-small",
+    embedding_model: str = "text-embedding-3-large",
     prettify_labels: bool = False,
     assign_outliers: bool = False,
     summary_model: str = "gpt-4.1",
@@ -460,7 +460,7 @@ def explain(
     # Clustering parameters  
     clusterer: Union[str, "PipelineStage"] = "hdbscan",
     min_cluster_size: int | None = 5,
-    embedding_model: str = "text-embedding-3-small",
+    embedding_model: str = "text-embedding-3-large",
     prettify_labels: bool = False,
     assign_outliers: bool = False,
     summary_model: str = "gpt-4.1",

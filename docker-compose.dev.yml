@@ -1,0 +1,31 @@
+# Development configuration with volume mounts for live code reloading
+# Usage:
+#   Option 1: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+#   Option 2: cp docker-compose.dev.yml docker-compose.override.yml && docker-compose up
+
+version: '3.8'
+
+services:
+  api:
+    volumes:
+      # Mount source code for live reload
+      - .:/app
+      # Exclude Python bytecode and build artifacts to avoid permission issues
+      - /app/__pycache__
+      - /app/.pytest_cache
+      - /app/*.egg-info
+    # Match host user to avoid permission issues (Linux/Mac)
+    # For Windows, you may want to comment this out
+    user: "${UID:-1000}:${GID:-1000}"
+
+  worker:
+    volumes:
+      # Mount source code for live reload
+      - .:/app
+      # Exclude Python bytecode and build artifacts
+      - /app/__pycache__
+      - /app/.pytest_cache
+      - /app/*.egg-info
+    # Match host user to avoid permission issues (Linux/Mac)
+    # For Windows, you may want to comment this out
+    user: "${UID:-1000}:${GID:-1000}"

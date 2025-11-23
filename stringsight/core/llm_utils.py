@@ -113,7 +113,7 @@ def disable_timing_logs():
 @dataclass
 class LLMConfig:
     """Configuration for LLM calls."""
-    model: str = "gpt-4o-mini"
+    model: str = "gpt-4.1-mini"
     max_workers: int = 64
     max_retries: int = 3
     base_sleep_time: float = 2.0
@@ -126,7 +126,7 @@ class LLMConfig:
 @dataclass
 class EmbeddingConfig:
     """Configuration for embedding calls."""
-    model: str = "text-embedding-3-small"
+    model: str = "text-embedding-3-large"
     batch_size: int = 100
     max_workers: int = 64
     max_retries: int = 3
@@ -550,7 +550,7 @@ def get_default_llm_utils() -> LLMUtils:
 # Convenience functions for common use cases
 def parallel_completions(
     messages: List[Union[str, List[Dict[str, Any]]]],
-    model: str = "gpt-4o-mini",
+    model: str = "gpt-4.1-mini",
     system_prompt: Optional[str] = None,
     max_workers: int = 64,
     show_progress: bool = True,
@@ -570,7 +570,7 @@ def parallel_completions(
 
 async def parallel_completions_async(
     messages: List[Union[str, List[Dict[str, Any]]]],
-    model: str = "gpt-4o-mini",
+    model: str = "gpt-4.1-mini",
     system_prompt: Optional[str] = None,
     max_workers: int = 64,
     show_progress: bool = True,
@@ -596,7 +596,7 @@ async def parallel_completions_async(
 
 def parallel_embeddings(
     texts: List[str],
-    model: str = "text-embedding-3-small",
+    model: str = "text-embedding-3-large",
     batch_size: int = 100,
     max_workers: int = 64,
     show_progress: bool = True,
@@ -618,22 +618,22 @@ def parallel_embeddings(
 # -----------------------------
 _OPENAI_EMBED_SYNONYMS = {
     "text-embedding-3-large": "openai/text-embedding-3-large",
-    "text-embedding-3-small": "openai/text-embedding-3-small",
+    "text-embedding-3-large": "openai/text-embedding-3-large",
     "text-embedding-ada-002": "openai/text-embedding-ada-002",
     "openai/text-embedding-3-large": "openai/text-embedding-3-large",
-    "openai/text-embedding-3-small": "openai/text-embedding-3-small",
+    "openai/text-embedding-3-large": "openai/text-embedding-3-large",
     "openai/text-embedding-ada-002": "openai/text-embedding-ada-002",
     "e3-large": "openai/text-embedding-3-large",
-    "e3-small": "openai/text-embedding-3-small",
+    "e3-small": "openai/text-embedding-3-large",
 }
 
 # Known valid OpenAI embedding models
 _VALID_OPENAI_MODELS = {
     "text-embedding-3-large",
-    "text-embedding-3-small", 
+    "text-embedding-3-large", 
     "text-embedding-ada-002",
     "openai/text-embedding-3-large",
-    "openai/text-embedding-3-small",
+    "openai/text-embedding-3-large",
     "openai/text-embedding-ada-002",
     "e3-large",
     "e3-small"
@@ -649,14 +649,14 @@ def _normalize_embedding_model_name(model: str) -> str:
         ValueError: If an invalid OpenAI model name is provided
     """
     if not model:
-        return "openai/text-embedding-3-small"
+        return "openai/text-embedding-3-large"
     m = str(model).strip()
     
     # Handle the common case where someone just specifies "openai"
     if m.lower() == "openai":
         raise ValueError(
             f"Invalid embedding model '{model}'. Please specify a complete model name like:\n"
-            f"  - 'text-embedding-3-small' (recommended)\n"
+            f"  - 'text-embedding-3-large' (recommended)\n"
             f"  - 'text-embedding-3-large'\n" 
             f"  - 'text-embedding-ada-002'\n"
             f"  - or any sentence-transformers model name"
@@ -684,7 +684,7 @@ def _normalize_embedding_model_name(model: str) -> str:
 
 def single_completion(
     message: Union[str, List[Dict[str, Any]]],
-    model: str = "gpt-4o-mini", 
+    model: str = "gpt-4.1-mini", 
     system_prompt: Optional[str] = None,
     **kwargs
 ) -> str:

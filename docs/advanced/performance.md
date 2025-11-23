@@ -12,7 +12,7 @@ from stringsight import explain
 # Cost-effective configuration
 clustered_df, model_stats = explain(
     df,
-    model_name="gpt-4o-mini",              
+    model_name="gpt-4.1-mini",              
     embedding_model="all-MiniLM-L6-v2",     # Free local model
     min_cluster_size=15,                     # Smaller clusters = more clusters
     use_wandb=False                          # Disable W&B logging (default True)
@@ -53,7 +53,7 @@ clustered_df, model_stats = explain(df_sample)
 |-------|----------------------|-------|---------|----------|
 | `gpt-4.1` | $3.50 input / $14.00 output | Slow | Excellent | Production |
 | `gpt-4.1-mini` | $0.70 / $2.80 | Medium | Very Good | Balanced |
-| `gpt-4o-mini` | $0.60 / $1.80 | Fast | Good | Development |
+| `gpt-4.1-mini` | $0.60 / $1.80 | Fast | Good | Development |
 | `gpt-4.1-nano` | $0.20 / $0.80 | Very Fast | Decent | Large-scale |
 
 ### Embedding Models
@@ -61,7 +61,7 @@ clustered_df, model_stats = explain(df_sample)
 | Model | Cost | Speed | Quality |
 |-------|------|-------|---------|
 | `text-embedding-3-large` | $0.13/1M | Medium | Excellent |
-| `text-embedding-3-small` | $0.02/1M | Fast | Very Good |
+| `text-embedding-3-large` | $0.02/1M | Fast | Very Good |
 | `all-MiniLM-L6-v2` | Free | Very Fast | Good |
 | `all-mpnet-base-v2` | Free | Medium | Very Good |
 
@@ -176,7 +176,7 @@ print(f"Estimated cost: ${extraction_cost + embedding_cost:.2f}")
 
 Typical performance on common hardware:
 
-| Dataset Size | GPT-4.1 | GPT-4o-mini | Local Embeddings | Total Time |
+| Dataset Size | GPT-4.1 | gpt-4.1-mini | Local Embeddings | Total Time |
 |--------------|---------|-------------|------------------|------------|
 | 100 convs | 2 min | 1 min | 10 sec | ~3 min |
 | 1,000 convs | 15 min | 8 min | 30 sec | ~16 min |
