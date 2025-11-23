@@ -12,7 +12,7 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U stringsight"]
+      test: [ "CMD-SHELL", "pg_isready -U stringsight" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,7 +22,7 @@ services:
     ports:
       - "6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -39,13 +39,18 @@ services:
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 30s
       timeout: 20s
       retries: 3
 
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile # Uses the optimized Dockerfile
+    volumes:
+      - ./results:/app/results
+      - ./data:/app/data
     ports:
       - "8000:8000"
     env_file:
@@ -67,7 +72,12 @@ services:
     command: uvicorn stringsight.api:app --host 0.0.0.0 --port 8000 --reload
 
   worker:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./results:/app/results
+      - ./data:/app/data
     env_file:
       - .env
     environment:

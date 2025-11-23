@@ -1,3 +1,4 @@
+# Core dependencies
 pandas>=2.0.0
 numpy>=1.19.3,<2.0
 scipy>=1.9.0
@@ -5,40 +6,40 @@ scikit-learn>=1.7.1
 tqdm>=4.65.0
 pydantic>=1.8.0
 litellm>=1.0.0
-# Note: sentence-transformers is optional (only needed for local embedding models)
-# Install with: pip install stringsight[local-embeddings]
-# or: pip install sentence-transformers
-bertopic>=0.17.3
+
+# ML/Clustering dependencies
+# Note: Installing bertopic without sentence-transformers dependency
+# This saves ~6.6GB (PyTorch + NVIDIA CUDA libraries)
+# sentence-transformers is optional - only needed for local embedding models
 hdbscan>=0.8.40
 umap-learn>=0.5.9
-wandb>=0.15.0
-openai>=1.0.0
+llvmlite  # Required by numba/hdbscan
 plotly>=5.15.0
+
+# Install bertopic but skip sentence-transformers
+# Your code already has lazy imports for sentence-transformers
+# Default embedding model is openai/text-embedding-3-large (API-based)
+# bertopic>=0.17.3  <-- REMOVED to install manually with --no-deps
+
+# LLM
+openai>=1.0.0
+
+# Data handling
 pyarrow>=12.0.0
-fastapi>=0.100.0
-uvicorn[standard]>=0.20.0
-python-multipart>=0.0.6
-omegaconf>=2.3.0
-nltk>=3.8.0
-rouge-score>=0.1.2
-markdown>=3.4.0
 lmdb>=1.4.1
 orjson>=3.9.0
 xxhash>=3.4.0
 
-# Visualization dependencies
-matplotlib>=3.7.0
-seaborn>=0.12.0
+# NLP
+nltk>=3.8.0
+rouge-score>=0.1.2
+markdown>=3.4.0
 
-# Documentation dependencies
-mkdocs>=1.5.0
-mkdocs-material>=9.4.0
-mkdocstrings>=0.24.0
-mkdocstrings-python>=1.7.0
-pymdown-extensions>=10.0.0
-
-# Optional ML dependencies (install separately if needed)
-# datasets>=2.14.0
+# API dependencies
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0
+python-multipart>=0.0.6
+omegaconf>=2.3.0
 
 # Multi-User Scaling Dependencies
 sqlalchemy>=2.0.0
