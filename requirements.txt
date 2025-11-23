@@ -15,6 +15,7 @@ hdbscan>=0.8.40
 umap-learn>=0.5.9
 llvmlite  # Required by numba/hdbscan
 plotly>=5.15.0
+wandb>=0.15.0
 
 # Install bertopic but skip sentence-transformers
 # Your code already has lazy imports for sentence-transformers
