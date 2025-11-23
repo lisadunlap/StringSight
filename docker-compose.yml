@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=stringsight
+      - POSTGRES_PASSWORD=stringsight_dev
+      - POSTGRES_DB=stringsight
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stringsight"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://stringsight:stringsight_dev@db:5432/stringsight
+      - REDIS_URL=redis://redis:6379/0
+      - STORAGE_TYPE=s3
+      - S3_ENDPOINT_URL=http://minio:9000
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    command: uvicorn stringsight.api:app --host 0.0.0.0 --port 8000 --reload
+
+  worker:
+    build: .
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://stringsight:stringsight_dev@db:5432/stringsight
+      - REDIS_URL=redis://redis:6379/0
+      - STORAGE_TYPE=s3
+      - S3_ENDPOINT_URL=http://minio:9000
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    command: celery -A stringsight.celery_app worker --loglevel=info
+
+volumes:
+  postgres_data:
+  minio_data:

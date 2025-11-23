@@ -176,7 +176,7 @@ This typically results in a more fine-grained analysis and is recommended when y
 sbs_clustered_df, sbs_model_stats = explain(
     df,
     method="side_by_side",
-    model_a="gpt-4o",
+    model_a="gpt-4.1",
     model_b="claude-sonnet-35",
     model_name="gpt-4.1",
     min_cluster_size=3,
@@ -217,7 +217,7 @@ labeled_df, label_stats = label(
 
 Cost-effective:
 ```python
-explain(df, model_name="gpt-4o-mini", min_cluster_size=5, sample_size=50)
+explain(df, model_name="gpt-4.1-mini", min_cluster_size=5, sample_size=50)
 ```
 
 High-quality:

@@ -175,6 +175,7 @@ import wandb
 from ..core.stage import PipelineStage
 from ..core.mixins import LoggingMixin, TimingMixin
 from ..core.data_objects import PropertyDataset
+from ..storage.adapter import StorageAdapter, get_storage_adapter
 from . import plotting
 
 
@@ -196,6 +197,7 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         bootstrap_samples: int = 100,
         log_to_wandb: bool = True,
         generate_plots: bool = True,
+        storage: Optional[StorageAdapter] = None,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -204,6 +206,7 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         self.bootstrap_samples = bootstrap_samples
         self.log_to_wandb = log_to_wandb
         self.generate_plots = generate_plots
+        self.storage = storage or get_storage_adapter()
 
     def run(self, data: PropertyDataset) -> PropertyDataset:
         """Main entry point for metrics computation."""
@@ -971,21 +974,18 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         model_scores = _json_safe(model_scores)
 
         # Save model-cluster scores
-        model_cluster_path = self.output_dir / "model_cluster_scores.json"
-        with open(model_cluster_path, 'w') as f:
-            json.dump(model_cluster_scores, f, indent=2)
+        model_cluster_path = str(self.output_dir / "model_cluster_scores.json")
+        self.storage.write_json(model_cluster_path, model_cluster_scores)
         self.log(f"📄 Saved model-cluster scores to {model_cluster_path}")
 
         # Save cluster scores
-        cluster_scores_path = self.output_dir / "cluster_scores.json"
-        with open(cluster_scores_path, 'w') as f:
-            json.dump(cluster_scores, f, indent=2)
+        cluster_scores_path = str(self.output_dir / "cluster_scores.json")
+        self.storage.write_json(cluster_scores_path, cluster_scores)
         self.log(f"📄 Saved cluster scores to {cluster_scores_path}")
 
         # Save model scores
-        model_scores_path = self.output_dir / "model_scores.json"
-        with open(model_scores_path, 'w') as f:
-            json.dump(model_scores, f, indent=2)
+        model_scores_path = str(self.output_dir / "model_scores.json")
+        self.storage.write_json(model_scores_path, model_scores)
         self.log(f"📄 Saved model scores to {model_scores_path}")
         
         # Save dataframe versions as JSONL files (previously only saved when wandb was enabled)

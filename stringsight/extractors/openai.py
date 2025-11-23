@@ -45,7 +45,7 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         Initialize the OpenAI extractor.
 
         Args:
-            model: OpenAI model name (e.g., "gpt-4o-mini")
+            model: OpenAI model name (e.g., "gpt-4.1-mini")
             system_prompt: System prompt for property extraction
             prompt_builder: Optional custom prompt builder function
             temperature: Temperature for LLM

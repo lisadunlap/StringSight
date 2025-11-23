@@ -501,7 +501,7 @@ Examples:
             task_description=cfg.get("task_description"),
             clusterer=cfg.get("clusterer", "hdbscan"),
             min_cluster_size=cfg.get("min_cluster_size", 15),
-            embedding_model=cfg.get("embedding_model", "text-embedding-3-small"),
+            embedding_model=cfg.get("embedding_model", "text-embedding-3-large"),
             max_workers=cfg.get("max_workers", 64),
             use_wandb=use_wandb_flag,
             verbose=verbose,

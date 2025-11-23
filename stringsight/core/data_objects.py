@@ -13,6 +13,7 @@ import math
 import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from stringsight.logging_config import get_logger
+from stringsight.storage.adapter import StorageAdapter, get_storage_adapter
 
 logger = get_logger(__name__)
 
@@ -588,7 +589,7 @@ class PropertyDataset:
     # ------------------------------------------------------------------
     # 📝 Persistence helpers
     # ------------------------------------------------------------------
-    def save(self, path: str, format: str = "json") -> None:
+    def save(self, path: str, format: str = "json", storage: Optional[StorageAdapter] = None) -> None:
         """Save the dataset to *path* in either ``json``, ``dataframe``, ``parquet`` or ``pickle`` format.
 
         The JSON variant produces a fully human-readable file while the pickle
@@ -596,19 +597,42 @@ class PropertyDataset:
         """
         import json, pickle, os
 
+        if storage is None:
+            storage = get_storage_adapter()
+
         fmt = format.lower()
-        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+
+        # Ensure parent directory exists
+        parent_dir = os.path.dirname(path)
+        if parent_dir:
+            storage.ensure_directory(parent_dir)
 
         if fmt == "json":
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(self.to_serializable_dict(), f, ensure_ascii=False, indent=2)
+            storage.write_json(path, self.to_serializable_dict())
         elif fmt == "dataframe":
-            self.to_dataframe().to_json(path, orient="records", lines=True)
+            df_content = self.to_dataframe().to_json(orient="records", lines=True)
+            storage.write_text(path, df_content)
         elif fmt == "parquet":
-            self.to_dataframe().to_parquet(path)
+            # Parquet requires special handling - write to temp file then upload
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.parquet') as tmp:
+                tmp_path = tmp.name
+                self.to_dataframe().to_parquet(tmp_path)
+            # Read and write via storage
+            with open(tmp_path, 'rb') as f:
+                content = f.read()
+            storage.write_text(path, content.decode('latin1'))  # Binary as text hack
+            os.unlink(tmp_path)
         elif fmt in {"pkl", "pickle"}:
-            with open(path, "wb") as f:
-                pickle.dump(self, f)
+            # Pickle requires binary - use temp file approach
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.pkl') as tmp:
+                tmp_path = tmp.name
+                pickle.dump(self, tmp)
+            with open(tmp_path, 'rb') as f:
+                content = f.read()
+            storage.write_text(path, content.decode('latin1'))  # Binary as text hack
+            os.unlink(tmp_path)
         else:
             raise ValueError(f"Unsupported format: {format}. Use 'json' or 'pickle'.")
         
@@ -624,52 +648,66 @@ class PropertyDataset:
         return list(models)
 
     @classmethod
-    def load(cls, path: str, format: str = "json") -> "PropertyDataset":
+    def load(cls, path: str, format: str = "json", storage: Optional[StorageAdapter] = None) -> "PropertyDataset":
         """Load a dataset previously saved with :py:meth:`save`."""
-        import json, pickle
+        import json, pickle, io
+
+        if storage is None:
+            storage = get_storage_adapter()
 
         fmt = format.lower()
         logger.info(f"Loading dataset from {path} with format {fmt}")
         if fmt == "json":
             logger.info(f"Loading dataset from {path}")
-            with open(path, "r") as f:
-                data = json.load(f)
+            data = storage.read_json(path)
             logger.debug(f"Data: {data.keys()}")
-            
+
             # Expected format: dictionary with keys like "conversations", "properties", etc.
             conversations = [ConversationRecord(**conv) for conv in data["conversations"]]
             properties = [Property(**prop) for prop in data.get("properties", [])]
-            
+
             # Convert cluster data to Cluster objects
             clusters = [Cluster(**cluster) for cluster in data.get("clusters", [])]
-            
+
             model_stats = data.get("model_stats", {})
             all_models = data.get("all_models", PropertyDataset.get_all_models(conversations))
             return cls(conversations=conversations, properties=properties, clusters=clusters, model_stats=model_stats, all_models=all_models)
         elif fmt == "dataframe":
             # Handle dataframe format - this creates a list of objects when saved
             import pandas as pd
+            content = storage.read_text(path)
             try:
                 # Try to load as JSON Lines first
-                df = pd.read_json(path, orient="records", lines=True)
+                df = pd.read_json(io.StringIO(content), orient="records", lines=True)
             except ValueError:
                 # If that fails, try regular JSON
-                df = pd.read_json(path, orient="records")
-            
+                df = pd.read_json(io.StringIO(content), orient="records")
+
             # Detect method based on columns
             method = "side_by_side" if {"model_a", "model_b"}.issubset(df.columns) else "single_model"
-            
+
             return cls.from_dataframe(df, method=method)
         elif fmt in {"pkl", "pickle"}:
-            with open(path, "rb") as f:
-                obj = pickle.load(f)
+            # Pickle requires binary - read as text then decode
+            import tempfile
+            content_text = storage.read_text(path)
+            content_bytes = content_text.encode('latin1')
+            obj = pickle.loads(content_bytes)
             if not isinstance(obj, cls):
                 raise TypeError("Pickle file does not contain a PropertyDataset object")
             return obj
         elif fmt == "parquet":
             # Load DataFrame and reconstruct minimal PropertyDataset with clusters
-            import pandas as pd
-            df = pd.read_parquet(path)
+            import pandas as pd, tempfile, os
+            # Read parquet via storage
+            content_text = storage.read_text(path)
+            content_bytes = content_text.encode('latin1')
+            # Write to temp file for pandas
+            with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.parquet') as tmp:
+                tmp.write(content_bytes)
+                tmp_path = tmp.name
+            df = pd.read_parquet(tmp_path)
+            os.unlink(tmp_path)
 
             # Attempt to detect method
             method = "side_by_side" if {"model_a", "model_b"}.issubset(df.columns) else "single_model"

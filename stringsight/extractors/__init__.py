@@ -9,7 +9,7 @@ from ..core.stage import PipelineStage
 
 
 def get_extractor(
-    model_name: str = "gpt-4o-mini",
+    model_name: str = "gpt-4.1-mini",
     system_prompt: str = "one_sided_system_prompt",
     prompt_builder: Optional[Callable] = None,
     temperature: float = 0.6,

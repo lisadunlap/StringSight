@@ -48,37 +48,7 @@ logger = get_logger(__name__)
 # -------------------------------------------------------------------------
 # Render persistent disk configuration
 # -------------------------------------------------------------------------
-def _get_persistent_data_dir() -> Path:
-    """Get the base directory for persistent data (results, cache) on Render.
-    
-    If RENDER_DISK_PATH is set, use that as the base for all persistent data.
-    Otherwise, default to the current working directory (local development).
-    """
-    render_disk = os.environ.get("RENDER_DISK_PATH")
-    if render_disk:
-        base = Path(render_disk).resolve()
-        logger.info(f"Using Render persistent disk: {base}")
-        return base
-    return Path.cwd()
-
-def _get_results_dir() -> Path:
-    """Get the results directory, potentially on persistent disk."""
-    base = _get_persistent_data_dir()
-    return base / "results"
-
-def _get_cache_dir() -> Path:
-    """Get the cache directory, potentially on persistent disk."""
-    # Check if RENDER_DISK_PATH is set and STRINGSIGHT_CACHE_DIR is not explicitly set
-    # If so, automatically configure cache to use the persistent disk
-    if os.environ.get("RENDER_DISK_PATH") and not os.environ.get("STRINGSIGHT_CACHE_DIR"):
-        base = _get_persistent_data_dir()
-        cache_dir = base / ".cache" / "stringsight"
-        # Set the environment variable so the Cache class picks it up
-        os.environ["STRINGSIGHT_CACHE_DIR"] = str(cache_dir)
-        logger.info(f"Auto-configured cache directory to use persistent disk: {cache_dir}")
-        return cache_dir
-    # Otherwise, let Cache class handle it using STRINGSIGHT_CACHE_DIR env var or default
-    return Path.cwd() / ".cache" / "stringsight"
+from stringsight.utils.paths import _get_persistent_data_dir, _get_results_dir, _get_cache_dir
 
 # -------------------------------------------------------------------------
 # Simple in-memory cache for parsed JSONL data with TTL
@@ -269,21 +239,7 @@ class ExtractSingleRequest(BaseModel):
     return_debug: Optional[bool] = False
 
 
-class ExtractBatchRequest(BaseModel):
-    rows: List[Dict[str, Any]]
-    method: Optional[Literal["single_model", "side_by_side"]] = None
-    system_prompt: Optional[str] = None
-    task_description: Optional[str] = None
-    model_name: Optional[str] = "gpt-4.1"
-    temperature: Optional[float] = 0.7
-    top_p: Optional[float] = 0.95
-    max_tokens: Optional[int] = 16000
-    max_workers: Optional[int] = 128
-    include_scores_in_prompt: Optional[bool] = False
-    use_wandb: Optional[bool] = False
-    output_dir: Optional[str] = None
-    return_debug: Optional[bool] = False
-    sample_size: Optional[int] = None  # Randomly sample N rows before extraction
+# ExtractBatchRequest moved to schemas.py
 
 
 # -----------------------------
@@ -400,6 +356,12 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
     expose_headers=["*"],  # Expose all headers to frontend
 )
+
+from stringsight.routers.auth import router as auth_router
+from stringsight.routers.jobs import router as jobs_router
+
+app.include_router(auth_router)
+app.include_router(jobs_router)
 
 # Include metrics endpoints (basic file serving)
 @app.get("/metrics/summary/{results_dir}")
@@ -552,7 +514,7 @@ def get_embedding_models() -> Dict[str, Any]:
     """
     models = [
         "openai/text-embedding-3-large",
-        "openai/text-embedding-3-small",
+        "openai/text-embedding-3-large",
         "bge-m3",
         "sentence-transformers/all-MiniLM-L6-v2",
     ]
@@ -2221,7 +2183,7 @@ class TidyRow(BaseModel):
     Fields:
         question_id: Optional stable ID used to pair A/B responses; pairs by prompt when absent.
         prompt: The task text.
-        model: Model name (e.g., 'gpt-4o').
+        model: Model name (e.g., 'gpt-4.1').
         model_response: The model's response; accepts string or OAI/chat-like structure.
         score: Optional dict of metric name → value.
 
@@ -2481,8 +2443,7 @@ _JOBS_LOCK = threading.Lock()
 _JOBS: Dict[str, ExtractJob] = {}
 
 
-class ExtractJobStartRequest(ExtractBatchRequest):
-    pass  # Inherits all fields from ExtractBatchRequest
+from stringsight.schemas import ExtractBatchRequest, ExtractJobStartRequest
 
 
 def _run_extract_job(job: ExtractJob, req: ExtractJobStartRequest):

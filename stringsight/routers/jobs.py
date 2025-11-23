@@ -1,0 +1,139 @@
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from sqlalchemy.orm import Session
+from typing import Dict, Any, Optional
+from uuid import UUID
+import uuid
+
+from stringsight.database import get_db
+from stringsight.models.job import Job
+from stringsight.models.user import User
+from stringsight.routers.auth import get_current_user_optional
+from stringsight.schemas import ExtractJobStartRequest, PipelineJobRequest
+from stringsight.workers.tasks import run_extract_job, run_pipeline_job
+
+router = APIRouter(prefix="/api/v1/jobs", tags=["jobs"])
+
+@router.post("/pipeline")
+def start_pipeline_job(
+    req: PipelineJobRequest,
+    response: Response,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    # Create job record
+    job_id = uuid.uuid4()
+    job = Job(
+        id=job_id,
+        user_id=current_user.id if current_user else None,
+        status="queued",
+        progress=0.0,
+        job_type="pipeline"
+    )
+    db.add(job)
+    db.commit()
+    
+    # Convert request to dict for serialization
+    req_data = req.dict()
+    
+    # Enqueue task
+    run_pipeline_job.delay(str(job_id), req_data)
+    
+    return {"job_id": str(job_id), "status": "queued", "job_type": "pipeline"}
+
+@router.post("/extract")
+def start_extract_job(
+    req: ExtractJobStartRequest,
+    response: Response,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    # Create job record
+    job_id = uuid.uuid4()
+    job = Job(
+        id=job_id,
+        user_id=current_user.id if current_user else None,
+        status="queued",
+        progress=0.0
+    )
+    db.add(job)
+    db.commit()
+    
+    # Convert request to dict for serialization
+    req_data = req.dict()
+    
+    # Enqueue task
+    run_extract_job.delay(str(job_id), req_data)
+    
+    return {"job_id": str(job_id), "status": "queued"}
+
+@router.get("/{job_id}")
+def get_job_status(
+    job_id: UUID,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Check ownership only if user is logged in and job has a user
+    if current_user and job.user_id and job.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this job")
+        
+    return {
+        "id": str(job.id),
+        "status": job.status,
+        "progress": job.progress,
+        "result_path": job.result_path,
+        "error_message": job.error_message,
+        "created_at": job.created_at
+    }
+
+@router.get("/{job_id}/results")
+def get_job_results(
+    job_id: UUID,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    """
+    Fetch the actual results content from the job's result_path.
+    Returns the properties extracted by the job.
+    """
+    import json
+    from pathlib import Path
+    
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Check ownership only if user is logged in and job has a user
+    if current_user and job.user_id and job.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this job")
+    
+    if job.status != "completed":
+        raise HTTPException(status_code=400, detail=f"Job not completed yet. Status: {job.status}")
+    
+    if not job.result_path:
+        raise HTTPException(status_code=404, detail="No results available for this job")
+    
+    # Read the results from the file
+    result_file = Path(job.result_path) / "validated_properties.jsonl"
+    if not result_file.exists():
+        raise HTTPException(status_code=404, detail=f"Results file not found: {result_file}")
+    
+    try:
+        # Read JSONL file
+        properties = []
+        with open(result_file, 'r') as f:
+            for line in f:
+                if line.strip():
+                    properties.append(json.loads(line))
+        
+        return {
+            "properties": properties,
+            "result_path": job.result_path,
+            "count": len(properties)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read results: {str(e)}")
+

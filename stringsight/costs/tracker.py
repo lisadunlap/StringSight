@@ -11,6 +11,7 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 
 from .pricing import estimate_tokens_cost
+from ..storage.adapter import StorageAdapter, get_storage_adapter
 
 
 @dataclass 
@@ -57,9 +58,10 @@ class CostSummary:
 class CostTracker:
     """Tracks API costs throughout pipeline execution."""
     
-    def __init__(self, output_dir: Optional[str] = None):
+    def __init__(self, output_dir: Optional[str] = None, storage: Optional[StorageAdapter] = None):
         self.calls: List[APICall] = []
         self.output_dir = Path(output_dir) if output_dir else None
+        self.storage = storage or get_storage_adapter()
         self.session_start = time.time()
         
     def record_call(
@@ -199,24 +201,22 @@ class CostTracker:
         if filename is None:
             filename = f"cost_tracking_{int(self.session_start)}.json"
         
-        filepath = self.output_dir / filename
-        
+        filepath = str(self.output_dir / filename)
+
         data = {
             "session_start": self.session_start,
             "session_duration": time.time() - self.session_start,
             "summary": self.get_summary().to_dict(),
             "calls": [call.to_dict() for call in self.calls]
         }
-        
-        with open(filepath, 'w') as f:
-            json.dump(data, f, indent=2)
-        
-        return str(filepath)
-    
+
+        self.storage.write_json(filepath, data)
+
+        return filepath
+
     def load_from_file(self, filepath: str) -> None:
         """Load cost tracking data from a JSON file."""
-        with open(filepath, 'r') as f:
-            data = json.load(f)
+        data = self.storage.read_json(filepath)
         
         self.session_start = data.get("session_start", time.time())
         

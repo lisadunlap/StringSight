@@ -140,7 +140,7 @@ df['score'] = df['score'].apply(json.loads)
 **Solutions:**
 ```python
 # Use faster model
-explain(df, model_name="gpt-4o-mini")
+explain(df, model_name="gpt-4.1-mini")
 
 # Increase parallelism
 explain(df, max_workers=32)

@@ -22,7 +22,7 @@ class FixedAxesLabeler(OpenAIExtractor):
         self,
         taxonomy: Dict[str, str],
         *,
-        model: str = "gpt-4o-mini",
+        model: str = "gpt-4.1-mini",
         temperature: float = 0.0,
         top_p: float = 1.0,
         max_tokens: int = 2048,

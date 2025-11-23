@@ -58,7 +58,7 @@ clustered_df, model_stats = explain(
 - `output_dir`: Directory to save results
 
 **Extraction Parameters:**
-- `model_name`: LLM for property extraction (default: `"gpt-4o"`) - This model analyzes responses to find behavioral patterns
+- `model_name`: LLM for property extraction (default: `"gpt-4.1"`) - This model analyzes responses to find behavioral patterns
 - `temperature`: Temperature for LLM calls (default: `0.7`) - Higher values = more creative property extraction
 - `max_workers`: Parallel workers for API calls (default: `16`) - Speed up analysis with concurrent requests
 
@@ -108,7 +108,7 @@ taxonomy = {
 clustered_df, model_stats = label(
     df,
     taxonomy=taxonomy,
-    model_name="gpt-4o-mini",
+    model_name="gpt-4.1-mini",
     output_dir="results/"
 )
 ```
@@ -118,7 +118,7 @@ clustered_df, model_stats = label(
 **Core Parameters:**
 - `df`: Input DataFrame (must be single-model format)
 - `taxonomy`: Dictionary mapping labels to descriptions
-- `model_name`: LLM for classification (default: `"gpt-4o-mini"`)
+- `model_name`: LLM for classification (default: `"gpt-4.1-mini"`)
 - `output_dir`: Directory to save results
 
 **Other Parameters:**
