@@ -28,7 +28,7 @@ import wandb
 import numpy as np
 import litellm  # type: ignore
 # sentence-transformers is optional - imported lazily when needed
-from .clustering_prompts import clustering_systems_prompt, coarse_clustering_systems_prompt, deduplication_clustering_systems_prompt
+from stringsight.prompts.clustering.prompts import clustering_systems_prompt, coarse_clustering_systems_prompt, deduplication_clustering_systems_prompt
 from stringsight.logging_config import get_logger
 
 logger = get_logger(__name__)

@@ -29,6 +29,11 @@ class PipelineJobRequest(BaseModel):
     system_prompt: Optional[str] = None
     task_description: Optional[str] = None
     
+    # Prompt expansion config
+    prompt_expansion: Optional[bool] = False
+    expansion_num_traces: Optional[int] = 5
+    expansion_model: Optional[str] = "gpt-4.1"
+    
     # Clustering config
     clusterer: Optional[str] = "hdbscan"
     min_cluster_size: Optional[int] = 15
@@ -47,6 +52,24 @@ class PipelineJobRequest(BaseModel):
     # Columns
     groupby_column: Optional[str] = "behavior_type"
     assign_outliers: Optional[bool] = False
+    score_columns: Optional[List[str]] = None
+    
+    # Output
+    output_dir: Optional[str] = None
+
+class ClusterParams(BaseModel):
+    minClusterSize: Optional[int] = 5
+    embeddingModel: str = "openai/text-embedding-3-large"
+    groupBy: Optional[str] = "none"  # none | category | behavior_type
+
+class ClusterJobRequest(BaseModel):
+    # Data
+    properties: List[Dict[str, Any]]
+    operationalRows: List[Dict[str, Any]]
+    
+    # Clustering params
+    params: ClusterParams
+    method: Optional[Literal["single_model", "side_by_side"]] = "single_model"
     score_columns: Optional[List[str]] = None
     
     # Output

@@ -4,40 +4,49 @@ Prompts module for StringSight.
 This module contains system prompts and prompt utilities for property extraction.
 """
 
-from .extractor_prompts import (
-    sbs_system_prompt,
-    sbs_system_prompt_custom,
-    single_model_system_prompt,
-    single_model_system_prompt_custom,
-    # Default task descriptions for extractor prompts
-    sbs_default_task_description,
-    single_model_default_task_description,
+# Import from new organized structure
+from .extraction.standard import (
     single_model_system_prompt_custom_revised,
-    sbs_system_prompt_custom_revised,\
+    sbs_system_prompt_custom_revised,
 )
 
-# Import agent-specific prompts for agentic environments
-from .agents import (
-    agent_system_prompt,
-    taubench_comparison_system_prompt,
-    agentic_swe_system_prompt,
-    agentic_tool_focused_prompt,
-    agentic_reasoning_focused_prompt,
-    agentic_reward_hacking_focused_prompt,
-    # Agent custom templates
-    agent_system_prompt_custom,
-    agent_sbs_system_prompt_custom,
-    # Default task descriptions for agent prompts
-    agent_system_prompt_custom_task_description,
-    agent_sbs_system_prompt_custom_task_description,
+from .extraction.agent import (
     agent_system_prompt_custom_revised,
     agent_sbs_system_prompt_custom_revised,
 )
 
+# Import task descriptions
+from .task_descriptions import (
+    sbs_default_task_description,
+    single_model_default_task_description,
+    agent_system_prompt_custom_task_description,
+    agent_sbs_system_prompt_custom_task_description,
+)
+
+# Import clustering prompts
+from .clustering.prompts import (
+    clustering_systems_prompt,
+    deduplication_clustering_systems_prompt,
+    outlier_clustering_systems_prompt,
+    coarse_clustering_systems_prompt,
+)
 
 # Import fixed-axis prompts
 from .fixed_axes import (
     fixed_axis_prompt,
+)
+
+# Import universal prompt system
+from .extraction.universal import (
+    format_universal_prompt,
+    single_model_config,
+    sbs_config,
+    agent_single_model_config,
+    agent_sbs_config,
+    get_single_model_prompt,
+    get_sbs_prompt,
+    get_agent_single_model_prompt,
+    get_agent_sbs_prompt,
 )
 
 # ------------------------------------------------------------------
@@ -46,22 +55,45 @@ from .fixed_axes import (
 
 DEFAULT_PROMPTS = {
     "single_model": {
-        "template": single_model_system_prompt_custom_revised,
+        "config": single_model_config,
         "default_task_description": single_model_default_task_description,
     },
     "side_by_side": {
-        "template": sbs_system_prompt_custom_revised,
+        "config": sbs_config,
         "default_task_description": sbs_default_task_description,
     },
 }
 
 AGENT_PROMPTS = {
     "single_model": {
-        "template": agent_system_prompt_custom_revised,
+        "config": agent_single_model_config,
         "default_task_description": agent_system_prompt_custom_task_description,
     },
     "side_by_side": {
-        "template": agent_sbs_system_prompt_custom_revised,
+        "config": agent_sbs_config,
+        "default_task_description": agent_sbs_system_prompt_custom_task_description,
+    },
+}
+
+# Universal prompt configurations
+UNIVERSAL_PROMPTS = {
+    "single_model": {
+        "config": single_model_config,
+        "default_task_description": single_model_default_task_description,
+    },
+    "side_by_side": {
+        "config": sbs_config,
+        "default_task_description": sbs_default_task_description,
+    },
+}
+
+AGENT_UNIVERSAL_PROMPTS = {
+    "single_model": {
+        "config": agent_single_model_config,
+        "default_task_description": agent_system_prompt_custom_task_description,
+    },
+    "side_by_side": {
+        "config": agent_sbs_config,
         "default_task_description": agent_sbs_system_prompt_custom_task_description,
     },
 }
@@ -69,6 +101,8 @@ AGENT_PROMPTS = {
 PROMPTS = {
     "default": DEFAULT_PROMPTS,
     "agent": AGENT_PROMPTS,
+    "universal": UNIVERSAL_PROMPTS,
+    "agent_universal": AGENT_UNIVERSAL_PROMPTS,
 }
 
 def _format_task_aware(template: str, task_description: str) -> str:
@@ -90,16 +124,25 @@ def get_default_system_prompt(method: str) -> str:
     if method not in ("single_model", "side_by_side"):
         raise ValueError(f"Unknown method: {method}. Supported methods: 'side_by_side', 'single_model'")
     entry = PROMPTS["default"][method]
-    template = entry["template"]
     default_desc = entry["default_task_description"]
+    
+    # Handle config-based prompts (universal)
+    if "config" in entry:
+        return format_universal_prompt(default_desc, entry["config"])
+    
+    # Handle template-based prompts (legacy)
+    template = entry["template"]
     return _format_task_aware(template, default_desc)
 
 
 def get_system_prompt(method: str, system_prompt: str | None = None, task_description: str | None = None) -> str:
     """Resolve and return the final system prompt string.
 
-    Supported values for system_prompt: None, "default", "agent", a prompt name (e.g., "agent_system_prompt"),
-    or a literal prompt string.
+    Supported values for system_prompt: None, "default", "agent", "universal", "agent_universal",
+    a prompt name (e.g., "agent_system_prompt"), or a literal prompt string.
+    
+    When using "universal" or "agent_universal", the universal prompt template is used with
+    the appropriate configuration dictionary.
     """
     if method not in ("single_model", "side_by_side"):
         raise ValueError(f"Unknown method: {method}. Supported methods: 'side_by_side', 'single_model'")
@@ -107,17 +150,29 @@ def get_system_prompt(method: str, system_prompt: str | None = None, task_descri
     # No explicit prompt → use default alias
     if system_prompt is None:
         entry = PROMPTS["default"][method]
-        template = entry["template"]
         default_desc = entry["default_task_description"]
         desc = task_description if task_description is not None else default_desc
+        
+        # Handle config-based prompts (universal)
+        if "config" in entry:
+            return format_universal_prompt(desc, entry["config"])
+        
+        # Handle template-based prompts (legacy)
+        template = entry["template"]
         return _format_task_aware(template, desc)
 
-    # Alias: "default" or "agent"
+    # Alias: "default", "agent", "universal", or "agent_universal"
     if system_prompt in PROMPTS:
         entry = PROMPTS[system_prompt][method]
-        template = entry["template"]
         default_desc = entry["default_task_description"]
         desc = task_description if task_description is not None else default_desc
+        
+        # Handle config-based prompts (universal)
+        if "config" in entry:
+            return format_universal_prompt(desc, entry["config"])
+        
+        # Handle template-based prompts (legacy)
+        template = entry["template"]
         return _format_task_aware(template, desc)
 
     # Try to resolve as a prompt name from the prompts module
@@ -160,14 +215,26 @@ __all__ = [
     "get_default_system_prompt",
     "get_system_prompt",
     "PROMPTS",
-    # Supported prompt templates (limited set)
-    "single_model_system_prompt_custom",
+    # Supported prompt templates (revised only)
     "single_model_system_prompt_custom_revised",
-    "sbs_system_prompt_custom",
     "sbs_system_prompt_custom_revised",
-    "agent_system_prompt_custom",
-    "agent_sbs_system_prompt_custom",
+    "agent_system_prompt_custom_revised",
     "agent_sbs_system_prompt_custom_revised",
+    # Universal prompt system
+    "format_universal_prompt",
+    "get_single_model_prompt",
+    "get_sbs_prompt",
+    "get_agent_single_model_prompt",
+    "get_agent_sbs_prompt",
+    "single_model_config",
+    "sbs_config",
+    "agent_single_model_config",
+    "agent_sbs_config",
     # Fixed-axis prompts
     "fixed_axis_prompt",
+    # Clustering prompts
+    "clustering_systems_prompt",
+    "deduplication_clustering_systems_prompt",
+    "outlier_clustering_systems_prompt",
+    "coarse_clustering_systems_prompt",
 ]

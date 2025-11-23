@@ -799,6 +799,114 @@ async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             )
             conversations.append(conv)
 
+        # NEW: Handle side-by-side specific logic if detected
+        # If method is side_by_side, we need to reconstruct the conversation records to have
+        # model=[model_a, model_b] and scores=[score_a, score_b] for SideBySideMetrics to work
+        
+        # Auto-detect side_by_side if not explicitly set but data looks like it
+        if req.method == "single_model" and req.operationalRows:
+            first_row = req.operationalRows[0]
+            if "model_a" in first_row and "model_b" in first_row:
+                logger.info("🔄 Auto-detected side_by_side method from operationalRows columns")
+                req.method = "side_by_side"
+
+        if req.method == "side_by_side":
+            logger.info("🔄 Reconstructing conversations for side-by-side metrics...")
+            
+            # Group properties by base question_id to identify pairs
+            properties_by_qid = {}
+            for p in properties:
+                if p.question_id not in properties_by_qid:
+                    properties_by_qid[p.question_id] = []
+                properties_by_qid[p.question_id].append(p)
+            
+            sxs_conversations = []
+            
+            # Pre-index operational rows for faster lookup
+            import time
+            t0 = time.time()
+            operational_rows_map = {}
+            for row in req.operationalRows:
+                row_qid = str(row.get("question_id", ""))
+                operational_rows_map[row_qid] = row
+                # Also index by base ID if it's a compound ID (e.g. "48-0" -> "48")
+                if '-' in row_qid:
+                    base_id = row_qid.split('-')[0]
+                    if base_id not in operational_rows_map:
+                         operational_rows_map[base_id] = row
+            
+            logger.info(f"⏱️ Indexed {len(req.operationalRows)} operational rows in {time.time() - t0:.4f}s")
+            t1 = time.time()
+
+            sxs_conversations = []
+            
+            for qid, props in properties_by_qid.items():
+                # Find matching operational row using lookup map
+                matching_row = operational_rows_map.get(qid)
+                
+                # If not found by exact match, try base ID match (if qid has suffix)
+                if not matching_row and '-' in qid:
+                    matching_row = operational_rows_map.get(qid.split('-')[0])
+                
+                if matching_row:
+                    # Extract models
+                    model_a = matching_row.get("model_a")
+                    model_b = matching_row.get("model_b")
+                    
+                    # If models not in row, try to infer from properties
+                    if not model_a or not model_b:
+                        unique_models = list(set(p.model for p in props))
+                        if len(unique_models) >= 2:
+                            model_a = unique_models[0]
+                            model_b = unique_models[1]
+                        else:
+                            # Fallback
+                            model_a = "model_a"
+                            model_b = "model_b"
+                    
+                    # Extract scores
+                    # Check for score_a/score_b columns first
+                    score_a = matching_row.get("score_a", {})
+                    score_b = matching_row.get("score_b", {})
+
+                    # If empty, check if 'scores' or 'score' contains combined info
+                    if not score_a and not score_b:
+                        combined_score = matching_row.get("score") or matching_row.get("scores")
+                        if combined_score:
+                            # Handle list format [score_a, score_b]
+                            if isinstance(combined_score, list) and len(combined_score) == 2:
+                                score_a = combined_score[0] if isinstance(combined_score[0], dict) else {}
+                                score_b = combined_score[1] if isinstance(combined_score[1], dict) else {}
+                            elif isinstance(combined_score, dict):
+                                # If it's a dict, duplicate it for both
+                                score_a = combined_score
+                                score_b = combined_score
+                            else:
+                                score_a = {}
+                                score_b = {}
+                    
+                    # Extract winner to meta
+                    meta = {}
+                    if "winner" in matching_row:
+                        meta["winner"] = matching_row["winner"]
+                    elif "score" in matching_row and isinstance(matching_row["score"], dict) and "winner" in matching_row["score"]:
+                        meta["winner"] = matching_row["score"]["winner"]
+                    
+                    # Create SxS conversation record
+                    conv = ConversationRecord(
+                        question_id=qid,
+                        model=[model_a, model_b],
+                        prompt=matching_row.get("prompt", ""),
+                        responses=[matching_row.get("model_a_response", ""), matching_row.get("model_b_response", "")],
+                        scores=[score_a, score_b],
+                        meta=meta
+                    )
+                    sxs_conversations.append(conv)
+            
+            if sxs_conversations:
+                logger.info(f"✅ Created {len(sxs_conversations)} side-by-side conversation records in {time.time() - t1:.4f}s")
+                conversations = sxs_conversations
+
         logger.info(f"✅ Matched {matches_found}/{len(property_keys)} conversations with operationalRows")
 
         # Enhanced logging for debugging quality metrics
@@ -895,16 +1003,27 @@ async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             "meta": cluster.meta,
         })
     
-    # Compute metrics using FunctionalMetrics (without bootstrap for speed)
+    # Compute metrics using FunctionalMetrics or SideBySideMetrics
     from stringsight.metrics.functional_metrics import FunctionalMetrics
+    from stringsight.metrics.side_by_side import SideBySideMetrics
     
-    # FunctionalMetrics needs PropertyDataset with clusters populated
-    metrics_computer = FunctionalMetrics(
-        output_dir=None,
-        compute_bootstrap=False,  # Disable bootstrap for API speed
-        log_to_wandb=False,
-        generate_plots=False
-    )
+    # Choose metrics computer based on method
+    if req.method == "side_by_side":
+        logger.info("🚀 Using SideBySideMetrics for computation")
+        metrics_computer = SideBySideMetrics(
+            output_dir=None,
+            compute_bootstrap=True,  # Disable bootstrap for API speed
+            log_to_wandb=False,
+            generate_plots=False
+        )
+    else:
+        logger.info("🚀 Using FunctionalMetrics for computation")
+        metrics_computer = FunctionalMetrics(
+            output_dir=None,
+            compute_bootstrap=True,  # Disable bootstrap for API speed
+            log_to_wandb=False,
+            generate_plots=False
+        )
     
     # Debug: Check what's in clustered_dataset before metrics
     logger.info(f"🔍 Before FunctionalMetrics:")

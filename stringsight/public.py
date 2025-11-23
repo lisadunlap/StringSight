@@ -457,6 +457,10 @@ def explain(
     max_tokens: int = 16000,
     max_workers: int = 64,
     include_scores_in_prompt: bool = False,
+    # Prompt expansion parameters
+    prompt_expansion: bool = False,
+    expansion_num_traces: int = 5,
+    expansion_model: str = "gpt-4.1",
     # Clustering parameters  
     clusterer: Union[str, "PipelineStage"] = "hdbscan",
     min_cluster_size: int | None = 5,
@@ -496,6 +500,8 @@ def explain(
         task_description: Optional description of the task; when provided with
             method="single_model" and no explicit system_prompt, a task-aware
             system prompt is constructed from single_model_system_prompt_custom.
+            If prompt_expansion=True, this description will be expanded using
+            example traces before being used in prompts.
         
         # Data preparation
         sample_size: Optional number of rows to sample from the dataset before processing.
@@ -527,6 +533,12 @@ def explain(
         top_p: Top-p for LLM
         max_tokens: Max tokens for LLM
         max_workers: Max parallel workers for API calls
+        
+        # Prompt expansion parameters
+        prompt_expansion: If True, expand task_description using example traces
+            before extraction (default: False)
+        expansion_num_traces: Number of traces to sample for expansion (default: 5)
+        expansion_model: LLM model to use for expansion (default: "gpt-4.1")
         
         # Clustering parameters
         clusterer: Clustering method ("hdbscan", "hdbscan_native") or PipelineStage
@@ -619,6 +631,38 @@ def explain(
         model_b_response_column=model_b_response_column,
         verbose=verbose,
     )
+    
+    # Prompt expansion: if enabled, expand task_description using example traces
+    if prompt_expansion and task_description:
+        from .prompts.expansion.trace_based import expand_task_description
+        from .formatters.traces import format_single_trace_from_row, format_side_by_side_trace_from_row
+        
+        if verbose:
+            logger.info("Expanding task description using example traces...")
+        
+        # Convert dataframe rows to traces
+        traces = []
+        for idx, row in df.iterrows():
+            if method == "single_model":
+                trace = format_single_trace_from_row(row)
+            else:  # side_by_side
+                trace = format_side_by_side_trace_from_row(row)
+            traces.append(trace)
+        
+        # Expand task description
+        expanded_description = expand_task_description(
+            task_description=task_description,
+            traces=traces,
+            model=expansion_model,
+            num_traces=expansion_num_traces,
+        )
+        
+        if verbose:
+            logger.info(f"Original task description length: {len(task_description)}")
+            logger.info(f"Expanded task description length: {len(expanded_description)}")
+        
+        # Use expanded description
+        task_description = expanded_description
     
     # Auto-determine/resolve system prompt with the centralized helper
     system_prompt = get_system_prompt(method, system_prompt, task_description)

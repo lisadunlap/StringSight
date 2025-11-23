@@ -1,3 +1,26 @@
+"""
+Clustering and deduplication prompts.
+
+These prompts are used for clustering extracted properties and deduplicating similar behaviors.
+"""
+
+def get_clustering_prompt_with_context(task_description: str | None = None) -> str:
+    """Get clustering prompt with optional task description context.
+    
+    Args:
+        task_description: Optional task description to provide context.
+    
+    Returns:
+        Clustering prompt string with task context if provided.
+    """
+    base_prompt = """You are an expert machine learning engineer tasked with summarizing LLM response behaviors. Given a list of properties seen in LLM responses that belong to the same cluster, create a clear description (1-3 sentences) that accurately describes most or all properties in the cluster. This should be a specific behavior of a model response, not a category of behaviors. Think: if a user saw this property, would they be able to understand the model behavior and gain valuable insight about the models specific behavior on a task?"""
+    
+    if task_description:
+        context = f"\n\n**Task Context:** The properties in this cluster were extracted from responses to the following task:\n{task_description}\n\nUse this context to ensure your cluster description is relevant and specific to this task."
+        return base_prompt + context
+    
+    return base_prompt
+
 clustering_systems_prompt = f"""You are an expert machine learning engineer tasked with summarizing LLM response behaviors. Given a list of properties seen in LLM responses that belong to the same cluster, create a clear description (1-3 sentences) that accurately describes most or all properties in the cluster. This should be a specific behavior of a model response, not a category of behaviors. Think: if a user saw this property, would they be able to understand the model behavior and gain valuable insight about the models specific behavior on a task?
 
 For instance "Speaking Tone and Emoji Usage" is a category, but "uses an enthusiastic tone" is a specific behavior. Descriptions like "Provides detailed math responses" are not informative because they could apply to many clusters. Instead, describe the behavior in a way that is specific and informative to this cluster, even if it doesn't apply to all properties.
@@ -48,3 +71,4 @@ Focus on creating properties that are:
 - Distinct from each other
 - Broad enough to encompass multiple fine-grained properties
 - Descriptive and meaningful for understanding model behavior"""
+

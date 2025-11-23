@@ -41,7 +41,7 @@ from .clustering_utils import generate_coarse_labels, assign_fine_to_coarse
 from .config import ClusterConfig
 
 # Prompts for LLM clustering
-from .clustering_prompts import coarse_clustering_systems_prompt, deduplication_clustering_systems_prompt, outlier_clustering_systems_prompt
+from stringsight.prompts.clustering.prompts import coarse_clustering_systems_prompt, deduplication_clustering_systems_prompt, outlier_clustering_systems_prompt
 
 # Optional imports (will be checked when needed)
 # sentence-transformers is optional - imported lazily when needed
@@ -263,7 +263,7 @@ def generate_cluster_summaries(cluster_values: Dict[int, List], config: ClusterC
         return cluster_label_map
     
     # Get the system prompt
-    from .clustering_prompts import clustering_systems_prompt
+    from stringsight.prompts.clustering.prompts import clustering_systems_prompt
     
     # Parallel LLM calls!
     summaries = parallel_completions(

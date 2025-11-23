@@ -478,6 +478,63 @@ export EMAIL_PASSWORD="your-app-password"    # Email password or app password
 - Extraction: `"gpt-4.1"`, `"gpt-4.1-mini"`, `"anthropic/claude-3-5-sonnet"`, `"google/gemini-1.5-pro"`
 - Embeddings: `"text-embedding-3-large"`, `"text-embedding-3-large"`, or local models like `"all-MiniLM-L6-v2"`
 
+### Prompt Expansion
+
+Prompt expansion is an optional feature that automatically enhances your task description by analyzing example traces from your dataset. Instead of using a generic or brief task description, expansion generates a comprehensive, task-specific list of behaviors to look for based on actual examples in your data.
+
+**When to Use Prompt Expansion:**
+
+- You have a general task description but want more specific guidance for extraction
+- Your dataset contains domain-specific behaviors that aren't covered by default descriptions
+- You want to improve extraction quality by providing more context about what to look for
+- You're working with a new domain or task type where default descriptions may be insufficient
+
+**How It Works:**
+
+1. You provide a base `task_description` (or use the default)
+2. StringSight randomly samples `expansion_num_traces` traces from your dataset (default: 5)
+3. An LLM analyzes these traces and generates an expanded task description with specific behaviors to look for
+4. The expanded description is used in both extraction and clustering prompts
+
+**Usage:**
+
+```python
+clustered_df, model_stats = explain(
+    df,
+    task_description="The task is summarizing call-center conversations for IT support.",
+    prompt_expansion=True,              # Enable expansion
+    expansion_num_traces=5,            # Number of traces to sample (default: 5)
+    expansion_model="gpt-4.1",         # Model for expansion (default: "gpt-4.1")
+    output_dir="results/"
+)
+```
+
+**Example:**
+
+Without expansion, you might provide:
+```python
+task_description="Analyze model responses for code quality and security issues."
+```
+
+With expansion enabled, StringSight might generate:
+```
+Task: Analyze model responses for code quality and security issues.
+
+Specific behaviors to look for:
+- Code Quality: Does the model suggest insecure coding practices (e.g., SQL injection vulnerabilities, hardcoded credentials, missing input validation)?
+- Security: Does the model identify potential security vulnerabilities in code examples?
+- Best Practices: Does the model recommend following security best practices (e.g., using parameterized queries, proper error handling)?
+- Code Review: Does the model provide constructive feedback on code structure and maintainability?
+...
+```
+
+**Parameters:**
+
+- `prompt_expansion` (bool, default: `False`): Enable/disable prompt expansion
+- `expansion_num_traces` (int, default: `5`): Number of traces to sample for expansion
+- `expansion_model` (str, default: `"gpt-4.1"`): LLM model to use for generating expanded descriptions
+
+**Note:** Prompt expansion adds one additional LLM call before extraction begins. The expanded description is cached and reused throughout the pipeline, so it only adds minimal overhead.
 
 ## CLI Usage
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional
 from uuid import UUID
@@ -8,8 +8,8 @@ from stringsight.database import get_db
 from stringsight.models.job import Job
 from stringsight.models.user import User
 from stringsight.routers.auth import get_current_user_optional
-from stringsight.schemas import ExtractJobStartRequest, PipelineJobRequest
-from stringsight.workers.tasks import run_extract_job, run_pipeline_job
+from stringsight.schemas import ExtractJobStartRequest, PipelineJobRequest, ClusterJobRequest
+from stringsight.workers.tasks import run_extract_job, run_pipeline_job, run_cluster_job, _run_cluster_job_async
 
 router = APIRouter(prefix="/api/v1/jobs", tags=["jobs"])
 
@@ -65,6 +65,37 @@ def start_extract_job(
     run_extract_job.delay(str(job_id), req_data)
     
     return {"job_id": str(job_id), "status": "queued"}
+
+    return {"job_id": str(job_id), "status": "queued"}
+
+@router.post("/cluster")
+def start_cluster_job(
+    req: ClusterJobRequest,
+    response: Response,
+    background_tasks: BackgroundTasks,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    # Create job record
+    job_id = uuid.uuid4()
+    job = Job(
+        id=job_id,
+        user_id=current_user.id if current_user else None,
+        status="queued",
+        progress=0.0,
+        job_type="cluster"
+    )
+    db.add(job)
+    db.commit()
+    
+    # Convert request to dict for serialization
+    req_data = req.dict()
+    
+    # Run in background task (in-process) instead of Celery
+    # This avoids issues with Celery workers not picking up new code
+    background_tasks.add_task(_run_cluster_job_async, str(job_id), req_data)
+    
+    return {"job_id": str(job_id), "status": "queued", "job_type": "cluster"}
 
 @router.get("/{job_id}")
 def get_job_status(

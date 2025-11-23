@@ -49,6 +49,8 @@ clustered_df, model_stats = explain(
 #          4) Provide statistical significance testing
 ```
 
+One this is run, your results will appear in the `results` folder, which you can upload to the UI to visualize!
+
 ### Parameters
 
 **Core Parameters:**
