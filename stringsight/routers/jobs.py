@@ -10,6 +10,7 @@ from stringsight.models.user import User
 from stringsight.routers.auth import get_current_user_optional
 from stringsight.schemas import ExtractJobStartRequest, PipelineJobRequest, ClusterJobRequest
 from stringsight.workers.tasks import run_extract_job, run_pipeline_job, run_cluster_job, _run_cluster_job_async
+from stringsight.storage.adapter import get_storage_adapter
 
 router = APIRouter(prefix="/api/v1/jobs", tags=["jobs"])
 
@@ -146,20 +147,18 @@ def get_job_results(
     
     if not job.result_path:
         raise HTTPException(status_code=404, detail="No results available for this job")
-    
-    # Read the results from the file
-    result_file = Path(job.result_path) / "validated_properties.jsonl"
-    if not result_file.exists():
-        raise HTTPException(status_code=404, detail=f"Results file not found: {result_file}")
-    
+
+    # Read the results from storage (works with both filesystem and S3)
+    storage = get_storage_adapter()
+    result_file_path = f"{job.result_path}/validated_properties.jsonl"
+
+    if not storage.exists(result_file_path):
+        raise HTTPException(status_code=404, detail=f"Results file not found: {result_file_path}")
+
     try:
-        # Read JSONL file
-        properties = []
-        with open(result_file, 'r') as f:
-            for line in f:
-                if line.strip():
-                    properties.append(json.loads(line))
-        
+        # Read JSONL file using storage adapter
+        properties = storage.read_jsonl(result_file_path)
+
         return {
             "properties": properties,
             "result_path": job.result_path,
