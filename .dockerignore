@@ -50,7 +50,7 @@ mkdocs.yml
 # Large demo/test files in root directory
 /arena_*/
 /benchmark/
-/scripts/
+
 /tests/
 /test_*.py
 /*_demo.*

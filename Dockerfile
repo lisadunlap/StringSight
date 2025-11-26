@@ -29,6 +29,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
   libpq5 \
   curl \
+  gosu \
   && rm -rf /var/lib/apt/lists/* \
   && apt-get clean
 
@@ -44,7 +45,12 @@ COPY pyproject.toml .
 
 # Create non-root user
 RUN useradd -m appuser && chown -R appuser:appuser /app
-USER appuser
+
+# Copy entrypoint script
+COPY scripts/docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["docker-entrypoint.sh"]
 
 # Expose port for API
 EXPOSE 8000
