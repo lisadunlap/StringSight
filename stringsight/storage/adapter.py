@@ -4,8 +4,13 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, List, Optional, Union
 import json
-import boto3
-from botocore.exceptions import ClientError
+try:
+    import boto3
+    from botocore.exceptions import ClientError
+except ImportError:
+    boto3 = None
+    class ClientError(Exception):
+        pass
 
 from stringsight.config import settings
 from stringsight.logging_config import get_logger
@@ -137,6 +142,8 @@ class S3Adapter(StorageAdapter):
     """Adapter for S3-compatible object storage."""
     
     def __init__(self):
+        if boto3 is None:
+            raise ImportError("boto3 is required for S3Adapter. Please install it with `pip install boto3`.")
         self.s3 = boto3.client(
             "s3",
             endpoint_url=settings.S3_ENDPOINT_URL,
