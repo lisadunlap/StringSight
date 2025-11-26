@@ -538,7 +538,7 @@ async def llm_match(cluster_names, coarse_cluster_names, max_workers=16, model="
     return fine_to_coarse
 
 def _setup_embeddings(texts, embedding_model, verbose=False, use_gpu=False):
-    """Setup embeddings based on model type. Uses DiskCache-based caching.
+    """Setup embeddings based on model type. Uses LMDB-based caching.
     
     Args:
         texts: List of strings to embed

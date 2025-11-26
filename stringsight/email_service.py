@@ -9,29 +9,45 @@ from pathlib import Path
 import tempfile
 import logging
 
+from stringsight.config import settings
+
 logger = logging.getLogger(__name__)
 
 
-def create_results_zip(results_dir: str) -> str:
+def create_results_zip(results_dir: str, max_size_mb: int = 24) -> str:
     """
-    Create a zip file of the results directory.
+    Create a zip file of the results directory, excluding large redundant files.
 
     Args:
         results_dir: Path to the results directory to zip
+        max_size_mb: Maximum size in MB before warning (default 24MB for Gmail)
 
     Returns:
         Path to the created zip file
     """
     temp_dir = tempfile.gettempdir()
     zip_path = os.path.join(temp_dir, f"{Path(results_dir).name}.zip")
+    
+    # Files to exclude to save space (redundant with jsonl files)
+    exclude_files = {'full_dataset.json', 'full_dataset.parquet'}
+    exclude_extensions = {'.parquet', '.pkl', '.pickle'}
 
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
         for root, dirs, files in os.walk(results_dir):
             for file in files:
+                # Skip excluded files
+                if file in exclude_files or os.path.splitext(file)[1] in exclude_extensions:
+                    continue
+                    
                 file_path = os.path.join(root, file)
                 arcname = os.path.relpath(file_path, os.path.dirname(results_dir))
                 zipf.write(file_path, arcname)
-
+                
+    # Check size
+    size_mb = os.path.getsize(zip_path) / (1024 * 1024)
+    if size_mb > max_size_mb:
+        logger.warning(f"⚠️ Created zip file is {size_mb:.2f}MB, which may exceed email limits ({max_size_mb}MB)")
+        
     return zip_path
 
 
@@ -59,10 +75,10 @@ def send_results_email(
     Returns:
         Dict with 'success' boolean and 'message' string
     """
-    smtp_server = smtp_server or os.getenv('EMAIL_SMTP_SERVER')
-    smtp_port = smtp_port or int(os.getenv('EMAIL_SMTP_PORT', 587))
-    sender_email = sender_email or os.getenv('EMAIL_SENDER')
-    sender_password = sender_password or os.getenv('EMAIL_PASSWORD')
+    smtp_server = smtp_server or settings.EMAIL_SMTP_SERVER
+    smtp_port = smtp_port or settings.EMAIL_SMTP_PORT
+    sender_email = sender_email or settings.EMAIL_SENDER
+    sender_password = sender_password or settings.EMAIL_PASSWORD
 
     if not all([smtp_server, sender_email, sender_password]):
         return {
@@ -82,26 +98,34 @@ def send_results_email(
         msg = MIMEMultipart()
         msg['From'] = sender_email
         msg['To'] = recipient_email
-        msg['Subject'] = f'StringSight Clustering Results - {experiment_name}'
+        msg['Subject'] = f'Your StringSight Clustering Results are Here! - {experiment_name}'
 
         body = f"""
-Hello,
+<html>
+<body>
+<p>Oh hello there!</p>
 
-Your StringSight clustering results for experiment "{experiment_name}" are attached.
+<p>Your StringSight clustering results for experiment "{experiment_name}" are attached, get excited.</p>
 
-The attached zip file contains all clustering outputs including:
-- Cluster definitions (clusters.jsonl)
-- Data properties (properties.jsonl)
-- Cluster scores and metrics
-- Embeddings
+<p>To view results, simply upload the zip file to <a href="https://stringsight.com">stringsight.com</a> (click the 'Load Results' button on the top right of the homepage)</p>
 
-Thank you for using StringSight!
+<p>The attached zip file contains all clustering outputs including:</p>
+<ul>
+<li>Original conversation data (conversations.jsonl)</li>
+<li>Cluster definitions (clusters.jsonl)</li>
+<li>Data properties (properties.jsonl)</li>
+<li>Cluster scores and metrics (scores_df.jsonl files)</li>
+</ul>
 
-Best regards,
-StringSight Team
+<p>Thank you for using StringSight! If you find this tool useful, we take funding in the form of github stars <a href="https://github.com/lisadunlap/StringSight">⭐ github.com/lisadunlap/StringSight</a></p>
+
+<p>Best regards,<br>
+SBF (Some Berkeley Folks)</p>
+</body>
+</html>
 """
 
-        msg.attach(MIMEText(body, 'plain'))
+        msg.attach(MIMEText(body, 'html'))
 
         with open(zip_path, 'rb') as attachment:
             part = MIMEBase('application', 'zip')

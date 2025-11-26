@@ -33,12 +33,13 @@ class PropertyValidator(LoggingMixin, PipelineStage):
         self.output_dir = output_dir
         self.storage = storage or get_storage_adapter()
         
-    def run(self, data: PropertyDataset) -> PropertyDataset:
+    def run(self, data: PropertyDataset, progress_callback=None) -> PropertyDataset:
         """
         Validate and clean properties.
         
         Args:
             data: PropertyDataset with properties to validate
+            progress_callback: Optional callback(completed, total) for progress updates
             
         Returns:
             PropertyDataset with validated properties
@@ -48,7 +49,13 @@ class PropertyValidator(LoggingMixin, PipelineStage):
         
         valid_properties = []
         invalid_properties = []
-        for prop in data.properties:
+        total_props = len(data.properties)
+        for i, prop in enumerate(data.properties):
+            if progress_callback and i % 100 == 0:
+                try:
+                    progress_callback(i / total_props)
+                except Exception:
+                    pass
             is_valid = self._is_valid_property(prop)
             if is_valid:
                 valid_properties.append(prop)

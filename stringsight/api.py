@@ -561,7 +561,7 @@ async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
     This is much more efficient than the full explain() pipeline since it skips
     the expensive LLM property extraction step and works with already-extracted properties.
     
-    Note: Cache is disk-backed (DiskCache) and thread-safe.
+    Note: Cache is disk-backed (LMDB-based) and thread-safe.
     """
     from stringsight.core.data_objects import PropertyDataset, Property, ConversationRecord
     from stringsight.clusterers import get_clusterer
@@ -1763,14 +1763,29 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
     cluster_scores_df.jsonl, model_scores_df.jsonl). If a `full_dataset.json`
     file is present, returns its `conversations`, `properties`, and `clusters`.
 
-    Request path must be within BASE_BROWSE_DIR (default: current working directory).
+    Request path can be:
+    - Relative path from results directory (e.g., "frontend/conversation_...")
+    - Absolute path within BASE_BROWSE_DIR
 
     Implements pagination to reduce initial load time and memory usage:
     - conversations_page/conversations_per_page for conversations pagination
     - properties_page/properties_per_page for properties pagination
     - load_metrics_only flag to skip loading conversations/properties entirely
     """
-    results_dir = _resolve_within_base(req.path)
+    # Try to resolve relative to results directory first (for job.result_path compatibility)
+    path_obj = Path(req.path)
+    if not path_obj.is_absolute():
+        # Try relative to results directory first
+        results_base = _get_results_dir()
+        candidate = (results_base / req.path).resolve()
+        if candidate.exists() and candidate.is_dir():
+            results_dir = candidate
+        else:
+            # Fallback to original behavior (relative to CWD/BASE_BROWSE_DIR)
+            results_dir = _resolve_within_base(req.path)
+    else:
+        results_dir = _resolve_within_base(req.path)
+
     if not results_dir.is_dir():
         raise HTTPException(status_code=400, detail=f"Not a directory: {results_dir}")
 
@@ -1819,6 +1834,25 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
         except Exception as e:
             logger.warning(f"Failed to load properties: {e}")
 
+    # Load clusters from clusters.jsonl or clusters.json
+    # This is critical because if we load conversations/properties from JSONL,
+    # we skip the full_dataset.json block below, so we must load clusters here.
+    clusters_file_jsonl = results_dir / "clusters.jsonl"
+    clusters_file_json = results_dir / "clusters.json"
+    
+    if clusters_file_jsonl.exists():
+        try:
+            clusters = _read_jsonl_as_list(clusters_file_jsonl)
+            logger.info(f"Loaded {len(clusters)} clusters from jsonl")
+        except Exception as e:
+            logger.warning(f"Failed to load clusters from jsonl: {e}")
+    elif clusters_file_json.exists():
+        try:
+            clusters = _read_json_safe(clusters_file_json)
+            logger.info(f"Loaded {len(clusters)} clusters from json")
+        except Exception as e:
+            logger.warning(f"Failed to load clusters from json: {e}")
+
     # Fallback to full_dataset.json only if JSONL files don't exist
     if not conversations and not properties:
         full = results_dir / "full_dataset.json"
@@ -1865,9 +1899,11 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
 
     return {
         "path": str(results_dir),
-        "model_cluster_scores": model_cluster_scores or [],
-        "cluster_scores": cluster_scores or [],
-        "model_scores": model_scores or [],
+        "metrics": {
+            "model_cluster_scores": model_cluster_scores or [],
+            "cluster_scores": cluster_scores or [],
+            "model_scores": model_scores or []
+        },
         "conversations": conversations,
         "properties": properties,
         "clusters": clusters,

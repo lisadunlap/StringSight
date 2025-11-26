@@ -147,68 +147,100 @@ def get_system_prompt(method: str, system_prompt: str | None = None, task_descri
     if method not in ("single_model", "side_by_side"):
         raise ValueError(f"Unknown method: {method}. Supported methods: 'side_by_side', 'single_model'")
 
-    # No explicit prompt → use default alias
-    if system_prompt is None:
-        entry = PROMPTS["default"][method]
-        default_desc = entry["default_task_description"]
-        desc = task_description if task_description is not None else default_desc
-        
-        # Handle config-based prompts (universal)
-        if "config" in entry:
-            return format_universal_prompt(desc, entry["config"])
-        
-        # Handle template-based prompts (legacy)
-        template = entry["template"]
-        return _format_task_aware(template, desc)
+    try:
+        # No explicit prompt → use default alias
+        if system_prompt is None:
+            entry = PROMPTS["default"][method]
+            default_desc = entry.get("default_task_description")
+            if default_desc is None:
+                raise ValueError(f"No default task description found for method '{method}'")
+            desc = task_description if task_description is not None else default_desc
+            
+            # Handle config-based prompts (universal)
+            if "config" in entry:
+                config = entry.get("config")
+                if config is None:
+                    raise ValueError(f"No config found for default prompt with method '{method}'")
+                result = format_universal_prompt(desc, config)
+                if result is None:
+                    raise ValueError(f"format_universal_prompt returned None for method '{method}'")
+                return result
+            
+            # Handle template-based prompts (legacy)
+            template = entry.get("template")
+            if template is None:
+                raise ValueError(f"No template found for default prompt with method '{method}'")
+            return _format_task_aware(template, desc)
 
-    # Alias: "default", "agent", "universal", or "agent_universal"
-    if system_prompt in PROMPTS:
-        entry = PROMPTS[system_prompt][method]
-        default_desc = entry["default_task_description"]
-        desc = task_description if task_description is not None else default_desc
-        
-        # Handle config-based prompts (universal)
-        if "config" in entry:
-            return format_universal_prompt(desc, entry["config"])
-        
-        # Handle template-based prompts (legacy)
-        template = entry["template"]
-        return _format_task_aware(template, desc)
+        # Alias: "default", "agent", "universal", or "agent_universal"
+        if system_prompt in PROMPTS:
+            entry = PROMPTS[system_prompt][method]
+            default_desc = entry.get("default_task_description")
+            if default_desc is None:
+                raise ValueError(f"No default task description found for prompt '{system_prompt}' with method '{method}'")
+            desc = task_description if task_description is not None else default_desc
+            
+            # Handle config-based prompts (universal)
+            if "config" in entry:
+                config = entry.get("config")
+                if config is None:
+                    raise ValueError(f"No config found for prompt '{system_prompt}' with method '{method}'")
+                result = format_universal_prompt(desc, config)
+                if result is None:
+                    raise ValueError(f"format_universal_prompt returned None for prompt '{system_prompt}' with method '{method}'")
+                return result
+            
+            # Handle template-based prompts (legacy)
+            template = entry.get("template")
+            if template is None:
+                raise ValueError(f"No template found for prompt '{system_prompt}' with method '{method}'")
+            return _format_task_aware(template, desc)
 
-    # Try to resolve as a prompt name from the prompts module
-    # This allows names like "agent_system_prompt" to be resolved
-    import sys
-    current_module = sys.modules[__name__]
-    if hasattr(current_module, system_prompt):
-        template = getattr(current_module, system_prompt)
-        # If the template has {task_description}, format it
-        if isinstance(template, str) and "{task_description}" in template:
-            default_desc = PROMPTS["default"][method]["default_task_description"]
+        # Try to resolve as a prompt name from the prompts module
+        # This allows names like "agent_system_prompt" to be resolved
+        import sys
+        current_module = sys.modules[__name__]
+        if hasattr(current_module, system_prompt):
+            template = getattr(current_module, system_prompt)
+            # If the template has {task_description}, format it
+            if isinstance(template, str) and "{task_description}" in template:
+                default_desc = PROMPTS["default"][method].get("default_task_description")
+                if default_desc is None:
+                    raise ValueError(f"No default task description found for method '{method}'")
+                desc = task_description if task_description is not None else default_desc
+                return _format_task_aware(template, desc)
+            # Otherwise return as-is (no task description support)
+            if isinstance(template, str):
+                if task_description is not None:
+                    # Warn that task_description was provided but won't be used
+                    import warnings
+                    warnings.warn(
+                        f"task_description was provided but prompt '{system_prompt}' does not support it. "
+                        "The task_description will be ignored."
+                    )
+                return template
+
+        # Literal string
+        template = system_prompt
+        if "{task_description}" in template:
+            default_desc = PROMPTS["default"][method].get("default_task_description")
+            if default_desc is None:
+                raise ValueError(f"No default task description found for method '{method}'")
             desc = task_description if task_description is not None else default_desc
             return _format_task_aware(template, desc)
-        # Otherwise return as-is (no task description support)
-        if isinstance(template, str):
-            if task_description is not None:
-                # Warn that task_description was provided but won't be used
-                import warnings
-                warnings.warn(
-                    f"task_description was provided but prompt '{system_prompt}' does not support it. "
-                    "The task_description will be ignored."
-                )
-            return template
-
-    # Literal string
-    template = system_prompt
-    if "{task_description}" in template:
-        default_desc = PROMPTS["default"][method]["default_task_description"]
-        desc = task_description if task_description is not None else default_desc
-        return _format_task_aware(template, desc)
-    if task_description is not None:
+        if task_description is not None:
+            raise ValueError(
+                "A task_description was provided, but the given system_prompt string does not "
+                "contain {task_description}. Please include the placeholder or use an alias ('default'|'agent')."
+            )
+        return template
+    except Exception as e:
+        # Add more context to any error
         raise ValueError(
-            "A task_description was provided, but the given system_prompt string does not "
-            "contain {task_description}. Please include the placeholder or use an alias ('default'|'agent')."
-        )
-    return template
+            f"Failed to generate system prompt for method='{method}', "
+            f"system_prompt={system_prompt!r}, task_description={task_description!r}. "
+            f"Error: {str(e)}"
+        ) from e
 
 
 __all__ = [

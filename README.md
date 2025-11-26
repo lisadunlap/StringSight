@@ -453,7 +453,7 @@ clustered_df, model_stats = explain(
 
 ### Caching
 
-StringSight uses an on-disk cache (DiskCache) by default to speed up repeated LLM and embedding calls.
+StringSight uses an on-disk cache (LMDB-based) by default to speed up repeated LLM and embedding calls.
 
 - Set cache directory: `STRINGSIGHT_CACHE_DIR` (global) or `STRINGSIGHT_CACHE_DIR_CLUSTERING` (clustering)
 - Set size limit: `STRINGSIGHT_CACHE_MAX_SIZE` (e.g., `50GB`)

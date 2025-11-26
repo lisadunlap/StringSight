@@ -43,12 +43,13 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
         self.output_dir = output_dir
         self.storage = storage or get_storage_adapter()
         
-    def run(self, data: PropertyDataset) -> PropertyDataset:
+    def run(self, data: PropertyDataset, progress_callback=None) -> PropertyDataset:
         """
         Parse raw LLM responses into Property objects.
         
         Args:
             data: PropertyDataset with properties containing raw LLM responses
+            progress_callback: Optional callback(completed, total) for progress updates
             
         Returns:
             PropertyDataset with parsed and validated properties
@@ -64,7 +65,13 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
         max_consecutive_errors = 10
 
         # Add progress bar for better visibility
+        total_props = len(data.properties)
         for i, prop in enumerate(tqdm(data.properties, desc="Parsing properties", disable=not getattr(self, 'verbose', False))):
+            if progress_callback and i % 10 == 0:
+                try:
+                    progress_callback(i / total_props)
+                except Exception:
+                    pass
             # We only process properties that still have raw_response
             if not prop.raw_response:
                 # Throw an error to help debug the extraction issue

@@ -149,8 +149,20 @@ def get_job_results(
         raise HTTPException(status_code=404, detail="No results available for this job")
 
     # Read the results from storage (works with both filesystem and S3)
+    from stringsight.utils.paths import _get_results_dir
+    from pathlib import Path
+
     storage = get_storage_adapter()
-    result_file_path = f"{job.result_path}/validated_properties.jsonl"
+
+    # Resolve result_path relative to results directory if it's not absolute
+    result_path_obj = Path(job.result_path)
+    if not result_path_obj.is_absolute():
+        results_base = _get_results_dir()
+        full_result_path = results_base / job.result_path
+    else:
+        full_result_path = result_path_obj
+
+    result_file_path = str(full_result_path / "validated_properties.jsonl")
 
     if not storage.exists(result_file_path):
         raise HTTPException(status_code=404, detail=f"Results file not found: {result_file_path}")

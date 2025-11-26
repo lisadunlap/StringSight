@@ -46,7 +46,7 @@ class PipelineJobRequest(BaseModel):
     
     # Execution
     max_workers: Optional[int] = 64
-    use_wandb: Optional[bool] = True
+    use_wandb: Optional[bool] = False
     sample_size: Optional[int] = None
     
     # Columns
@@ -56,6 +56,7 @@ class PipelineJobRequest(BaseModel):
     
     # Output
     output_dir: Optional[str] = None
+    email: Optional[str] = None
 
 class ClusterParams(BaseModel):
     minClusterSize: Optional[int] = 5
@@ -74,3 +75,4 @@ class ClusterJobRequest(BaseModel):
     
     # Output
     output_dir: Optional[str] = None
+    email: Optional[str] = None

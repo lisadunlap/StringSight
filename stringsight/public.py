@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 
 # ==================== Helper for Event Loop Management ====================
 
-def _run_pipeline_smart(pipeline, dataset):
+def _run_pipeline_smart(pipeline, dataset, progress_callback=None):
     """Run pipeline, handling both sync and async contexts automatically."""
     try:
         # Check if we're already in an event loop
@@ -33,7 +33,7 @@ def _run_pipeline_smart(pipeline, dataset):
     except RuntimeError as e:
         if "no running event loop" in str(e).lower():
             # No event loop - safe to use asyncio.run()
-            return asyncio.run(pipeline.run(dataset))
+            return asyncio.run(pipeline.run(dataset, progress_callback=progress_callback))
         else:
             raise
 
@@ -484,6 +484,7 @@ def explain(
     extraction_cache_dir: Optional[str] = None,
     clustering_cache_dir: Optional[str] = None,
     metrics_cache_dir: Optional[str] = None,
+    progress_callback: Optional[Callable[[float], None]] = None,
     **kwargs
 ) -> Tuple[pd.DataFrame, Dict[str, pd.DataFrame]]:
     """
@@ -751,9 +752,11 @@ def explain(
                 },
                 reinit=False  # Don't reinitialize if already exists
             )
-        except ImportError:
-            # wandb not installed or not available
+        except (ImportError, TypeError, Exception) as e:
+            # wandb not installed, has corrupted package metadata, or initialization failed
+            logger.warning(f"Wandb initialization failed: {e}. Disabling wandb tracking.")
             use_wandb = False
+            _os.environ["WANDB_DISABLED"] = "true"
     
     # Use custom pipeline if provided, otherwise build default pipeline
     if custom_pipeline is not None:
@@ -795,7 +798,7 @@ def explain(
         )
     
     # 4️⃣  Execute pipeline
-    result_dataset = _run_pipeline_smart(pipeline, dataset)
+    result_dataset = _run_pipeline_smart(pipeline, dataset, progress_callback=progress_callback)
 
        # Check for 0 properties before attempting to save
     if len([p for p in result_dataset.properties if p.property_description is not None]) == 0:

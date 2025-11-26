@@ -80,12 +80,13 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
         """Remove and return a stage at a specific position."""
         return self.stages.pop(index)
         
-    async def run(self, data: PropertyDataset) -> PropertyDataset:
+    async def run(self, data: PropertyDataset, progress_callback=None) -> PropertyDataset:
         """
         Execute all stages in the pipeline.
         
         Args:
             data: Input PropertyDataset
+            progress_callback: Optional callback(float) -> None to report progress (0.0-1.0)
             
         Returns:
             PropertyDataset after processing through all stages
@@ -112,13 +113,48 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
         current_data = data
         
         for i, stage in enumerate(self.stages):
+            # Report progress at start of stage
+            if progress_callback:
+                # Progress is fraction of stages completed
+                # We can also use i / len(self.stages) + something for intra-stage progress if we had it
+                progress = i / len(self.stages)
+                try:
+                    progress_callback(progress)
+                except Exception as e:
+                    print(f"Warning: progress callback failed: {e}")
+
             stage_start_time = time.time()
             
             # try:
             self.log(f"Running stage {i+1}/{len(self.stages)}: {stage.name}")
             
-            # Execute the stage (__call__ handles both async and sync automatically)
-            current_data = await stage(current_data)
+            # Create a stage-specific progress callback
+            stage_progress_callback = None
+            if progress_callback:
+                def make_callback(stage_idx, total_stages):
+                    def callback(progress_or_completed, total=None):
+                        # Handle both callback(progress) and callback(completed, total) signatures
+                        if total is not None and total > 0:
+                            stage_progress = progress_or_completed / total
+                        else:
+                            stage_progress = progress_or_completed
+                            
+                        # stage_progress is 0.0 to 1.0 within the stage
+                        # overall progress = (stage_idx + stage_progress) / total_stages
+                        # Ensure we don't exceed 1.0 or go backwards (though backwards is possible if stage resets)
+                        if isinstance(stage_progress, (int, float)):
+                            overall = (stage_idx + min(max(stage_progress, 0.0), 1.0)) / total_stages
+                            try:
+                                progress_callback(overall)
+                            except Exception:
+                                pass
+                    return callback
+                
+                stage_progress_callback = make_callback(i, len(self.stages))
+
+            # Pass progress callback to stage
+            # The stage.__call__ method we updated handles checking if the underlying run() accepts it
+            current_data = await stage(current_data, progress_callback=stage_progress_callback)
             
             # Track timing
             stage_execution_time = time.time() - stage_start_time

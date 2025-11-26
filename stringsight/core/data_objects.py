@@ -428,18 +428,27 @@ class PropertyDataset:
             if "model_a" in df.columns and "model_b" in df.columns:
                 # For side-by-side inputs, merge properties by question_id (both models share the question)
                 df = df.merge(prop_df, on=["question_id"], how="left")
+                
+                # Handle id collision (id_x=conversation, id_y=property)
+                if "id_y" in df.columns:
+                    df["property_id"] = df["id_y"]
+                    df["id"] = df["id_y"] # Ensure 'id' is property_id for downstream
+                elif "id" in df.columns and "property_id" not in df.columns:
+                    df["property_id"] = df["id"]
+
                 # Deduplicate by property id when available
-                if "id" in df.columns:
-                    df = df.drop_duplicates(subset="id")
-                    # Alias for clarity: id refers to property id
-                    if "property_id" not in df.columns:
-                        df["property_id"] = df["id"]
+                if "property_id" in df.columns:
+                    df = df.drop_duplicates(subset="property_id")
             else:
                 # CHANGE: Use left join to preserve all conversations, including those without properties
                 # Don't drop duplicates to ensure conversations without properties are preserved
                 df = df.merge(prop_df, on=["question_id", "model"], how="left")
-                # Alias when present
-                if "id" in df.columns and "property_id" not in df.columns:
+                
+                # Handle id collision
+                if "id_y" in df.columns:
+                    df["property_id"] = df["id_y"]
+                    df["id"] = df["id_y"]
+                elif "id" in df.columns and "property_id" not in df.columns:
                     df["property_id"] = df["id"]
             logger.debug(f"len of df after merge with properties {len(df)}")
 
