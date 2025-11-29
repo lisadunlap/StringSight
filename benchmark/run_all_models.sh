@@ -14,7 +14,7 @@ BENCHMARKS=("aci_bench" "instructeval")
 # Configuration parameters (modify as needed)
 SUBSET_SIZE=""  # Leave empty for all data, or set to number like "--subset-size 10"
 MIN_CLUSTER_SIZE="--min-cluster-size 5"
-EMBEDDING_MODEL="--embedding-model text-embedding-3-small"
+EMBEDDING_MODEL="--embedding-model text-embedding-3-large"
 EXTRACTION_MODEL="--extraction-model gpt-4.1-mini"
 JUDGE_MODEL="--judge-model gpt-4.1"
 TOP_K="--top-k 10"  # Evaluate top 10 behaviors per model, or leave empty for all

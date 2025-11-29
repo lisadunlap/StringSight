@@ -76,3 +76,7 @@ class ClusterJobRequest(BaseModel):
     # Output
     output_dir: Optional[str] = None
     email: Optional[str] = None
+
+class DemoEmailRequest(BaseModel):
+    email: str
+    method: Literal["single_model", "side_by_side"]

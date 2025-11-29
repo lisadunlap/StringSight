@@ -8,9 +8,14 @@ from stringsight.database import get_db
 from stringsight.models.job import Job
 from stringsight.models.user import User
 from stringsight.routers.auth import get_current_user_optional
-from stringsight.schemas import ExtractJobStartRequest, PipelineJobRequest, ClusterJobRequest
+from stringsight.schemas import ExtractJobStartRequest, PipelineJobRequest, ClusterJobRequest, DemoEmailRequest
 from stringsight.workers.tasks import run_extract_job, run_pipeline_job, run_cluster_job, _run_cluster_job_async
 from stringsight.storage.adapter import get_storage_adapter
+from stringsight.email_service import send_results_email
+from stringsight.utils.paths import _get_results_dir
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/jobs", tags=["jobs"])
 
@@ -67,8 +72,6 @@ def start_extract_job(
     
     return {"job_id": str(job_id), "status": "queued"}
 
-    return {"job_id": str(job_id), "status": "queued"}
-
 @router.post("/cluster")
 def start_cluster_job(
     req: ClusterJobRequest,
@@ -97,6 +100,40 @@ def start_cluster_job(
     background_tasks.add_task(_run_cluster_job_async, str(job_id), req_data)
     
     return {"job_id": str(job_id), "status": "queued", "job_type": "cluster"}
+
+@router.post("/email-demo")
+def email_demo_results(
+    req: DemoEmailRequest,
+    background_tasks: BackgroundTasks,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Send demo results via email."""
+    # Determine demo directory
+    demo_dir_name = "taubench_airline_data_sbs" if req.method == "side_by_side" else "taubench_airline_data"
+    results_base = _get_results_dir()
+    demo_dir = results_base / demo_dir_name
+    
+    if not demo_dir.exists():
+        raise HTTPException(status_code=404, detail=f"Demo results not found at {demo_dir}")
+        
+    def _send_email_task():
+        try:
+            logger.info(f"Sending demo results email to {req.email}")
+            result = send_results_email(
+                recipient_email=req.email,
+                results_dir=str(demo_dir),
+                experiment_name=f"Demo Data ({req.method})"
+            )
+            if result.get('success'):
+                logger.info(f"✅ Demo email sent successfully: {result.get('message')}")
+            else:
+                logger.warning(f"⚠️ Demo email sending failed: {result.get('message')}")
+        except Exception as e:
+            logger.error(f"Failed to send demo email: {e}")
+
+    background_tasks.add_task(_send_email_task)
+    
+    return {"status": "queued", "message": "Email sending queued"}
 
 @router.get("/{job_id}")
 def get_job_status(
@@ -147,7 +184,7 @@ def get_job_results(
     
     if not job.result_path:
         raise HTTPException(status_code=404, detail="No results available for this job")
-
+ 
     # Read the results from storage (works with both filesystem and S3)
     from stringsight.utils.paths import _get_results_dir
     from pathlib import Path
@@ -178,4 +215,3 @@ def get_job_results(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to read results: {str(e)}")
-
