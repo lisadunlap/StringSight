@@ -229,24 +229,13 @@ def run_pipeline_job(self, job_id: str, req_data: Dict[str, Any]):
         job.result_path = req.output_dir if req.output_dir else f"pipeline_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         db.commit()
         
-        # Send email if requested
+        # Send email if requested (Async)
         if req.email:
-            try:
-                logger.info(f"Sending results email to {req.email}")
-                result = send_results_email(
-                    recipient_email=req.email,
-                    results_dir=output_dir,
-                    experiment_name=f"Pipeline Job {job_id}"
-                )
-                if result.get('success'):
-                    logger.info(f"✅ Email sent successfully: {result.get('message')}")
-                else:
-                    logger.warning(f"⚠️ Email sending failed: {result.get('message')}")
-            except Exception as e:
-                # Log error but don't fail the job
-                logger.error(f"Failed to send email for job {job_id}: {e}")
-                # We could update the job with a warning, but for now just log it
-                # The job is already marked as completed above
+            send_email_task.delay(
+                email=req.email,
+                output_dir=output_dir,
+                job_name=f"Pipeline Job {job_id}"
+            )
         
     except Exception as e:
         logger.error(f"Error in pipeline job {job_id}: {e}", exc_info=True)
@@ -260,6 +249,23 @@ def run_pipeline_job(self, job_id: str, req_data: Dict[str, Any]):
             logger.error(f"Failed to update job error state: {db_e}")
     finally:
         db.close()
+
+@celery_app.task(bind=True, name="stringsight.workers.tasks.send_email_task")
+def send_email_task(self, email: str, output_dir: str, job_name: str):
+    """Async task to send email so it doesn't block the main job."""
+    try:
+        logger.info(f"Sending results email to {email}")
+        result = send_results_email(
+            recipient_email=email,
+            results_dir=output_dir,
+            experiment_name=job_name
+        )
+        if result.get('success'):
+            logger.info(f"✅ Email sent successfully: {result.get('message')}")
+        else:
+            logger.warning(f"⚠️ Email sending failed: {result.get('message')}")
+    except Exception as e:
+        logger.error(f"Failed to send email for {job_name}: {e}")
 
 @celery_app.task(bind=True, name="stringsight.workers.tasks.run_cluster_job")
 def run_cluster_job(self, job_id: str, req_data: Dict[str, Any]):
@@ -573,22 +579,13 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
         }
         db.commit()
         
-        # Send email if requested
+        # Send email if requested (Async)
         if req.email:
-            try:
-                logger.info(f"Sending results email to {req.email}")
-                result = send_results_email(
-                    recipient_email=req.email,
-                    results_dir=str(results_dir),
-                    experiment_name=f"Cluster Job {job_id}"
-                )
-                if result.get('success'):
-                    logger.info(f"✅ Email sent successfully: {result.get('message')}")
-                else:
-                    logger.warning(f"⚠️ Email sending failed: {result.get('message')}")
-            except Exception as e:
-                # Log error but don't fail the job
-                logger.error(f"Failed to send email for job {job_id}: {e}")
+            send_email_task.delay(
+                email=req.email,
+                output_dir=str(results_dir),
+                job_name=f"Cluster Job {job_id}"
+            )
         
         logger.info(f"Cluster job {job_id} completed successfully")
         
