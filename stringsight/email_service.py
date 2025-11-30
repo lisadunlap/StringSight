@@ -98,14 +98,14 @@ def send_results_email(
         msg = MIMEMultipart()
         msg['From'] = sender_email
         msg['To'] = recipient_email
-        msg['Subject'] = f'Your StringSight Clustering Results are Here! - {experiment_name}'
+        msg['Subject'] = f'Your StringSight Clustering Results are Here!'
 
         body = f"""
 <html>
 <body>
-<p>Oh hello there!</p>
+<p>Oh hello there,</p>
 
-<p>Your StringSight clustering results for experiment "{experiment_name}" are attached, get excited.</p>
+<p>Your StringSight clustering results for experiment "{experiment_name}" are attached, get excited! 🎉</p>
 
 <p>To view results, simply upload the zip file to <a href="https://stringsight.com">stringsight.com</a> (click the 'Load Results' button on the top right of the homepage)</p>
 
@@ -120,7 +120,7 @@ def send_results_email(
 <p>Thank you for using StringSight! If you find this tool useful, we take funding in the form of github stars <a href="https://github.com/lisadunlap/StringSight">⭐ github.com/lisadunlap/StringSight</a></p>
 
 <p>Best regards,<br>
-SBF (Some Berkeley Folks)</p>
+Some Berkeley Folks</p>
 </body>
 </html>
 """
