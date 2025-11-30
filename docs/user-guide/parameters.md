@@ -83,10 +83,10 @@ These parameters control how behavioral properties are extracted from model resp
 - **Purpose**: LLM used for extracting behavioral properties
 - **Type**: `str`
 - **Default**: `"gpt-4.1"`
-- **Options**: Any OpenAI model name (`"gpt-4.1"`, `"gpt-4o-mini"`, etc.)
+- **Options**: Any OpenAI model name (`"gpt-4.1"`, `"gpt-4.1-mini"`, etc.)
 - **Cost/Quality Tradeoff**:
   - `"gpt-4.1"`: Best quality, higher cost
-  - `"gpt-4o-mini"`: Good balance
+  - `"gpt-4.1-mini"`: Good balance
   - `"gpt-3.5-turbo"`: Fastest, cheapest
 
 ### `system_prompt`
@@ -123,9 +123,9 @@ These parameters control how properties are grouped into behavioral clusters.
 ### `embedding_model`
 - **Purpose**: Model used for embedding properties during clustering
 - **Type**: `str`
-- **Default**: `"text-embedding-3-small"`
+- **Default**: `"text-embedding-3-large"`
 - **Options**:
-  - `"text-embedding-3-small"`: Fast, cost-effective
+  - `"text-embedding-3-large"`: Fast, cost-effective
   - `"text-embedding-3-large"`: Higher quality embeddings
   - Any OpenAI embedding model
 
@@ -140,7 +140,7 @@ These parameters control how properties are grouped into behavioral clusters.
 - **Type**: `str`
 - **Default**: `"gpt-4.1-mini"`
 - **Note**: This makes many calls, so using a cheaper model is recommended
-- **Recommendation**: `"gpt-4o-mini"` or `"gpt-3.5-turbo"` for cost efficiency
+- **Recommendation**: `"gpt-4.1-mini"` or `"gpt-3.5-turbo"` for cost efficiency
 
 ## Side-by-Side Specific Parameters
 
@@ -150,7 +150,7 @@ For side-by-side comparison using tidy format (auto-pairing):
 - **Purpose**: Name of first model to compare
 - **Type**: `str`
 - **Required**: Only when using `method="side_by_side"` with tidy format
-- **Example**: `model_a="gpt-4o"`
+- **Example**: `model_a="gpt-4.1"`
 
 ### `model_b`
 - **Purpose**: Name of second model to compare
@@ -236,7 +236,7 @@ Note: The larger your `min_cluster_size`, the more outliers you will likely have
 
 ### Starting Out
 1. Start with `sample_size=50-100` for initial exploration
-2. Use cheaper models first: `model_name="gpt-4o-mini"`, `cluster_assignment_model="gpt-3.5-turbo"`
+2. Use cheaper models first: `model_name="gpt-4.1-mini"`, `cluster_assignment_model="gpt-3.5-turbo"`
 3. Iterate on `min_cluster_size` to find the right granularity
 
 ### Data Preparation
@@ -263,8 +263,8 @@ Note: The larger your `min_cluster_size`, the more outliers you will likely have
 clustered_df, model_stats = explain(
     df,
     sample_size=50,
-    model_name="gpt-4o-mini",
-    embedding_model="text-embedding-3-small",
+    model_name="gpt-4.1-mini",
+    embedding_model="text-embedding-3-large",
     cluster_assignment_model="gpt-3.5-turbo",
     min_cluster_size=5,
     use_wandb=False

@@ -48,37 +48,7 @@ logger = get_logger(__name__)
 # -------------------------------------------------------------------------
 # Render persistent disk configuration
 # -------------------------------------------------------------------------
-def _get_persistent_data_dir() -> Path:
-    """Get the base directory for persistent data (results, cache) on Render.
-    
-    If RENDER_DISK_PATH is set, use that as the base for all persistent data.
-    Otherwise, default to the current working directory (local development).
-    """
-    render_disk = os.environ.get("RENDER_DISK_PATH")
-    if render_disk:
-        base = Path(render_disk).resolve()
-        logger.info(f"Using Render persistent disk: {base}")
-        return base
-    return Path.cwd()
-
-def _get_results_dir() -> Path:
-    """Get the results directory, potentially on persistent disk."""
-    base = _get_persistent_data_dir()
-    return base / "results"
-
-def _get_cache_dir() -> Path:
-    """Get the cache directory, potentially on persistent disk."""
-    # Check if RENDER_DISK_PATH is set and STRINGSIGHT_CACHE_DIR is not explicitly set
-    # If so, automatically configure cache to use the persistent disk
-    if os.environ.get("RENDER_DISK_PATH") and not os.environ.get("STRINGSIGHT_CACHE_DIR"):
-        base = _get_persistent_data_dir()
-        cache_dir = base / ".cache" / "stringsight"
-        # Set the environment variable so the Cache class picks it up
-        os.environ["STRINGSIGHT_CACHE_DIR"] = str(cache_dir)
-        logger.info(f"Auto-configured cache directory to use persistent disk: {cache_dir}")
-        return cache_dir
-    # Otherwise, let Cache class handle it using STRINGSIGHT_CACHE_DIR env var or default
-    return Path.cwd() / ".cache" / "stringsight"
+from stringsight.utils.paths import _get_persistent_data_dir, _get_results_dir, _get_cache_dir
 
 # -------------------------------------------------------------------------
 # Simple in-memory cache for parsed JSONL data with TTL
@@ -269,21 +239,7 @@ class ExtractSingleRequest(BaseModel):
     return_debug: Optional[bool] = False
 
 
-class ExtractBatchRequest(BaseModel):
-    rows: List[Dict[str, Any]]
-    method: Optional[Literal["single_model", "side_by_side"]] = None
-    system_prompt: Optional[str] = None
-    task_description: Optional[str] = None
-    model_name: Optional[str] = "gpt-4.1"
-    temperature: Optional[float] = 0.7
-    top_p: Optional[float] = 0.95
-    max_tokens: Optional[int] = 16000
-    max_workers: Optional[int] = 128
-    include_scores_in_prompt: Optional[bool] = False
-    use_wandb: Optional[bool] = False
-    output_dir: Optional[str] = None
-    return_debug: Optional[bool] = False
-    sample_size: Optional[int] = None  # Randomly sample N rows before extraction
+# ExtractBatchRequest moved to schemas.py
 
 
 # -----------------------------
@@ -400,6 +356,12 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
     expose_headers=["*"],  # Expose all headers to frontend
 )
+
+from stringsight.routers.auth import router as auth_router
+from stringsight.routers.jobs import router as jobs_router
+
+app.include_router(auth_router)
+app.include_router(jobs_router)
 
 # Include metrics endpoints (basic file serving)
 @app.get("/metrics/summary/{results_dir}")
@@ -552,7 +514,7 @@ def get_embedding_models() -> Dict[str, Any]:
     """
     models = [
         "openai/text-embedding-3-large",
-        "openai/text-embedding-3-small",
+        "openai/text-embedding-3-large",
         "bge-m3",
         "sentence-transformers/all-MiniLM-L6-v2",
     ]
@@ -599,7 +561,7 @@ async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
     This is much more efficient than the full explain() pipeline since it skips
     the expensive LLM property extraction step and works with already-extracted properties.
     
-    Note: Cache is disk-backed (DiskCache) and thread-safe.
+    Note: Cache is disk-backed (LMDB-based) and thread-safe.
     """
     from stringsight.core.data_objects import PropertyDataset, Property, ConversationRecord
     from stringsight.clusterers import get_clusterer
@@ -837,6 +799,114 @@ async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             )
             conversations.append(conv)
 
+        # NEW: Handle side-by-side specific logic if detected
+        # If method is side_by_side, we need to reconstruct the conversation records to have
+        # model=[model_a, model_b] and scores=[score_a, score_b] for SideBySideMetrics to work
+        
+        # Auto-detect side_by_side if not explicitly set but data looks like it
+        if req.method == "single_model" and req.operationalRows:
+            first_row = req.operationalRows[0]
+            if "model_a" in first_row and "model_b" in first_row:
+                logger.info("🔄 Auto-detected side_by_side method from operationalRows columns")
+                req.method = "side_by_side"
+
+        if req.method == "side_by_side":
+            logger.info("🔄 Reconstructing conversations for side-by-side metrics...")
+            
+            # Group properties by base question_id to identify pairs
+            properties_by_qid = {}
+            for p in properties:
+                if p.question_id not in properties_by_qid:
+                    properties_by_qid[p.question_id] = []
+                properties_by_qid[p.question_id].append(p)
+            
+            sxs_conversations = []
+            
+            # Pre-index operational rows for faster lookup
+            import time
+            t0 = time.time()
+            operational_rows_map = {}
+            for row in req.operationalRows:
+                row_qid = str(row.get("question_id", ""))
+                operational_rows_map[row_qid] = row
+                # Also index by base ID if it's a compound ID (e.g. "48-0" -> "48")
+                if '-' in row_qid:
+                    base_id = row_qid.split('-')[0]
+                    if base_id not in operational_rows_map:
+                         operational_rows_map[base_id] = row
+            
+            logger.info(f"⏱️ Indexed {len(req.operationalRows)} operational rows in {time.time() - t0:.4f}s")
+            t1 = time.time()
+
+            sxs_conversations = []
+            
+            for qid, props in properties_by_qid.items():
+                # Find matching operational row using lookup map
+                matching_row = operational_rows_map.get(qid)
+                
+                # If not found by exact match, try base ID match (if qid has suffix)
+                if not matching_row and '-' in qid:
+                    matching_row = operational_rows_map.get(qid.split('-')[0])
+                
+                if matching_row:
+                    # Extract models
+                    model_a = matching_row.get("model_a")
+                    model_b = matching_row.get("model_b")
+                    
+                    # If models not in row, try to infer from properties
+                    if not model_a or not model_b:
+                        unique_models = list(set(p.model for p in props))
+                        if len(unique_models) >= 2:
+                            model_a = unique_models[0]
+                            model_b = unique_models[1]
+                        else:
+                            # Fallback
+                            model_a = "model_a"
+                            model_b = "model_b"
+                    
+                    # Extract scores
+                    # Check for score_a/score_b columns first
+                    score_a = matching_row.get("score_a", {})
+                    score_b = matching_row.get("score_b", {})
+
+                    # If empty, check if 'scores' or 'score' contains combined info
+                    if not score_a and not score_b:
+                        combined_score = matching_row.get("score") or matching_row.get("scores")
+                        if combined_score:
+                            # Handle list format [score_a, score_b]
+                            if isinstance(combined_score, list) and len(combined_score) == 2:
+                                score_a = combined_score[0] if isinstance(combined_score[0], dict) else {}
+                                score_b = combined_score[1] if isinstance(combined_score[1], dict) else {}
+                            elif isinstance(combined_score, dict):
+                                # If it's a dict, duplicate it for both
+                                score_a = combined_score
+                                score_b = combined_score
+                            else:
+                                score_a = {}
+                                score_b = {}
+                    
+                    # Extract winner to meta
+                    meta = {}
+                    if "winner" in matching_row:
+                        meta["winner"] = matching_row["winner"]
+                    elif "score" in matching_row and isinstance(matching_row["score"], dict) and "winner" in matching_row["score"]:
+                        meta["winner"] = matching_row["score"]["winner"]
+                    
+                    # Create SxS conversation record
+                    conv = ConversationRecord(
+                        question_id=qid,
+                        model=[model_a, model_b],
+                        prompt=matching_row.get("prompt", ""),
+                        responses=[matching_row.get("model_a_response", ""), matching_row.get("model_b_response", "")],
+                        scores=[score_a, score_b],
+                        meta=meta
+                    )
+                    sxs_conversations.append(conv)
+            
+            if sxs_conversations:
+                logger.info(f"✅ Created {len(sxs_conversations)} side-by-side conversation records in {time.time() - t1:.4f}s")
+                conversations = sxs_conversations
+
         logger.info(f"✅ Matched {matches_found}/{len(property_keys)} conversations with operationalRows")
 
         # Enhanced logging for debugging quality metrics
@@ -933,16 +1003,27 @@ async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             "meta": cluster.meta,
         })
     
-    # Compute metrics using FunctionalMetrics (without bootstrap for speed)
+    # Compute metrics using FunctionalMetrics or SideBySideMetrics
     from stringsight.metrics.functional_metrics import FunctionalMetrics
+    from stringsight.metrics.side_by_side import SideBySideMetrics
     
-    # FunctionalMetrics needs PropertyDataset with clusters populated
-    metrics_computer = FunctionalMetrics(
-        output_dir=None,
-        compute_bootstrap=False,  # Disable bootstrap for API speed
-        log_to_wandb=False,
-        generate_plots=False
-    )
+    # Choose metrics computer based on method
+    if req.method == "side_by_side":
+        logger.info("🚀 Using SideBySideMetrics for computation")
+        metrics_computer = SideBySideMetrics(
+            output_dir=None,
+            compute_bootstrap=True,  # Disable bootstrap for API speed
+            log_to_wandb=False,
+            generate_plots=False
+        )
+    else:
+        logger.info("🚀 Using FunctionalMetrics for computation")
+        metrics_computer = FunctionalMetrics(
+            output_dir=None,
+            compute_bootstrap=True,  # Disable bootstrap for API speed
+            log_to_wandb=False,
+            generate_plots=False
+        )
     
     # Debug: Check what's in clustered_dataset before metrics
     logger.info(f"🔍 Before FunctionalMetrics:")
@@ -1682,14 +1763,29 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
     cluster_scores_df.jsonl, model_scores_df.jsonl). If a `full_dataset.json`
     file is present, returns its `conversations`, `properties`, and `clusters`.
 
-    Request path must be within BASE_BROWSE_DIR (default: current working directory).
+    Request path can be:
+    - Relative path from results directory (e.g., "frontend/conversation_...")
+    - Absolute path within BASE_BROWSE_DIR
 
     Implements pagination to reduce initial load time and memory usage:
     - conversations_page/conversations_per_page for conversations pagination
     - properties_page/properties_per_page for properties pagination
     - load_metrics_only flag to skip loading conversations/properties entirely
     """
-    results_dir = _resolve_within_base(req.path)
+    # Try to resolve relative to results directory first (for job.result_path compatibility)
+    path_obj = Path(req.path)
+    if not path_obj.is_absolute():
+        # Try relative to results directory first
+        results_base = _get_results_dir()
+        candidate = (results_base / req.path).resolve()
+        if candidate.exists() and candidate.is_dir():
+            results_dir = candidate
+        else:
+            # Fallback to original behavior (relative to CWD/BASE_BROWSE_DIR)
+            results_dir = _resolve_within_base(req.path)
+    else:
+        results_dir = _resolve_within_base(req.path)
+
     if not results_dir.is_dir():
         raise HTTPException(status_code=400, detail=f"Not a directory: {results_dir}")
 
@@ -1738,6 +1834,25 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
         except Exception as e:
             logger.warning(f"Failed to load properties: {e}")
 
+    # Load clusters from clusters.jsonl or clusters.json
+    # This is critical because if we load conversations/properties from JSONL,
+    # we skip the full_dataset.json block below, so we must load clusters here.
+    clusters_file_jsonl = results_dir / "clusters.jsonl"
+    clusters_file_json = results_dir / "clusters.json"
+    
+    if clusters_file_jsonl.exists():
+        try:
+            clusters = _read_jsonl_as_list(clusters_file_jsonl)
+            logger.info(f"Loaded {len(clusters)} clusters from jsonl")
+        except Exception as e:
+            logger.warning(f"Failed to load clusters from jsonl: {e}")
+    elif clusters_file_json.exists():
+        try:
+            clusters = _read_json_safe(clusters_file_json)
+            logger.info(f"Loaded {len(clusters)} clusters from json")
+        except Exception as e:
+            logger.warning(f"Failed to load clusters from json: {e}")
+
     # Fallback to full_dataset.json only if JSONL files don't exist
     if not conversations and not properties:
         full = results_dir / "full_dataset.json"
@@ -1784,9 +1899,11 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
 
     return {
         "path": str(results_dir),
-        "model_cluster_scores": model_cluster_scores or [],
-        "cluster_scores": cluster_scores or [],
-        "model_scores": model_scores or [],
+        "metrics": {
+            "model_cluster_scores": model_cluster_scores or [],
+            "cluster_scores": cluster_scores or [],
+            "model_scores": model_scores or []
+        },
         "conversations": conversations,
         "properties": properties,
         "clusters": clusters,
@@ -2221,7 +2338,7 @@ class TidyRow(BaseModel):
     Fields:
         question_id: Optional stable ID used to pair A/B responses; pairs by prompt when absent.
         prompt: The task text.
-        model: Model name (e.g., 'gpt-4o').
+        model: Model name (e.g., 'gpt-4.1').
         model_response: The model's response; accepts string or OAI/chat-like structure.
         score: Optional dict of metric name → value.
 
@@ -2481,8 +2598,7 @@ _JOBS_LOCK = threading.Lock()
 _JOBS: Dict[str, ExtractJob] = {}
 
 
-class ExtractJobStartRequest(ExtractBatchRequest):
-    pass  # Inherits all fields from ExtractBatchRequest
+from stringsight.schemas import ExtractBatchRequest, ExtractJobStartRequest
 
 
 def _run_extract_job(job: ExtractJob, req: ExtractJobStartRequest):

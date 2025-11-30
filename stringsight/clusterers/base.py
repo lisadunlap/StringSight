@@ -82,7 +82,7 @@ class BaseClusterer(LoggingMixin, TimingMixin, WandbMixin, PipelineStage, ABC):
         self.config: Optional[ClusterConfig] = config
 
     @abstractmethod
-    def cluster(self, data: PropertyDataset, column_name: str) -> pd.DataFrame:
+    def cluster(self, data: PropertyDataset, column_name: str, progress_callback=None) -> pd.DataFrame:
         """Produce a standardized clustered DataFrame from the dataset.
 
         Implementations may compute embeddings or use heuristic rules, but
@@ -96,6 +96,8 @@ class BaseClusterer(LoggingMixin, TimingMixin, WandbMixin, PipelineStage, ABC):
         column_name:
             The name of the textual feature column to cluster (default
             expected value is "property_description").
+        progress_callback:
+            Optional callback(completed, total) for progress updates.
 
         Returns
         -------
@@ -191,7 +193,7 @@ Do not include any other text in your response."""
         )
         return self.config
 
-    async def run(self, data: PropertyDataset, column_name: str = "property_description") -> PropertyDataset:
+    async def run(self, data: PropertyDataset, column_name: str = "property_description", progress_callback=None) -> PropertyDataset:
         """Execute the clustering pipeline and return an updated dataset.
 
         Expected orchestration steps:
@@ -214,9 +216,19 @@ Do not include any other text in your response."""
         # Handle both sync and async cluster() methods
         import inspect
         if inspect.iscoroutinefunction(self.cluster):
-            clustered_df = await self.cluster(data, column_name)
+            # Check if cluster accepts progress_callback
+            sig = inspect.signature(self.cluster)
+            if 'progress_callback' in sig.parameters:
+                clustered_df = await self.cluster(data, column_name, progress_callback=progress_callback)
+            else:
+                clustered_df = await self.cluster(data, column_name)
         else:
-            clustered_df = self.cluster(data, column_name)
+            # Check if cluster accepts progress_callback
+            sig = inspect.signature(self.cluster)
+            if 'progress_callback' in sig.parameters:
+                clustered_df = self.cluster(data, column_name, progress_callback=progress_callback)
+            else:
+                clustered_df = self.cluster(data, column_name)
         if "meta" not in clustered_df.columns:
             clustered_df["meta"] = [{} for _ in range(len(clustered_df))]
         clustered_df = await self.postprocess_clustered_df(clustered_df, column_name, prettify_labels=self.prettify_labels)

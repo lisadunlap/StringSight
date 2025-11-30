@@ -135,7 +135,7 @@ Consider disabling embedding cache when:
 
 ## Technical Details
 
-- **Cache Type**: DiskCache (thread-safe, persistent across runs)
+- **Cache Type**: LMDB-based Cache (thread-safe, persistent across runs)
 - **Cache Keys**: SHA-256 hashes of input parameters
 - **Namespacing**: Completions and embeddings stored separately
 - **Model-aware**: Embeddings are namespaced by model to prevent dimension mismatches

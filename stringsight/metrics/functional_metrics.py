@@ -175,6 +175,7 @@ import wandb
 from ..core.stage import PipelineStage
 from ..core.mixins import LoggingMixin, TimingMixin
 from ..core.data_objects import PropertyDataset
+from ..storage.adapter import StorageAdapter, get_storage_adapter
 from . import plotting
 
 
@@ -196,6 +197,7 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         bootstrap_samples: int = 100,
         log_to_wandb: bool = True,
         generate_plots: bool = True,
+        storage: Optional[StorageAdapter] = None,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -204,15 +206,25 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         self.bootstrap_samples = bootstrap_samples
         self.log_to_wandb = log_to_wandb
         self.generate_plots = generate_plots
+        self.storage = storage or get_storage_adapter()
 
-    def run(self, data: PropertyDataset) -> PropertyDataset:
+    def run(self, data: PropertyDataset, progress_callback=None) -> PropertyDataset:
         """Main entry point for metrics computation."""
         self.log("⚖️  Computing functional metrics...")
 
         # Convert to DataFrame and prepare data
         df = self._prepare_data(data)
         if df.empty:
-            self.log("No cluster data found; skipping metrics stage.")
+            self.log("No cluster data found; saving empty metrics.")
+            if self.output_dir:
+                self._save_results({}, {}, {})
+            
+            # Initialize empty model_stats to avoid AttributeError downstream
+            data.model_stats = {
+                "model_cluster_scores": pd.DataFrame(),
+                "cluster_scores": pd.DataFrame(),
+                "model_scores": pd.DataFrame()
+            }
             return data
 
         # Extract cluster names and models
@@ -232,7 +244,7 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         if self.compute_bootstrap and self.bootstrap_samples > 0:
             self.log(f"Adding bootstrap confidence intervals with {self.bootstrap_samples} samples...")
             model_cluster_scores, cluster_scores, model_scores = self._add_bootstrap_analysis(
-                df, model_cluster_scores, cluster_scores, model_scores
+                df, model_cluster_scores, cluster_scores, model_scores, progress_callback=progress_callback
             )
 
         # Save results
@@ -542,7 +554,7 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
             for model in model_names
         }
 
-    def _add_bootstrap_analysis(self, df: pd.DataFrame, model_cluster_scores, cluster_scores, model_scores):
+    def _add_bootstrap_analysis(self, df: pd.DataFrame, model_cluster_scores, cluster_scores, model_scores, progress_callback=None):
         """Add bootstrap confidence intervals and statistical significance testing."""
         import numpy as np
         
@@ -558,6 +570,12 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         for i in range(self.bootstrap_samples):
             if i % 20 == 0:
                 self.log(f"Bootstrap progress: {i}/{self.bootstrap_samples} ({i/self.bootstrap_samples*100:.1f}%)")
+            
+            if progress_callback and i % 5 == 0:
+                try:
+                    progress_callback(i / self.bootstrap_samples)
+                except Exception:
+                    pass
             
             # Resample conversations with replacement
             sample_df = self._resample_conversations(df)
@@ -971,21 +989,18 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         model_scores = _json_safe(model_scores)
 
         # Save model-cluster scores
-        model_cluster_path = self.output_dir / "model_cluster_scores.json"
-        with open(model_cluster_path, 'w') as f:
-            json.dump(model_cluster_scores, f, indent=2)
+        model_cluster_path = str(self.output_dir / "model_cluster_scores.json")
+        self.storage.write_json(model_cluster_path, model_cluster_scores)
         self.log(f"📄 Saved model-cluster scores to {model_cluster_path}")
 
         # Save cluster scores
-        cluster_scores_path = self.output_dir / "cluster_scores.json"
-        with open(cluster_scores_path, 'w') as f:
-            json.dump(cluster_scores, f, indent=2)
+        cluster_scores_path = str(self.output_dir / "cluster_scores.json")
+        self.storage.write_json(cluster_scores_path, cluster_scores)
         self.log(f"📄 Saved cluster scores to {cluster_scores_path}")
 
         # Save model scores
-        model_scores_path = self.output_dir / "model_scores.json"
-        with open(model_scores_path, 'w') as f:
-            json.dump(model_scores, f, indent=2)
+        model_scores_path = str(self.output_dir / "model_scores.json")
+        self.storage.write_json(model_scores_path, model_scores)
         self.log(f"📄 Saved model scores to {model_scores_path}")
         
         # Save dataframe versions as JSONL files (previously only saved when wandb was enabled)

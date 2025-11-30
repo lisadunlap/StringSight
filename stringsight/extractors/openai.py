@@ -14,7 +14,7 @@ import litellm
 from ..core.stage import PipelineStage
 from ..core.data_objects import PropertyDataset, Property
 from ..core.mixins import LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin
-from ..prompts import extractor_prompts as _extractor_prompts
+from .. import prompts as _extractor_prompts
 from ..core.caching import UnifiedCache
 from ..core.llm_utils import parallel_completions_async
 from .conv_to_str import conv_to_str
@@ -45,7 +45,7 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         Initialize the OpenAI extractor.
 
         Args:
-            model: OpenAI model name (e.g., "gpt-4o-mini")
+            model: OpenAI model name (e.g., "gpt-4.1-mini")
             system_prompt: System prompt for property extraction
             prompt_builder: Optional custom prompt builder function
             temperature: Temperature for LLM
@@ -225,28 +225,27 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
                 
                 # Build the prompt with separate scores for each model
                 prompt_parts = [
-                    f"# Model A (Name: \"{model_a}\") conversation:\n {response_a}"
+                    f"<beginning of Model A trace>\n {response_a}\n<end of Model A trace>\n\n--------------------------------\n\n"
                 ]
                 
                 if self.include_scores_in_prompt and scores_a:
-                    prompt_parts.append(f"# Model A Scores:\n {scores_a}")
-                
+                    prompt_parts.append(f"<Quality scores on Model A trace>\n {scores_a}\n</Quality scores on Model A trace>\n\n")
                 prompt_parts.append("--------------------------------")
-                prompt_parts.append(f"# Model B (Name: \"{model_b}\") conversation:\n {response_b}")
-                
+                prompt_parts.append(f"<beginning of Model B trace>\n {response_b}\n<end of Model B trace>\n\n--------------------------------\n\n")
+
                 if self.include_scores_in_prompt and scores_b:
-                    prompt_parts.append(f"# Model B Scores:\n {scores_b}")
+                    prompt_parts.append(f"<Quality scores on Model B trace>\n {scores_b}\n</Quality scores on Model B trace>\n\n")
                 
                 if self.include_scores_in_prompt and winner:
-                    prompt_parts.append(f"# Winner: {winner}")
+                    prompt_parts.append(f"<Winner of side-by-side comparison>\n {winner}\n</Winner of side-by-side comparison>\n\n")
                 
                 return "\n\n".join(prompt_parts)
             else:
                 # No scores available
                 return (
-                    f"# Model A (Name: \"{model_a}\") conversation:\n {response_a}\n\n"
+                    f"<beginning of Model A trace>\n {response_a}\n<end of Model A trace>\n\n--------------------------------\n\n"
                     f"--------------------------------\n"
-                    f"# Model B (Name: \"{model_b}\") conversation:\n {response_b}"
+                    f"<beginning of Model B trace>\n {response_b}\n<end of Model B trace>\n\n--------------------------------\n\n"
                 )
         elif isinstance(conversation.model, str):
             # Single model format
@@ -274,7 +273,7 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
                 return response
             return (
                 f"{response}\n\n"
-                f"### Scores:\n {scores}"
+                f"<Quality scores on the trace>\n {scores}\n</Quality scores on the trace>\n\n"
             )
         else:
             raise ValueError(f"Invalid conversation format: {conversation}")
@@ -377,7 +376,7 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         messages: List[Dict[str, Any]] = []
         if self.system_prompt:
             messages.append({"role": "system", "content": self.system_prompt})
-        messages.append({"role": "user", "content": content})
+        messages.append({"role": "user", "content": f"<beginning of Model trace>\n {content}\n<end of Model trace>\n\n"})
         return messages
 
     def _build_side_by_side_messages(
@@ -389,11 +388,13 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
     ) -> List[Dict[str, Any]]:
         """Build a full messages list with system + single user turn containing A/B sections."""
         content: List[Dict[str, Any]] = []
-        content.append({"type": "text", "text": f"# Model A (Name: \"{model_a}\")"})
-        content.extend(self._collapse_segments_to_openai_content(conv_a))
-        content.append({"type": "text", "text": "--------------------------------"})
-        content.append({"type": "text", "text": f"# Model B (Name: \"{model_b}\")"})
-        content.extend(self._collapse_segments_to_openai_content(conv_b))
+        content += (
+            [{"type": "text", "text": "<beginning of Model A trace>"}]
+            + self._collapse_segments_to_openai_content(conv_a)
+            + [{"type": "text", "text": "<end of Model A trace>\n\n--------------------------------\n\n<beginning of Model B trace>"}]
+            + self._collapse_segments_to_openai_content(conv_b)
+            + [{"type": "text", "text": "<end of Model B trace>"}]
+        )
 
         messages: List[Dict[str, Any]] = []
         if self.system_prompt:

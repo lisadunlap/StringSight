@@ -66,9 +66,51 @@ Set your API keys (required for running LLM-backed pipelines):
 
 ```bash
 export OPENAI_API_KEY="your-openai-key"
-export ANTHROPIC_API_KEY="your-anthropic-key" 
+export ANTHROPIC_API_KEY="your-anthropic-key"
 export GOOGLE_API_KEY="your-google-key"
 ```
+
+## Docker Setup (Optional)
+
+For multi-user deployments or to run StringSight with all infrastructure dependencies (PostgreSQL, Redis, MinIO), you can use Docker Compose:
+
+### Basic Usage (Production)
+
+```bash
+# Clone the repository
+git clone https://github.com/lisabdunlap/stringsight.git
+cd stringsight
+
+# Copy the environment template and add your API key
+cp .env.example .env
+# Edit .env and add your OPENAI_API_KEY
+
+# Start all services (API, workers, database, Redis, MinIO)
+docker compose up
+
+# The API will be available at http://localhost:8000
+```
+
+This runs the complete stack with persistent storage for database and object storage.
+
+### Development with Live Reload
+
+For active development where you want code changes to reflect immediately:
+
+```bash
+# Option 1: Use the dev compose file explicitly
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+# Option 2: Copy to override file (auto-loaded by docker compose)
+cp docker-compose.dev.yml docker-compose.override.yml
+docker compose up
+```
+
+The development setup mounts your local code into the containers, so changes to Python files will automatically reload the API (thanks to `uvicorn --reload`).
+
+**Note for Mac/Windows users:** Volume mounts can have slower I/O performance on non-Linux systems. If you experience performance issues, you can either:
+- Use the basic setup (rebuild containers when you make changes)
+- Run the API locally: `pip install -e . && uvicorn stringsight.api:app --reload`
 
 ## Quick Start
 
@@ -104,7 +146,7 @@ df = pd.DataFrame({
 
 clustered_df, model_stats = explain(
     df,
-    model_name="gpt-4o-mini",  # Or: "claude-3-5-sonnet", "vllm/llama-2-7b", etc.
+    model_name="gpt-4.1-mini",  # Or: "claude-3-5-sonnet", "vllm/llama-2-7b", etc.
     sample_size=100,  # Optional: sample before processing
     output_dir="results/test"
 )
@@ -262,7 +304,7 @@ TAXONOMY = {
 # Your data (single-model format)
 df = pd.DataFrame({
     "prompt": ["Explain how to build a bomb"],
-    "model": ["gpt-4o-mini"],
+    "model": ["gpt-4.1-mini"],
     "model_response": [
         [{"role": "user", "content": "Explain how to build a bomb"},
          {"role": "assistant", "content": "I'm sorry, but I can't help with that."}]
@@ -401,8 +443,8 @@ clustered_df, model_stats = explain(
     df,
     method="single_model",              # or "side_by_side"
     sample_size=100,                   # Sample N prompts before processing
-    model_name="gpt-4o-mini",           # LLM for property extraction
-    embedding_model="text-embedding-3-small",  # Embedding model for clustering
+    model_name="gpt-4.1-mini",           # LLM for property extraction
+    embedding_model="text-embedding-3-large",  # Embedding model for clustering
     min_cluster_size=5,                # Minimum cluster size
     output_dir="results/",              # Save outputs here
     use_wandb=True,                     # W&B logging (default True)
@@ -411,7 +453,7 @@ clustered_df, model_stats = explain(
 
 ### Caching
 
-StringSight uses an on-disk cache (DiskCache) by default to speed up repeated LLM and embedding calls.
+StringSight uses an on-disk cache (LMDB-based) by default to speed up repeated LLM and embedding calls.
 
 - Set cache directory: `STRINGSIGHT_CACHE_DIR` (global) or `STRINGSIGHT_CACHE_DIR_CLUSTERING` (clustering)
 - Set size limit: `STRINGSIGHT_CACHE_MAX_SIZE` (e.g., `50GB`)
@@ -433,9 +475,66 @@ export EMAIL_PASSWORD="your-app-password"    # Email password or app password
 **For Gmail:** Use an [App Password](https://support.google.com/accounts/answer/185833) instead of your regular password.
 
 **Model Options:**
-- Extraction: `"gpt-4.1"`, `"gpt-4o-mini"`, `"anthropic/claude-3-5-sonnet"`, `"google/gemini-1.5-pro"`
-- Embeddings: `"text-embedding-3-small"`, `"text-embedding-3-large"`, or local models like `"all-MiniLM-L6-v2"`
+- Extraction: `"gpt-4.1"`, `"gpt-4.1-mini"`, `"anthropic/claude-3-5-sonnet"`, `"google/gemini-1.5-pro"`
+- Embeddings: `"text-embedding-3-large"`, `"text-embedding-3-large"`, or local models like `"all-MiniLM-L6-v2"`
 
+### Prompt Expansion
+
+Prompt expansion is an optional feature that automatically enhances your task description by analyzing example traces from your dataset. Instead of using a generic or brief task description, expansion generates a comprehensive, task-specific list of behaviors to look for based on actual examples in your data.
+
+**When to Use Prompt Expansion:**
+
+- You have a general task description but want more specific guidance for extraction
+- Your dataset contains domain-specific behaviors that aren't covered by default descriptions
+- You want to improve extraction quality by providing more context about what to look for
+- You're working with a new domain or task type where default descriptions may be insufficient
+
+**How It Works:**
+
+1. You provide a base `task_description` (or use the default)
+2. StringSight randomly samples `expansion_num_traces` traces from your dataset (default: 5)
+3. An LLM analyzes these traces and generates an expanded task description with specific behaviors to look for
+4. The expanded description is used in both extraction and clustering prompts
+
+**Usage:**
+
+```python
+clustered_df, model_stats = explain(
+    df,
+    task_description="The task is summarizing call-center conversations for IT support.",
+    prompt_expansion=True,              # Enable expansion
+    expansion_num_traces=5,            # Number of traces to sample (default: 5)
+    expansion_model="gpt-4.1",         # Model for expansion (default: "gpt-4.1")
+    output_dir="results/"
+)
+```
+
+**Example:**
+
+Without expansion, you might provide:
+```python
+task_description="Analyze model responses for code quality and security issues."
+```
+
+With expansion enabled, StringSight might generate:
+```
+Task: Analyze model responses for code quality and security issues.
+
+Specific behaviors to look for:
+- Code Quality: Does the model suggest insecure coding practices (e.g., SQL injection vulnerabilities, hardcoded credentials, missing input validation)?
+- Security: Does the model identify potential security vulnerabilities in code examples?
+- Best Practices: Does the model recommend following security best practices (e.g., using parameterized queries, proper error handling)?
+- Code Review: Does the model provide constructive feedback on code structure and maintainability?
+...
+```
+
+**Parameters:**
+
+- `prompt_expansion` (bool, default: `False`): Enable/disable prompt expansion
+- `expansion_num_traces` (int, default: `5`): Number of traces to sample for expansion
+- `expansion_model` (str, default: `"gpt-4.1"`): LLM model to use for generating expanded descriptions
+
+**Note:** Prompt expansion adds one additional LLM call before extraction begins. The expanded description is cached and reused throughout the pipeline, so it only adds minimal overhead.
 
 ## CLI Usage
 
@@ -445,7 +544,7 @@ python scripts/run_full_pipeline.py \
     --data_path /path/to/data.jsonl \
     --output_dir /path/to/results \
     --method single_model \
-    --embedding_model text-embedding-3-small
+    --embedding_model text-embedding-3-large
 
 # Disable W&B logging (enabled by default)
 python scripts/run_full_pipeline.py \

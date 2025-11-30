@@ -13,6 +13,7 @@ from tqdm import tqdm
 from ..core.stage import PipelineStage
 from ..core.data_objects import PropertyDataset, Property
 from ..core.mixins import LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin
+from ..storage.adapter import StorageAdapter, get_storage_adapter
 
 
 class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, PipelineStage):
@@ -23,7 +24,14 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
     It handles JSON parsing errors gracefully and filters out invalid responses.
     """
     
-    def __init__(self, *, fail_fast: bool = False, output_dir: Optional[str] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        fail_fast: bool = False,
+        output_dir: Optional[str] = None,
+        storage: Optional[StorageAdapter] = None,
+        **kwargs
+    ):
         """Initialize the JSON parser.
 
         By default ``fail_fast`` is set to *False* so that a handful of
@@ -32,14 +40,16 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
         """
         super().__init__(fail_fast=fail_fast, **kwargs)
         self.parsing_failures = []
-        self.output_dir = Path(output_dir) if output_dir else None
+        self.output_dir = output_dir
+        self.storage = storage or get_storage_adapter()
         
-    def run(self, data: PropertyDataset) -> PropertyDataset:
+    def run(self, data: PropertyDataset, progress_callback=None) -> PropertyDataset:
         """
         Parse raw LLM responses into Property objects.
         
         Args:
             data: PropertyDataset with properties containing raw LLM responses
+            progress_callback: Optional callback(completed, total) for progress updates
             
         Returns:
             PropertyDataset with parsed and validated properties
@@ -55,7 +65,13 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
         max_consecutive_errors = 10
 
         # Add progress bar for better visibility
+        total_props = len(data.properties)
         for i, prop in enumerate(tqdm(data.properties, desc="Parsing properties", disable=not getattr(self, 'verbose', False))):
+            if progress_callback and i % 10 == 0:
+                try:
+                    progress_callback(i / total_props)
+                except Exception:
+                    pass
             # We only process properties that still have raw_response
             if not prop.raw_response:
                 # Throw an error to help debug the extraction issue
@@ -254,18 +270,17 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
     def _save_stage_results(self, data: PropertyDataset, parsed_properties: List[Property], parse_errors: int, unknown_model_filtered: int, empty_list_responses: int):
         """Save parsing results to the specified output directory."""
         # Create output directory if it doesn't exist
-        from pathlib import Path
-        output_path = Path(self.output_dir) if isinstance(self.output_dir, str) else self.output_dir
-        output_path.mkdir(parents=True, exist_ok=True)
-        
+        output_path = self.output_dir
+        self.storage.ensure_directory(output_path)
+
         self.log(f"✅ Auto-saving parsing results to: {output_path}")
-        
+
         # 1. Save parsed properties as JSONL
-        properties_df = pd.DataFrame([prop.to_dict() for prop in parsed_properties])
-        properties_path = output_path / "parsed_properties.jsonl"
-        properties_df.to_json(properties_path, orient="records", lines=True)
+        properties_records = [prop.to_dict() for prop in parsed_properties]
+        properties_path = f"{output_path}/parsed_properties.jsonl"
+        self.storage.write_jsonl(properties_path, properties_records)
         self.log(f"  • Parsed properties: {properties_path}")
-        
+
         # 2. Save parsing statistics
         stats = {
             "total_input_properties": len(data.properties),
@@ -276,51 +291,48 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
             "parsing_success_rate": len(parsed_properties) / len(data.properties) if data.properties else 0,
             "failures_count": len(self.parsing_failures),
         }
-        
-        stats_path = output_path / "parsing_stats.json"
-        with open(stats_path, 'w') as f:
-            json.dump(stats, f, indent=2)
+
+        stats_path = f"{output_path}/parsing_stats.json"
+        self.storage.write_json(stats_path, stats)
         self.log(f"  • Parsing stats: {stats_path}")
-        
+
         # 3. Save parsing failures if any
         if self.parsing_failures:
-            failures_path = output_path / "parsing_failures.jsonl"
-            pd.DataFrame(self.parsing_failures).to_json(failures_path, orient="records", lines=True)
+            failures_path = f"{output_path}/parsing_failures.jsonl"
+            self.storage.write_jsonl(failures_path, self.parsing_failures)
             self.log(f"  • Parsing failures: {failures_path}")
-            
+
             # Also save a summary of error types
             error_types = {}
             for failure in self.parsing_failures:
                 error_type = failure['error_type']
                 error_types[error_type] = error_types.get(error_type, 0) + 1
-            
-            error_summary_path = output_path / "parsing_error_summary.json"
-            with open(error_summary_path, 'w') as f:
-                json.dump(error_types, f, indent=2)
+
+            error_summary_path = f"{output_path}/parsing_error_summary.json"
+            self.storage.write_json(error_summary_path, error_types)
             self.log(f"  • Error summary: {error_summary_path}")
     
     def _save_failures_immediately(self):
         """Save parsing failures immediately (e.g., when consecutive error limit is reached)."""
         if not self.parsing_failures:
             return
-        
-        output_path = Path(self.output_dir) if isinstance(self.output_dir, str) else self.output_dir
-        output_path.mkdir(parents=True, exist_ok=True)
-        
+
+        output_path = self.output_dir
+        self.storage.ensure_directory(output_path)
+
         # Save parsing failures
-        failures_path = output_path / "parsing_failures.jsonl"
-        pd.DataFrame(self.parsing_failures).to_json(failures_path, orient="records", lines=True)
+        failures_path = f"{output_path}/parsing_failures.jsonl"
+        self.storage.write_jsonl(failures_path, self.parsing_failures)
         self.log(f"  • Parsing failures saved to: {failures_path}")
-        
+
         # Save error summary
         error_types = {}
         for failure in self.parsing_failures:
             error_type = failure['error_type']
             error_types[error_type] = error_types.get(error_type, 0) + 1
-        
-        error_summary_path = output_path / "parsing_error_summary.json"
-        with open(error_summary_path, 'w') as f:
-            json.dump(error_types, f, indent=2)
+
+        error_summary_path = f"{output_path}/parsing_error_summary.json"
+        self.storage.write_json(error_summary_path, error_types)
         self.log(f"  • Error summary saved to: {error_summary_path}")
     
     def get_parsing_failures(self) -> List[Dict[str, Any]]:

@@ -15,12 +15,12 @@ def get_clusterer(
     assign_outliers: bool = False,
     include_embeddings: bool = False,
     use_gpu: bool | None = None,
-    cluster_positive: bool = False,
+    cluster_positive: bool = True,
     **kwargs
 ) -> PipelineStage:
     """
     Factory function to get the appropriate clusterer.
-    
+
     Args:
         method: Clustering method ("hdbscan", "dummy")
         min_cluster_size: Minimum cluster size
@@ -30,7 +30,7 @@ def get_clusterer(
         use_gpu: Enable GPU acceleration for embeddings, UMAP, and HDBSCAN.
                 None (default) = auto-detect based on CUDA availability.
         cluster_positive: If False and groupby_column is "behavior_type", skip clustering positive behaviors.
-                         Defaults to False.
+                         Defaults to True.
         **kwargs: Additional configuration
         
     Returns:

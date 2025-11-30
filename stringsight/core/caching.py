@@ -403,6 +403,7 @@ class LMDBCache:
         """Set value in LMDB.
 
         Uses write transaction (single writer, serialized).
+        Auto-expands map_size if MapFullError occurs.
 
         Args:
             key: Cache key
@@ -410,37 +411,43 @@ class LMDBCache:
             db: Database name ('completions' or 'embeddings')
         """
         db_handle = self.completions_db if db == 'completions' else self.embeddings_db
-        with self.env.begin(db=db_handle, write=True) as txn:
-            txn.put(key.encode('utf-8'), value)
-
-    def mget(self, keys: List[str], db: str = 'completions') -> List[Optional[bytes]]:
-        """Batch get (single transaction, more efficient).
-
-        Args:
-            keys: List of cache keys
-            db: Database name ('completions' or 'embeddings')
-
-        Returns:
-            List of values (None for missing keys)
-        """
-        db_handle = self.completions_db if db == 'completions' else self.embeddings_db
-        results = []
-        with self.env.begin(db=db_handle, write=False) as txn:
-            for key in keys:
-                results.append(txn.get(key.encode('utf-8')))
-        return results
+        try:
+            with self.env.begin(db=db_handle, write=True) as txn:
+                txn.put(key.encode('utf-8'), value)
+        except lmdb.MapFullError:
+            logger.warning("LMDB MapFullError: resizing map...")
+            self._resize_map()
+            # Retry once
+            with self.env.begin(db=db_handle, write=True) as txn:
+                txn.put(key.encode('utf-8'), value)
 
     def mset(self, mapping: Dict[str, bytes], db: str = 'completions') -> None:
         """Batch set (single transaction, MUCH more efficient).
+
+        Auto-expands map_size if MapFullError occurs.
 
         Args:
             mapping: Dictionary of key-value pairs
             db: Database name ('completions' or 'embeddings')
         """
         db_handle = self.completions_db if db == 'completions' else self.embeddings_db
-        with self.env.begin(db=db_handle, write=True) as txn:
-            for key, value in mapping.items():
-                txn.put(key.encode('utf-8'), value)
+        try:
+            with self.env.begin(db=db_handle, write=True) as txn:
+                for key, value in mapping.items():
+                    txn.put(key.encode('utf-8'), value)
+        except lmdb.MapFullError:
+            logger.warning("LMDB MapFullError: resizing map...")
+            self._resize_map()
+            # Retry once
+            with self.env.begin(db=db_handle, write=True) as txn:
+                for key, value in mapping.items():
+                    txn.put(key.encode('utf-8'), value)
+
+    def _resize_map(self):
+        """Double the map size of the LMDB environment."""
+        new_map_size = self.env.info()['map_size'] * 2
+        self.env.set_mapsize(new_map_size)
+        logger.info(f"Resized LMDB map size to {new_map_size / 1024**3:.1f}GB")
 
     def close(self) -> None:
         """Sync and close LMDB environment."""

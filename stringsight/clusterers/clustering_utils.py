@@ -28,7 +28,7 @@ import wandb
 import numpy as np
 import litellm  # type: ignore
 # sentence-transformers is optional - imported lazily when needed
-from .clustering_prompts import clustering_systems_prompt, coarse_clustering_systems_prompt, deduplication_clustering_systems_prompt
+from stringsight.prompts.clustering.prompts import clustering_systems_prompt, coarse_clustering_systems_prompt, deduplication_clustering_systems_prompt
 from stringsight.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -204,7 +204,7 @@ def _get_embeddings(texts: List[str], embedding_model: str, verbose: bool = Fals
     """
 
     # Treat OpenAI models either as "openai" keyword or provider-prefixed names
-    if embedding_model == "openai" or str(embedding_model).startswith("openai/") or embedding_model in {"text-embedding-3-large", "text-embedding-3-small", "e3-large", "e3-small"}:
+    if embedding_model == "openai" or str(embedding_model).startswith("openai/") or embedding_model in {"text-embedding-3-large", "text-embedding-3-large", "e3-large", "e3-small"}:
         return _get_openai_embeddings(texts, model=_normalize_embedding_model_name(embedding_model))
 
     # Lazy import of sentence-transformers (optional dependency)
@@ -538,7 +538,7 @@ async def llm_match(cluster_names, coarse_cluster_names, max_workers=16, model="
     return fine_to_coarse
 
 def _setup_embeddings(texts, embedding_model, verbose=False, use_gpu=False):
-    """Setup embeddings based on model type. Uses DiskCache-based caching.
+    """Setup embeddings based on model type. Uses LMDB-based caching.
     
     Args:
         texts: List of strings to embed
@@ -549,7 +549,7 @@ def _setup_embeddings(texts, embedding_model, verbose=False, use_gpu=False):
     Returns:
         Tuple of (embeddings array or None, model or None)
     """
-    if embedding_model == "openai" or str(embedding_model).startswith("openai/") or embedding_model in {"text-embedding-3-large", "text-embedding-3-small", "e3-large", "e3-small"}:
+    if embedding_model == "openai" or str(embedding_model).startswith("openai/") or embedding_model in {"text-embedding-3-large", "text-embedding-3-large", "e3-large", "e3-small"}:
         if verbose:
             logger.info("Using OpenAI embeddings (with disk caching)...")
         embeddings = _get_openai_embeddings(texts, model=_normalize_embedding_model_name(embedding_model))

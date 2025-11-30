@@ -214,7 +214,13 @@ class SideBySideMetrics(FunctionalMetrics):
         # Handle list format [scores_a, scores_b]
         if isinstance(all_scores, list) and len(all_scores) == 2:
             scores_a, scores_b = all_scores[0], all_scores[1]
-            
+
+            # Ensure scores_a and scores_b are dicts
+            if not isinstance(scores_a, dict):
+                scores_a = {}
+            if not isinstance(scores_b, dict):
+                scores_b = {}
+
             # Match this_model to the appropriate scores based on conversation order
             if conversation and isinstance(conversation.model, (list, tuple)) and len(conversation.model) == 2:
                 model_a, model_b = conversation.model[0], conversation.model[1]
@@ -228,11 +234,12 @@ class SideBySideMetrics(FunctionalMetrics):
             else:
                 # Fallback: use scores_a for first model, scores_b for second
                 model_scores = scores_a if this_model < other_model else scores_b
-            
+
             # Copy all numeric metrics from the model's scores
-            for k, v in model_scores.items():
-                if isinstance(v, (int, float)):
-                    result[k] = float(v)
+            if isinstance(model_scores, dict):
+                for k, v in model_scores.items():
+                    if isinstance(v, (int, float)):
+                        result[k] = float(v)
             
             # Handle winner if present in meta field
             if conversation and hasattr(conversation, 'meta'):

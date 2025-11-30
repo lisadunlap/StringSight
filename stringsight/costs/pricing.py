@@ -36,14 +36,14 @@ PRICING_TABLE: Dict[str, ModelPricing] = {
         context_window=128000,
         provider="openai",
     ),
-    "gpt-4o": ModelPricing(
+    "gpt-4.1": ModelPricing(
         input_price_per_1m_tokens=5.00,
         output_price_per_1m_tokens=15.00,
         context_window=128000,
         provider="openai",
         notes="Fast and high quality"
     ),
-    "gpt-4o-mini": ModelPricing(
+    "gpt-4.1-mini": ModelPricing(
         input_price_per_1m_tokens=0.60,
         output_price_per_1m_tokens=1.80,
         context_window=128000,
@@ -66,7 +66,7 @@ PRICING_TABLE: Dict[str, ModelPricing] = {
         provider="openai",
         notes="High quality embeddings"
     ),
-    "text-embedding-3-small": ModelPricing(
+    "text-embedding-3-large": ModelPricing(
         input_price_per_1m_tokens=0.02,
         output_price_per_1m_tokens=0.0,
         context_window=8191,

@@ -118,7 +118,7 @@ def main():
                         help="Number of prompts to sample (None = use all)")
     parser.add_argument("--min-cluster-size", type=int, default=4,
                         help="Minimum cluster size for StringSight")
-    parser.add_argument("--embedding-model", type=str, default="text-embedding-3-small",
+    parser.add_argument("--embedding-model", type=str, default="text-embedding-3-large",
                         help="Embedding model for StringSight clustering")
     parser.add_argument("--extraction-model", type=str, default="gpt-4.1-mini",
                         help="Model for StringSight property extraction")

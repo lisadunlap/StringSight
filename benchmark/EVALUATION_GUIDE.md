@@ -131,7 +131,7 @@ python benchmark/evaluate_stringsight.py \
     --min-cluster-size 5 \
     --extraction-model gpt-4.1-mini \
     --judge-model gpt-4.1 \
-    --embedding-model text-embedding-3-small \
+    --embedding-model text-embedding-3-large \
     --hierarchical \
     --output-dir benchmark/evaluation_results/full_run/
 ```
@@ -192,8 +192,8 @@ for gt_name, gt_matches in by_gt.items():
 - `--min-cluster-size`: Minimum cluster size (default: 5)
   - Lower = more fine-grained clusters, higher recall
   - Higher = fewer, larger clusters, higher precision
-- `--embedding-model`: Embedding model (default: text-embedding-3-small)
-  - Options: text-embedding-3-small, text-embedding-3-large, all-MiniLM-L6-v2
+- `--embedding-model`: Embedding model (default: text-embedding-3-large)
+  - Options: text-embedding-3-large, text-embedding-3-large, all-MiniLM-L6-v2
 - `--hierarchical`: Enable hierarchical clustering (recommended)
 
 **Matching Parameters:**
@@ -201,7 +201,7 @@ for gt_name, gt_matches in by_gt.items():
   - Lower = more lenient matching, higher recall
   - Higher = stricter matching, higher precision
 - `--judge-model`: LLM for evaluation (default: gpt-4.1)
-  - Options: gpt-4.1 (best), gpt-4.1-mini (cheaper), gpt-4o-mini
+  - Options: gpt-4.1 (best), gpt-4.1-mini (cheaper), gpt-4.1-mini
 
 **Sampling:**
 - `--subset-size`: Number of prompts to sample (None = all)

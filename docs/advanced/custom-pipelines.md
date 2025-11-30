@@ -31,7 +31,7 @@ from stringsight.metrics import SingleModelMetrics
 pipeline = (PipelineBuilder("My Custom Pipeline")
     .extract_properties(
         OpenAIExtractor(
-            model="gpt-4o-mini",
+            model="gpt-4.1-mini",
             temperature=0.5
         )
     )
@@ -258,7 +258,7 @@ pipeline = (PipelineBuilder("Multi-Stage Pipeline")
     .extract_properties(
         MultiStageExtractor([
             OpenAIExtractor(model="gpt-4.1", temperature=0.3),
-            OpenAIExtractor(model="gpt-4o-mini", temperature=0.7)
+            OpenAIExtractor(model="gpt-4.1-mini", temperature=0.7)
         ])
     )
     .cluster_properties(HDBSCANClusterer())

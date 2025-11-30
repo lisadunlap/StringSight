@@ -14,18 +14,27 @@ StringSight is a comprehensive analysis framework for evaluating and comparing L
 
 3. **Quantifies importance** - Calculates statistical metrics to show which models excel at which behaviors and by how much
 
-4. **Provides insights** - Surfaces the *why* behind model performance differences, not just the *what*
+4. **Provides insights** - Explains *why* your model is failing, compare the behaviors of different models/methods, and find instances of reward hacking. 
 
 ## Key Features
 
-- **🔍 Automatic property extraction** - LLM-powered analysis identifies behavioral patterns without manual coding
-- **📊 Clustering** - Groups similar behaviors into meaningful clusters
-- **📈 Statistical analysis** - Computes significance testing, confidence intervals, and quality scores
-- **Multiple analysis modes** - Single-model analysis or side-by-side comparisons (Arena-style)
-- **🏷️ Fixed-taxonomy labeling** - LLM-as-judge with predefined behavioral axes
-- **💰 Cost tracking** - Built-in monitoring of LLM API costs
-- **📱 Interactive visualizations** - React frontend for exploring results
-- **🔧 Flexible pipeline** - Modular architecture supports custom extractors, clusterers, and metrics
+**StringSight tells you what the heck is going on with your traces with minimal to no prompt tuning on your part.**
+Upload you traces and automatically discover interesting behaviors through the following pipeline:
+- **Automatic property extraction** - LLM-powered analysis identifies behavioral patterns without manual coding
+- **Clustering** - Groups similar behaviors into meaningful clusters
+- **Statistical analysis** - Computes significance testing, confidence intervals, and quality scores
+
+Easily visualize and analyze your traces in our UI:
+- **Trace visualization** No money or compute required! Simply upload your data and easily view and search through your traces
+- **Run Automatic Behavior Extraction and Explore Insights Dashboard**
+  - Common failure modes
+  - Model comparrison
+  - Instances of misaligned metrics 
+
+We also support:
+- **Side-by-side analysis** - Compare methods with side-by-side comparisons (find behaviors that differ across traces) or extract behaviors per trace
+- **Multimodal support** - Allows for text, image, or interleaved text image conversations
+- **Fixed-taxonomy labeling** - If you have a predefined list of behaviors, LLM-as-judge with predefined behavioral axes
 
 ## Quick Example
 
@@ -35,15 +44,18 @@ from stringsight import explain
 
 # Your data with model responses
 df = pd.DataFrame({
-    "prompt": ["What is machine learning?", "Explain quantum computing"],
-    "model": ["gpt-4", "gpt-4"],
+    "prompt": ["What is machine learning?", "Explain quantum computing", "What is machine learning?", ..],
+    "model": ["gpt-4", "gpt-4", "claude-3", ..],
     "model_response": [
         [{"role": "user", "content": "What is machine learning?"},
          {"role": "assistant", "content": "Machine learning involves..."}],
         [{"role": "user", "content": "Explain quantum computing"},
          {"role": "assistant", "content": "Quantum computing uses..."}]
+         [{"role": "user", "content": "What is machine learning?"},
+         {"role": "assistant", "content": "Machine learning involves..."}],
+         ...
     ],
-    "score": [{"accuracy": 1, "helpfulness": 4.2}, {"accuracy": 0, "helpfulness": 3.8}]
+    "score": [{"accuracy": 1, "helpfulness": 4.2}, {"accuracy": 0, "helpfulness": 3.8}, {"accuracy": 0, "helpfulness": 3.8}, ..] 
 })
 
 # Extract and cluster behavioral properties
@@ -53,7 +65,16 @@ clustered_df, model_stats = explain(
     output_dir="results/"
 )
 
-# View results using the React frontend or other visualization tools
+# Compare 2 models side-by-side
+clustered_df, model_stats = explain(
+    df,
+    method="side_by_side",
+    model_a="gpt-4",
+    model_b="claude-3", 
+    output_dir="results/"
+)
+
+# View results by uploading results folder to the UI (either stringsight.com or locally)
 ```
 
 ## Use Cases
@@ -78,16 +99,15 @@ Focus on behaviors relevant to your domain:
 
 ## How It Works
 
-StringSight uses a 4-stage pipeline:
+StringSight uses a 3-stage pipeline:
 
 ```
-Data Input → Property Extraction → Post-processing → Clustering → Metrics & Analysis
+Data Input → Property Extraction → Clustering → Metrics & Analysis
 ```
 
 1. **Property Extraction** - An LLM analyzes each response and extracts behavioral properties
-2. **Post-processing** - Parse and validate extracted properties into structured data
-3. **Clustering** - Group similar properties using embeddings and HDBSCAN
-4. **Metrics & Analysis** - Calculate per-model statistics, quality scores, and significance tests
+2. **Clustering** - Group similar properties using embeddings and HDBSCAN
+3. **Metrics & Analysis** - Calculate per-model statistics, quality scores, and significance tests
 
 ## Installation
 

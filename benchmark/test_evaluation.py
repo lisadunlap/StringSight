@@ -12,7 +12,7 @@ config = EvaluationConfig(
     output_dir="benchmark/evaluation_results/test_run/",
     subset_size=5,  # Sample 5 prompts (if 12 behaviors, this = 5×12=60 total responses)
     min_cluster_size=3,  # Lower threshold for small test
-    embedding_model="text-embedding-3-small",
+    embedding_model="text-embedding-3-large",
     extraction_model="gpt-4.1-mini",  # Cheaper model for testing
     judge_model="gpt-4.1-mini",  # Cheaper model for testing
     hierarchical=True,
