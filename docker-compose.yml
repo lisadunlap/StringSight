@@ -49,21 +49,20 @@ services:
       context: .
       dockerfile: Dockerfile # Uses the optimized Dockerfile
       network: host
+    network_mode: "host"
     dns:
       - 8.8.8.8
       - 8.8.4.4
     volumes:
       - ./results:/app/results
       - ./data:/app/data
-    ports:
-      - "8000:8000"
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://stringsight:stringsight_dev@db:5432/stringsight
-      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://stringsight:stringsight_dev@localhost:5432/stringsight
+      - REDIS_URL=redis://localhost:6379/0
       - STORAGE_TYPE=s3
-      - S3_ENDPOINT_URL=http://minio:9000
+      - S3_ENDPOINT_URL=http://localhost:9000
       - AWS_ACCESS_KEY_ID=minioadmin
       - AWS_SECRET_ACCESS_KEY=minioadmin
     depends_on:
@@ -80,6 +79,7 @@ services:
       context: .
       dockerfile: Dockerfile
       network: host
+    network_mode: "host"
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -89,10 +89,10 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://stringsight:stringsight_dev@db:5432/stringsight
-      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://stringsight:stringsight_dev@localhost:5432/stringsight
+      - REDIS_URL=redis://localhost:6379/0
       - STORAGE_TYPE=s3
-      - S3_ENDPOINT_URL=http://minio:9000
+      - S3_ENDPOINT_URL=http://localhost:9000
       - AWS_ACCESS_KEY_ID=minioadmin
       - AWS_SECRET_ACCESS_KEY=minioadmin
     depends_on:

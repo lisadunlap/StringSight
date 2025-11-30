@@ -243,7 +243,10 @@ def run_pipeline_job(self, job_id: str, req_data: Dict[str, Any]):
                 else:
                     logger.warning(f"⚠️ Email sending failed: {result.get('message')}")
             except Exception as e:
+                # Log error but don't fail the job
                 logger.error(f"Failed to send email for job {job_id}: {e}")
+                # We could update the job with a warning, but for now just log it
+                # The job is already marked as completed above
         
     except Exception as e:
         logger.error(f"Error in pipeline job {job_id}: {e}", exc_info=True)
@@ -584,6 +587,7 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
                 else:
                     logger.warning(f"⚠️ Email sending failed: {result.get('message')}")
             except Exception as e:
+                # Log error but don't fail the job
                 logger.error(f"Failed to send email for job {job_id}: {e}")
         
         logger.info(f"Cluster job {job_id} completed successfully")
