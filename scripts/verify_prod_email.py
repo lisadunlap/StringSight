@@ -54,6 +54,7 @@ def verify_email_config(recipient=None):
     # Load env vars
     load_dotenv()
     
+    brevo_key = os.getenv('BREVO_API_KEY')
     smtp_server = os.getenv('EMAIL_SMTP_SERVER')
     smtp_port = os.getenv('EMAIL_SMTP_PORT')
     sender_email = os.getenv('EMAIL_SENDER')
@@ -62,6 +63,51 @@ def verify_email_config(recipient=None):
     print("\n" + "="*50)
     print("📧 Email Configuration Check")
     print("="*50)
+    
+    if brevo_key:
+        print("✅ Brevo API Key found!")
+        print(f"Key:           {mask_secret(brevo_key)}")
+        print(f"Sender Email:  {sender_email}")
+        
+        if not sender_email:
+            print("❌ EMAIL_SENDER is missing (required for Brevo)")
+            return False
+            
+        if recipient:
+            print("\n🔄 Testing Brevo API...")
+            try:
+                import requests
+                url = "https://api.brevo.com/v3/smtp/email"
+                headers = {
+                    "accept": "application/json",
+                    "api-key": brevo_key,
+                    "content-type": "application/json"
+                }
+                payload = {
+                    "sender": {"email": sender_email},
+                    "to": [{"email": recipient}],
+                    "subject": "StringSight Brevo Test",
+                    "htmlContent": "<p>This is a test email from StringSight using Brevo API.</p>"
+                }
+                response = requests.post(url, headers=headers, json=payload)
+                
+                if response.status_code in [200, 201, 202]:
+                    print("   ✅ Email sent successfully via Brevo!")
+                    return True
+                else:
+                    print(f"   ❌ Brevo API Error: {response.status_code}")
+                    print(f"   {response.text}")
+                    return False
+            except Exception as e:
+                print(f"   ❌ Brevo Test Failed: {e}")
+                return False
+        else:
+            print("\nℹ️  To test sending, provide a recipient email:")
+            print("    python scripts/verify_prod_email.py me@example.com")
+            return True
+
+    # Fallback to SMTP checks if no Brevo key
+    print("\nℹ️  No Brevo API Key found. Checking SMTP configuration...")
     
     print(f"SMTP Server:   {smtp_server}")
     print(f"SMTP Port:     {smtp_port}")

@@ -75,6 +75,91 @@ def send_results_email(
     Returns:
         Dict with 'success' boolean and 'message' string
     """
+    # Check for Brevo API Key
+    brevo_api_key = os.getenv('BREVO_API_KEY')
+    
+    if brevo_api_key:
+        logger.info("Using Brevo API for email sending")
+        try:
+            import requests
+            import base64
+            
+            zip_path = create_results_zip(results_dir)
+            
+            # Read and encode the zip file
+            with open(zip_path, "rb") as f:
+                encoded_content = base64.b64encode(f.read()).decode()
+            
+            url = "https://api.brevo.com/v3/smtp/email"
+            
+            headers = {
+                "accept": "application/json",
+                "api-key": brevo_api_key,
+                "content-type": "application/json"
+            }
+            
+            payload = {
+                "sender": {"email": sender_email},
+                "to": [{"email": recipient_email}],
+                "subject": "Your StringSight Clustering Results are Here!",
+                "htmlContent": """
+<html>
+<body>
+<p>Oh hello there,</p>
+
+<p>Your StringSight clustering results are attached, get excited! 🎉</p>
+
+<p>To view results, simply upload the zip file to <a href="https://stringsight.com">stringsight.com</a> (click the 'Load Results' button on the top right of the homepage)</p>
+
+<p>The attached zip file contains all clustering outputs including:</p>
+<ul>
+<li>Original conversation data (conversations.jsonl)</li>
+<li>Cluster definitions (clusters.jsonl)</li>
+<li>Data properties (properties.jsonl)</li>
+<li>Cluster scores and metrics (scores_df.jsonl files)</li>
+</ul>
+
+<p>Thank you for using StringSight! Hopefully you get some good insights from your strings. If you find this tool useful, please toss us a github star <a href="https://github.com/lisadunlap/StringSight">⭐ github.com/lisadunlap/StringSight</a></p>
+
+<p>Best regards,<br>
+Some Berkeley Folks</p>
+</body>
+</html>
+""",
+                "attachment": [
+                    {
+                        "content": encoded_content,
+                        "name": f"{Path(zip_path).name}"
+                    }
+                ]
+            }
+            
+            response = requests.post(url, headers=headers, json=payload)
+            
+            os.remove(zip_path)
+            
+            if response.status_code in [200, 201, 202]:
+                logger.info(f"Results emailed successfully via Brevo to {recipient_email}")
+                return {
+                    'success': True,
+                    'message': f'Results successfully sent to {recipient_email} via Brevo'
+                }
+            else:
+                error_msg = f"Brevo API Error: {response.status_code} - {response.text}"
+                logger.error(error_msg)
+                return {
+                    'success': False,
+                    'message': error_msg
+                }
+                
+        except Exception as e:
+            logger.error(f"Failed to send email via Brevo: {str(e)}", exc_info=True)
+            return {
+                'success': False,
+                'message': f'Failed to send email via Brevo: {str(e)}'
+            }
+
+    # Fallback to SMTP if no Brevo key
     smtp_server = smtp_server or settings.EMAIL_SMTP_SERVER
     smtp_port = smtp_port or settings.EMAIL_SMTP_PORT
     sender_email = sender_email or settings.EMAIL_SENDER
@@ -87,7 +172,7 @@ def send_results_email(
     if not sender_password: missing_vars.append("EMAIL_PASSWORD")
 
     if missing_vars:
-        error_msg = f"Email configuration missing: {', '.join(missing_vars)}. Please set these environment variables."
+        error_msg = f"Email configuration missing: {', '.join(missing_vars)}. Please set these environment variables OR set BREVO_API_KEY."
         logger.error(error_msg)
         return {
             'success': False,
