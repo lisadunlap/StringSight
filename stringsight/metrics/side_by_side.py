@@ -124,6 +124,9 @@ class SideBySideMetrics(FunctionalMetrics):
                 )
 
         conversations_df = pd.DataFrame(expanded_rows)
+        if conversations_df.empty:
+            # Ensure required columns exist even if empty to prevent merge errors
+            conversations_df = pd.DataFrame(columns=["conversation_id", "model", "scores", "conversation_metadata"])
 
         # ------------------------------------------------------------------
         # 4) Join: properties ↔ conversations ↔ clusters

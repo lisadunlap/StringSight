@@ -19,7 +19,7 @@ import os
 import time
 
 import pandas as pd
-from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Query
+from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Query, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -41,7 +41,9 @@ import threading, uuid
 from dataclasses import dataclass, field
 from functools import lru_cache
 from datetime import datetime, timedelta
+from datetime import datetime, timedelta
 import hashlib
+from stringsight.routers.auth import get_current_user_optional
 
 logger = get_logger(__name__)
 
@@ -552,10 +554,15 @@ class ClusterRunRequest(BaseModel):
     output_dir: Optional[str] = None
     score_columns: Optional[List[str]] = None  # NEW: List of score column names to convert to dict format
     method: Optional[str] = "single_model"  # NEW: Method for score column conversion
+    email: Optional[str] = None  # NEW: Email for notifications
 
 
 @app.post("/cluster/run")
-async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
+async def cluster_run(
+    req: ClusterRunRequest,
+    background_tasks: BackgroundTasks,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+) -> Dict[str, Any]:
     """Run clustering directly on existing properties without re-running extraction.
     
     This is much more efficient than the full explain() pipeline since it skips
@@ -587,7 +594,14 @@ async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             _cu._cache = None
     except Exception:
         pass
+    except Exception:
+        pass
     
+    # Inject email from current_user if not provided
+    if not req.email and current_user and current_user.email:
+        req.email = current_user.email
+        logger.info(f"Injecting email {req.email} for cluster run")
+
     try:
         # NEW: Preprocess operationalRows to handle score_columns conversion
         # This ensures scores are in the expected nested dict format before creating ConversationRecords
@@ -1333,8 +1347,6 @@ async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
         sample_model = list(model_cluster_scores_dict.keys())[0]
         sample_cluster = list(model_cluster_scores_dict[sample_model].keys())[0]
         sample_metrics = model_cluster_scores_dict[sample_model][sample_cluster]
-        logger.info(f"🔧 Transforming model_cluster_scores to array format:")
-        logger.info(f"  - Sample model: {sample_model}")
         logger.info(f"  - Sample cluster: {sample_cluster}")
         logger.info(f"  - Sample metrics keys: {list(sample_metrics.keys())}")
         logger.info(f"  - Sample quality: {sample_metrics.get('quality')}")
@@ -1516,6 +1528,29 @@ async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             logger.info(f"✓ Saved metrics JSONL files under: {results_dir}")
     except Exception as e:
         logger.warning(f"Failed to save metrics JSONL files: {e}")
+
+    # Send email if requested
+    if req.email and results_dir:
+        def _send_email_task():
+            try:
+                logger.info(f"Sending clustering results email to {req.email}")
+                # Determine experiment name
+                exp_name = results_dir_name or "Clustering Results"
+                
+                result = send_results_email(
+                    recipient_email=req.email,
+                    results_dir=str(results_dir),
+                    experiment_name=exp_name
+                )
+                if result.get('success'):
+                    logger.info(f"✅ Clustering email sent successfully: {result.get('message')}")
+                else:
+                    logger.warning(f"⚠️ Clustering email sending failed: {result.get('message')}")
+            except Exception as e:
+                logger.error(f"Failed to send clustering email: {e}")
+
+        background_tasks.add_task(_send_email_task)
+        logger.info(f"📧 Queued email notification for {req.email}")
 
     return {
         "clusters": enriched,

@@ -19,9 +19,6 @@ Note: The task description may be incomplete or missing details. Use your best j
 
 **Your Goal:**
 {goal_instructions}
-```json
-{json_schema}
-```
 
 ### ANALYSIS PROCESS
 
@@ -109,7 +106,7 @@ single_model_config = {
     "analysis_process": """1. **Scan the Trace:** Read the user input, the model's internal thoughts (if available), the model's interaction with the user, the system of tools the model has access to, and the environment, and the final output.
 2. **Distinguish internal reasoning from external output:** Identify unique behaviors in the model's <internal_reasoning> (thoughts), <user_interaction> (interaction with the user), <tool_use> (use of tools), <environment> (environment the model is in), and <external_output> (user-facing output).
 3. **Filter:** Ignore generic behaviors (e.g., "Agent answered correctly"). Focus on behaviors that are **High Leverage** (critical success/failure), **Distinctive** (persona/style), or **Structural** (looping, adherence to format).
-4. **Draft:** Write the behavior descriptions following the formulas and rules below.""",
+4. **Draft:** Write the behavior descriptions following the **Definitions & Rubric** section.""",
 
     "model_naming_rule": "",  # Empty string for Single Model
     
@@ -126,7 +123,7 @@ sbs_config = {
   {
     "model": "The name of the model that exhibits this behavior",
     "behavior_type": "Negative (critical)|Negative (non-critical)|Positive|Style",
-    "property_description": "lowercase verb + exact action + trigger + consequence/policy impact (1-3 sentences)",
+    "property_description": "string (following the Property Description Formula in Section 2: [lowercase verb] + [specific trigger/context] + [consequence])",
     "category": "1-4 word category (e.g., 'Regex Failure', 'Safety Robustness', 'Response to Jailbreaking Attempts')",
     "evidence": "exact quote one", "exact quote two", "exact quote three",
     "reason": "1-2 sentence explanation of why this property is notable or important",
@@ -139,7 +136,7 @@ sbs_config = {
     "analysis_process": """1. **Scan the Traces:** Read the user input, each model's internal thoughts (if available), the models interaction with the user, the system of tools the model has access to, and the environment, and the final output. Compare and consider differences between the models' responses.
 2. **Distinguish internal reasoning from external output:** Identify unique behaviors in each model's <internal_reasoning> (thoughts), <user_interaction> (interaction with the user), <tool_use> (use of tools), <environment> (environment the model is in), and <external_output> (user-facing output).
 3. **Filter:** Ignore generic behaviors (e.g., "Agent answered correctly"). Focus on differentiating behaviors that are **High Leverage** (critical success/failure), **Distinctive** (persona/style), or **Structural** (looping, adherence to format).
-4. **Draft:** Write the behavior descriptions according to the rules and formulas below.""",
+4. **Draft:** Write the behavior descriptions following the **Definitions & Rubric** section.""",
 
     "model_naming_rule": """0. MODEL NAMING RULES:
 * Respond with either "Model A" or "Model B" depending on which model exhibits the behavior. Remember to include distinct properties from each model and do not let the ordering of the model responses influence the properties you include.
@@ -157,10 +154,10 @@ agent_single_model_config = {
     
     "json_schema": """[
   {
-    "property_description": "string (following the formula above)",
+    "property_description": "string (following the Property Description Formula in Section 2: [lowercase verb] + [specific trigger/context] + [consequence])",
     "category": "string (short category, e.g., 'Tool Use', 'Tone', 'Safety')",
     "reason": "string (Why does this matter to a developer?)",
-    "evidence": ["exact quote 1", "exact quote 2"],
+    "evidence": "exact quote 1", "exact quote 2", "exact quote 3",
     "behavior_type": "Negative (critical)|Negative (non-critical)|Positive|Style",
     "contains_errors": boolean,
     "unexpected_behavior": boolean
@@ -170,7 +167,7 @@ agent_single_model_config = {
     "analysis_process": """1. **Scan the Trace:** Read the user input, each agent's internal thoughts (if available), the agents interaction with the user, the system of tools the agent has access to, and the environment, and the final output.
 2. **Distinguish:** Strictly differentiate between each agent's <internal_reasoning> (thoughts), <user_interaction> (interaction with the user), <tool_use> (use of tools), <environment> (environment the agent is in), and <external_output> (what the user sees).
 3. **Filter:** Ignore generic behaviors (e.g., "Agent answered correctly"). Look for behaviors that are **High Leverage** (critical success/failure), **Distinctive** (persona/style), or **Structural** (looping, format adherence).
-4. **Draft:** Formulate the behavior descriptions using the specific formulas defined below.""",
+4. **Draft:** Formulate the behavior descriptions following the **Definitions & Rubric** section.""",
 
     "model_naming_rule": "",  # Empty string for Single Model
     
@@ -186,7 +183,7 @@ agent_sbs_config = {
     "json_schema": """[
   {
     "model": "The name of the model that exhibits this behavior",
-    "property_description": "lowercase verb + exact action + trigger + consequence/policy impact (1-3 sentences, exactly like the examples above)",
+    "property_description": "lowercase verb + exact action + trigger + consequence/policy impact (1-3 sentences, exactly like the examples in Section 2: [lowercase verb] + [specific trigger/context] + [consequence])",
     "category": "1-4 word category (e.g., 'Refund Policy Violation', 'Safety Refusal', 'Deception Handling', 'Internal Reasoning Leak', 'Manipulation Resistance')",
     "reason": "Why this property is notable/important — explain impact only (1-2 sentences)",
     "evidence": "exact quote one", "exact quote two", "exact quote three",
@@ -199,7 +196,7 @@ agent_sbs_config = {
     "analysis_process": """1. **Scan the Trace:** Read the user input, each agent's internal thoughts (if available), the agents interaction with the user, the system of tools the agent has access to, and the environment, and the final output.
 2. **Distinguish:** Strictly differentiate between each agent's <internal_reasoning> (thoughts), <user_interaction> (interaction with the user), <tool_use> (use of tools), <environment> (environment the agent is in), and <external_output> (what the user sees).
 3. **Filter:** Ignore generic behaviors (e.g., "Agent answered correctly", "The agent adhered to the system policy", "The agent thought step by step"). Look for behaviors that are **High Leverage** (critical success/failure), **Distinctive** (persona/style), or **Structural** (looping, format adherence).
-4. **Draft:** Formulate the behavior descriptions using the specific formulas defined below.""",
+4. **Draft:** Formulate the behavior descriptions following the **Definitions & Rubric** section.""",
 
     "model_naming_rule": """0. MODEL NAMING RULES:
 * Respond with either "Model A" or "Model B" depending on which agent exhibits the behavior. Remember to include distinct properties from each agent and do not let the ordering of the agent responses influence the properties you include.

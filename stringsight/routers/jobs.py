@@ -38,6 +38,11 @@ def start_pipeline_job(
     db.add(job)
     db.commit()
     
+    # Inject email from current_user if not provided
+    if not req.email and current_user and current_user.email:
+        req.email = current_user.email
+        logger.info(f"Injecting email {req.email} for job {job_id}")
+    
     # Convert request to dict for serialization
     req_data = req.dict()
     
@@ -63,6 +68,11 @@ def start_extract_job(
     )
     db.add(job)
     db.commit()
+    
+    # Inject email from current_user if not provided
+    if not req.email and current_user and current_user.email:
+        req.email = current_user.email
+        logger.info(f"Injecting email {req.email} for job {job_id}")
     
     # Convert request to dict for serialization
     req_data = req.dict()
@@ -91,6 +101,11 @@ def start_cluster_job(
     )
     db.add(job)
     db.commit()
+    
+    # Inject email from current_user if not provided
+    if not req.email and current_user and current_user.email:
+        req.email = current_user.email
+        logger.info(f"Injecting email {req.email} for job {job_id}")
     
     # Convert request to dict for serialization
     req_data = req.dict()

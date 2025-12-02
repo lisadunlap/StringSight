@@ -43,6 +43,7 @@ COPY alembic.ini .
 COPY requirements.txt ./requirements.txt
 COPY pyproject.toml .
 COPY check_jobs.py .
+COPY scripts/ ./scripts/
 
 # Create non-root user
 RUN useradd -m appuser && chown -R appuser:appuser /app

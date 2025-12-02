@@ -16,6 +16,7 @@ class ExtractBatchRequest(BaseModel):
     output_dir: Optional[str] = None
     return_debug: Optional[bool] = False
     sample_size: Optional[int] = None
+    email: Optional[str] = None
 
 class ExtractJobStartRequest(ExtractBatchRequest):
     pass

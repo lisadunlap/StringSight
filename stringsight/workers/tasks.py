@@ -122,9 +122,16 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
         job = db.query(Job).filter(Job.id == job_id).first()
         job.status = "completed"
         job.progress = 1.0
-        # Store relative path from results directory for API compatibility
         job.result_path = req.output_dir if req.output_dir else f"extract_{job_id}_{timestamp}"
         db.commit()
+        
+        # Send email if requested (Async)
+        if req.email:
+            send_email_task.delay(
+                email=req.email,
+                output_dir=output_dir,
+                job_name=f"Extraction Job {job_id}"
+            )
         
     except Exception as e:
         logger.error(f"Error in extract job {job_id}: {e}", exc_info=True)
