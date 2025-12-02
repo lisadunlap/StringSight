@@ -145,15 +145,29 @@ Some Berkeley Folks</p>
             )
             msg.attach(part)
 
+        # Helper to resolve to IPv4 to avoid Docker IPv6 timeouts
+        def get_ipv4_addr(host, port):
+            try:
+                import socket
+                infos = socket.getaddrinfo(host, port, socket.AF_INET)
+                if infos:
+                    return infos[0][4][0]
+            except Exception:
+                pass
+            return host
+
+        server_ip = get_ipv4_addr(smtp_server, smtp_port)
+        logger.info(f"Resolved {smtp_server} to {server_ip}")
+
         # Handle SSL vs STARTTLS based on port
         if smtp_port == 465:
-            logger.info(f"Connecting to SMTP server {smtp_server}:{smtp_port} using SSL")
-            with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
+            logger.info(f"Connecting to SMTP server {server_ip}:{smtp_port} using SSL")
+            with smtplib.SMTP_SSL(server_ip, smtp_port) as server:
                 server.login(sender_email, sender_password)
                 server.send_message(msg)
         else:
-            logger.info(f"Connecting to SMTP server {smtp_server}:{smtp_port} using STARTTLS")
-            with smtplib.SMTP(smtp_server, smtp_port) as server:
+            logger.info(f"Connecting to SMTP server {server_ip}:{smtp_port} using STARTTLS")
+            with smtplib.SMTP(server_ip, smtp_port) as server:
                 server.starttls()
                 server.login(sender_email, sender_password)
                 server.send_message(msg)

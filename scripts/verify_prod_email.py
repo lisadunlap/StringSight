@@ -96,10 +96,12 @@ def verify_email_config(recipient=None):
         print(f"\n❌ Connection Failed: {e}")
         
         # If failed, try forcing IPv4 if it looks like a network unreachable error
-        if "unreachable" in str(e).lower() or "101" in str(e):
-            print("\n⚠️  Network Unreachable. Attempting to force IPv4...")
+        if "unreachable" in str(e).lower() or "101" in str(e) or "timed out" in str(e).lower():
+            print("\n⚠️  Network Issue Detected. Attempting diagnostics...")
+            
+            # 1. Try IPv4 Force
+            print("\n   [Attempt 1] Forcing IPv4...")
             try:
-                # Resolve to IPv4 address manually
                 ipv4_addr = None
                 infos = socket.getaddrinfo(smtp_server, port, socket.AF_INET)
                 if infos:
@@ -112,6 +114,25 @@ def verify_email_config(recipient=None):
                     print("   ❌ Could not resolve to IPv4 address.")
             except Exception as e2:
                 print(f"   ❌ IPv4 Force Failed: {e2}")
+
+            # 2. Try Port 465 (SSL)
+            if port != 465:
+                print("\n   [Attempt 2] Trying Port 465 (SSL)...")
+                print("   (DigitalOcean often blocks port 587 but allows 465)")
+                try:
+                    # Resolve IPv4 for this too
+                    ipv4_addr = None
+                    infos = socket.getaddrinfo(smtp_server, 465, socket.AF_INET)
+                    if infos:
+                        ipv4_addr = infos[0][4][0]
+                    else:
+                        ipv4_addr = smtp_server
+                        
+                    connect_to_server(ipv4_addr, 465, sender_email, sender_password, recipient)
+                    print("\n✨ Success using Port 465! Please update EMAIL_SMTP_PORT=465 in your .env")
+                    return True
+                except Exception as e3:
+                    print(f"   ❌ Port 465 Failed: {e3}")
 
         import traceback
         traceback.print_exc()
