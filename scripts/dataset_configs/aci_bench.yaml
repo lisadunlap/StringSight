@@ -15,8 +15,8 @@ models:
   - deepseek-ai/deepseek-r1
   - google/gemini-1.5-pro-001
   - google/gemini-2.5-pro-preview-03-25
-  - openai/gpt-4o-2024-05-13
-  - openai/gpt-4o-mini-2024-07-18
+  - openai/gpt-4.1-2024-05-13
+  - openai/gpt-4.1-mini-2024-07-18
   - openai/o3-mini-2025-01-31
 task_description: |
   This task is summarizing patient-doctor conversations.

@@ -2,7 +2,7 @@ data_path: data/helm_capabilities/wildbench_top_models.jsonl
 output_dir: results/wildbench_grok_4_0709_grok_3_beta_sample
 method: side_by_side
 min_cluster_size: 8
-embedding_model: text-embedding-3-small
+embedding_model: text-embedding-3-large
 max_workers: 16
 groupby_column: behavior_type
 assign_outliers: false

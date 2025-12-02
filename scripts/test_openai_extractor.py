@@ -39,7 +39,7 @@ def test_openai_extractor():
         
         # Test the prompt builder
         print("\nTesting prompt builder...")
-        extractor = OpenAIExtractor(model="gpt-4o-mini")  # Use a cheaper model for testing
+        extractor = OpenAIExtractor(model="gpt-4.1-mini")  # Use a cheaper model for testing
         
         try:
             prompt = extractor._default_prompt_builder(conv)

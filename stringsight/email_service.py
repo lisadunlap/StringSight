@@ -80,10 +80,18 @@ def send_results_email(
     sender_email = sender_email or settings.EMAIL_SENDER
     sender_password = sender_password or settings.EMAIL_PASSWORD
 
-    if not all([smtp_server, sender_email, sender_password]):
+    # Check for missing configuration
+    missing_vars = []
+    if not smtp_server: missing_vars.append("EMAIL_SMTP_SERVER")
+    if not sender_email: missing_vars.append("EMAIL_SENDER")
+    if not sender_password: missing_vars.append("EMAIL_PASSWORD")
+
+    if missing_vars:
+        error_msg = f"Email configuration missing: {', '.join(missing_vars)}. Please set these environment variables."
+        logger.error(error_msg)
         return {
             'success': False,
-            'message': 'Email configuration missing. Please set EMAIL_SMTP_SERVER, EMAIL_SENDER, and EMAIL_PASSWORD environment variables.'
+            'message': error_msg
         }
 
     if not os.path.exists(results_dir):
@@ -105,7 +113,7 @@ def send_results_email(
 <body>
 <p>Oh hello there,</p>
 
-<p>Your StringSight clustering results for experiment "{experiment_name}" are attached, get excited! 🎉</p>
+<p>Your StringSight clustering results are attached, get excited! 🎉</p>
 
 <p>To view results, simply upload the zip file to <a href="https://stringsight.com">stringsight.com</a> (click the 'Load Results' button on the top right of the homepage)</p>
 
@@ -117,7 +125,7 @@ def send_results_email(
 <li>Cluster scores and metrics (scores_df.jsonl files)</li>
 </ul>
 
-<p>Thank you for using StringSight! If you find this tool useful, we take funding in the form of github stars <a href="https://github.com/lisadunlap/StringSight">⭐ github.com/lisadunlap/StringSight</a></p>
+<p>Thank you for using StringSight! Hopefully you get some good insights from your strings. If you find this tool useful, please toss us a github star <a href="https://github.com/lisadunlap/StringSight">⭐ github.com/lisadunlap/StringSight</a></p>
 
 <p>Best regards,<br>
 Some Berkeley Folks</p>
@@ -137,10 +145,18 @@ Some Berkeley Folks</p>
             )
             msg.attach(part)
 
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(sender_email, sender_password)
-            server.send_message(msg)
+        # Handle SSL vs STARTTLS based on port
+        if smtp_port == 465:
+            logger.info(f"Connecting to SMTP server {smtp_server}:{smtp_port} using SSL")
+            with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
+                server.login(sender_email, sender_password)
+                server.send_message(msg)
+        else:
+            logger.info(f"Connecting to SMTP server {smtp_server}:{smtp_port} using STARTTLS")
+            with smtplib.SMTP(smtp_server, smtp_port) as server:
+                server.starttls()
+                server.login(sender_email, sender_password)
+                server.send_message(msg)
 
         os.remove(zip_path)
 
@@ -151,7 +167,7 @@ Some Berkeley Folks</p>
         }
 
     except Exception as e:
-        logger.error(f"Failed to send email: {str(e)}")
+        logger.error(f"Failed to send email: {str(e)}", exc_info=True)
         return {
             'success': False,
             'message': f'Failed to send email: {str(e)}'

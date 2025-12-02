@@ -2,13 +2,13 @@ data_path: data/medhelm/medi_qa.jsonl
 output_dir: results/medi_qa
 method: single_model
 min_cluster_size: 5
-embedding_model: text-embedding-3-small
+embedding_model: text-embedding-3-large
 max_workers: 16
 groupby_column: behavior_type
 assign_outliers: false
 models:
   - google/gemini-1.5-pro-001
-  - openai/gpt-4o-mini-2024-07-18
+  - openai/gpt-4.1-mini-2024-07-18
   - meta/llama-3.3-70b-instruct
 task_description: |
   This task is answering consumer medication-related questions.

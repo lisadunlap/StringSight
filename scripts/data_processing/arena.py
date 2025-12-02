@@ -70,16 +70,16 @@ def load_arena_data(args) -> Tuple[pd.DataFrame, Callable, str]:
 
     # models = [
     #     "claude-3-5-sonnet-20240620",
-    #     "gpt-4o-2024-05-13",
+    #     "gpt-4.1-2024-05-13",
     #     "gemini-1.5-pro-api-0514",
     #     "llama-3-70b-instruct",
     #     "gemini-1.5-pro-exp-0801",
     #     "claude-3-opus-20240229",
     #     "llama-3.1-405b-instruct",
-    #     "chatgpt-4o-latest",
+    #     "chatgpt-4.1-latest",
     #     "gpt-4-turbo-2024-04-09",
     #     "deepseek-v2-api-0628",
-    #     "gpt-4o-2024-08-06",
+    #     "gpt-4.1-2024-08-06",
     # ]
     # df = df[df["model_a"].isin(models) & df["model_b"].isin(models)]
     # print(f"After model filter: {len(df)} battles")

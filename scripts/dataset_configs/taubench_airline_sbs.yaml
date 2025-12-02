@@ -1,17 +1,18 @@
-data_path: data/taubench/retail_data.jsonl
-output_dir: results/taubench_retail
-method: single_model
+data_path: data/taubench/airline_data.jsonl
+output_dir: results/taubench_airline_data_sbs_gpt41
+method: side_by_side
+model_a: gpt-4o
+model_b: claude-sonnet-35
 min_cluster_size: 5
-extraction_model: gpt-5
-summary_model: gpt-5
+extraction_model: gpt-4.1
+summary_model: gpt-4.1
 embedding_model: text-embedding-3-large
 max_workers: 16
 groupby_column: behavior_type
 assign_outliers: false
-use_wandb: true
 system_prompt: agent
 task_description: |
-  The TauBench Retail benchmark evaluates large language and multimodal models on retail-related tasks, such as customer support, product information, sales interactions, inventory management, and retail-specific problem solving. The benchmark is designed to assess not only a model’s ability to understand and generate responses relevant to real-world retail scenarios but also to capture a comprehensive range of behavioral and agentic properties that are key to robust retail AI systems.
+  The TauBench Airline benchmark evaluates large language and multimodal models on airline-related customer support tasks, such as booking flights, checking in, and managing reservations. The benchmark is designed to assess not only a model’s ability to understand and generate responses relevant to real-world airline scenarios but also to capture a comprehensive range of behavioral and agentic properties that are key to robust airline AI systems.
 
   **Focus on Agentic and Behavioral Properties:**
   Please analyze and record evidence related to (but not limited to) the following traits, expanding with new relevant properties as observed:
@@ -81,7 +82,3 @@ task_description: |
     - What exactly the agent did that was in violation,
     - What user or system input led to this behavior,
     - Whether the agent attempted to self-correct or escalate.
-
-  When analyzing traces, look for *both positive and negative* manifestations of these traits (e.g., evidence of responsible policy adherence, as well as policy lapses; successful error recovery as well as task abandonment).
-
-  Please record evidence using concrete quotes, output snippets, or trace excerpts wherever possible. If you observe any additional behaviors or issues not covered by these categories, include them as well.

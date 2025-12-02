@@ -33,7 +33,7 @@ def main():
         clusterer="hdbscan",
         min_cluster_size=2,
         max_coarse_clusters=12,
-        embedding_model="text-embedding-3-small",
+        embedding_model="text-embedding-3-large",
         hierarchical=False,
         max_workers=16,
         use_wandb=False,

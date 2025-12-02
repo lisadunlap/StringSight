@@ -1,10 +1,10 @@
 data_path: data/taubench/retail_data.jsonl
 output_dir: results/taubench_retail_sbs
 method: side_by_side
-model_a: gpt-4o
+model_a: gpt-4.1
 model_b: claude-sonnet-35
 min_cluster_size: 5
-embedding_model: text-embedding-3-small
+embedding_model: text-embedding-3-large
 max_workers: 16
 sample_size: 50
 groupby_column: behavior_type
@@ -82,7 +82,3 @@ task_description: |
     - What exactly the agent did that was in violation,
     - What user or system input led to this behavior,
     - Whether the agent attempted to self-correct or escalate.
-
-  When analyzing traces, look for *both positive and negative* manifestations of these traits (e.g., evidence of responsible policy adherence, as well as policy lapses; successful error recovery as well as task abandonment).
-
-  Please record evidence using concrete quotes, output snippets, or trace excerpts wherever possible. If you observe any additional behaviors or issues not covered by these categories, include them as well.
