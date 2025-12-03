@@ -75,9 +75,14 @@ def send_results_email(
     Returns:
         Dict with 'success' boolean and 'message' string
     """
-    # Check for Brevo API Key
-    brevo_api_key = os.getenv('BREVO_API_KEY')
-    
+    # NOTE: Brevo API support is temporarily disabled to ensure emails come from
+    # the correct sender address (stringsightai@gmail.com instead of brevosend.com).
+    # Brevo may be re-enabled in the future for better deliverability and higher sending limits.
+    # To re-enable Brevo, uncomment the code block below and set BREVO_API_KEY in .env
+
+    # Check for Brevo API Key (currently disabled - see note above)
+    brevo_api_key = None  # os.getenv('BREVO_API_KEY')
+
     if brevo_api_key:
         logger.info("Using Brevo API for email sending")
         try:
