@@ -19,7 +19,7 @@ import os
 import time
 
 import pandas as pd
-from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Query
+from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Query, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -41,44 +41,16 @@ import threading, uuid
 from dataclasses import dataclass, field
 from functools import lru_cache
 from datetime import datetime, timedelta
+from datetime import datetime, timedelta
 import hashlib
+from stringsight.routers.auth import get_current_user_optional
 
 logger = get_logger(__name__)
 
 # -------------------------------------------------------------------------
 # Render persistent disk configuration
 # -------------------------------------------------------------------------
-def _get_persistent_data_dir() -> Path:
-    """Get the base directory for persistent data (results, cache) on Render.
-    
-    If RENDER_DISK_PATH is set, use that as the base for all persistent data.
-    Otherwise, default to the current working directory (local development).
-    """
-    render_disk = os.environ.get("RENDER_DISK_PATH")
-    if render_disk:
-        base = Path(render_disk).resolve()
-        logger.info(f"Using Render persistent disk: {base}")
-        return base
-    return Path.cwd()
-
-def _get_results_dir() -> Path:
-    """Get the results directory, potentially on persistent disk."""
-    base = _get_persistent_data_dir()
-    return base / "results"
-
-def _get_cache_dir() -> Path:
-    """Get the cache directory, potentially on persistent disk."""
-    # Check if RENDER_DISK_PATH is set and STRINGSIGHT_CACHE_DIR is not explicitly set
-    # If so, automatically configure cache to use the persistent disk
-    if os.environ.get("RENDER_DISK_PATH") and not os.environ.get("STRINGSIGHT_CACHE_DIR"):
-        base = _get_persistent_data_dir()
-        cache_dir = base / ".cache" / "stringsight"
-        # Set the environment variable so the Cache class picks it up
-        os.environ["STRINGSIGHT_CACHE_DIR"] = str(cache_dir)
-        logger.info(f"Auto-configured cache directory to use persistent disk: {cache_dir}")
-        return cache_dir
-    # Otherwise, let Cache class handle it using STRINGSIGHT_CACHE_DIR env var or default
-    return Path.cwd() / ".cache" / "stringsight"
+from stringsight.utils.paths import _get_persistent_data_dir, _get_results_dir, _get_cache_dir
 
 # -------------------------------------------------------------------------
 # Simple in-memory cache for parsed JSONL data with TTL
@@ -269,21 +241,7 @@ class ExtractSingleRequest(BaseModel):
     return_debug: Optional[bool] = False
 
 
-class ExtractBatchRequest(BaseModel):
-    rows: List[Dict[str, Any]]
-    method: Optional[Literal["single_model", "side_by_side"]] = None
-    system_prompt: Optional[str] = None
-    task_description: Optional[str] = None
-    model_name: Optional[str] = "gpt-4.1"
-    temperature: Optional[float] = 0.7
-    top_p: Optional[float] = 0.95
-    max_tokens: Optional[int] = 16000
-    max_workers: Optional[int] = 128
-    include_scores_in_prompt: Optional[bool] = False
-    use_wandb: Optional[bool] = False
-    output_dir: Optional[str] = None
-    return_debug: Optional[bool] = False
-    sample_size: Optional[int] = None  # Randomly sample N rows before extraction
+# ExtractBatchRequest moved to schemas.py
 
 
 # -----------------------------
@@ -400,6 +358,12 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
     expose_headers=["*"],  # Expose all headers to frontend
 )
+
+from stringsight.routers.auth import router as auth_router
+from stringsight.routers.jobs import router as jobs_router
+
+app.include_router(auth_router)
+app.include_router(jobs_router)
 
 # Include metrics endpoints (basic file serving)
 @app.get("/metrics/summary/{results_dir}")
@@ -552,7 +516,7 @@ def get_embedding_models() -> Dict[str, Any]:
     """
     models = [
         "openai/text-embedding-3-large",
-        "openai/text-embedding-3-small",
+        "openai/text-embedding-3-large",
         "bge-m3",
         "sentence-transformers/all-MiniLM-L6-v2",
     ]
@@ -590,16 +554,21 @@ class ClusterRunRequest(BaseModel):
     output_dir: Optional[str] = None
     score_columns: Optional[List[str]] = None  # NEW: List of score column names to convert to dict format
     method: Optional[str] = "single_model"  # NEW: Method for score column conversion
+    email: Optional[str] = None  # NEW: Email for notifications
 
 
 @app.post("/cluster/run")
-async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
+async def cluster_run(
+    req: ClusterRunRequest,
+    background_tasks: BackgroundTasks,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+) -> Dict[str, Any]:
     """Run clustering directly on existing properties without re-running extraction.
     
     This is much more efficient than the full explain() pipeline since it skips
     the expensive LLM property extraction step and works with already-extracted properties.
     
-    Note: Cache is disk-backed (DiskCache) and thread-safe.
+    Note: Cache is disk-backed (LMDB-based) and thread-safe.
     """
     from stringsight.core.data_objects import PropertyDataset, Property, ConversationRecord
     from stringsight.clusterers import get_clusterer
@@ -625,7 +594,14 @@ async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             _cu._cache = None
     except Exception:
         pass
+    except Exception:
+        pass
     
+    # Inject email from current_user if not provided
+    if not req.email and current_user and current_user.email:
+        req.email = current_user.email
+        logger.info(f"Injecting email {req.email} for cluster run")
+
     try:
         # NEW: Preprocess operationalRows to handle score_columns conversion
         # This ensures scores are in the expected nested dict format before creating ConversationRecords
@@ -837,6 +813,114 @@ async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             )
             conversations.append(conv)
 
+        # NEW: Handle side-by-side specific logic if detected
+        # If method is side_by_side, we need to reconstruct the conversation records to have
+        # model=[model_a, model_b] and scores=[score_a, score_b] for SideBySideMetrics to work
+        
+        # Auto-detect side_by_side if not explicitly set but data looks like it
+        if req.method == "single_model" and req.operationalRows:
+            first_row = req.operationalRows[0]
+            if "model_a" in first_row and "model_b" in first_row:
+                logger.info("🔄 Auto-detected side_by_side method from operationalRows columns")
+                req.method = "side_by_side"
+
+        if req.method == "side_by_side":
+            logger.info("🔄 Reconstructing conversations for side-by-side metrics...")
+            
+            # Group properties by base question_id to identify pairs
+            properties_by_qid = {}
+            for p in properties:
+                if p.question_id not in properties_by_qid:
+                    properties_by_qid[p.question_id] = []
+                properties_by_qid[p.question_id].append(p)
+            
+            sxs_conversations = []
+            
+            # Pre-index operational rows for faster lookup
+            import time
+            t0 = time.time()
+            operational_rows_map = {}
+            for row in req.operationalRows:
+                row_qid = str(row.get("question_id", ""))
+                operational_rows_map[row_qid] = row
+                # Also index by base ID if it's a compound ID (e.g. "48-0" -> "48")
+                if '-' in row_qid:
+                    base_id = row_qid.split('-')[0]
+                    if base_id not in operational_rows_map:
+                         operational_rows_map[base_id] = row
+            
+            logger.info(f"⏱️ Indexed {len(req.operationalRows)} operational rows in {time.time() - t0:.4f}s")
+            t1 = time.time()
+
+            sxs_conversations = []
+            
+            for qid, props in properties_by_qid.items():
+                # Find matching operational row using lookup map
+                matching_row = operational_rows_map.get(qid)
+                
+                # If not found by exact match, try base ID match (if qid has suffix)
+                if not matching_row and '-' in qid:
+                    matching_row = operational_rows_map.get(qid.split('-')[0])
+                
+                if matching_row:
+                    # Extract models
+                    model_a = matching_row.get("model_a")
+                    model_b = matching_row.get("model_b")
+                    
+                    # If models not in row, try to infer from properties
+                    if not model_a or not model_b:
+                        unique_models = list(set(p.model for p in props))
+                        if len(unique_models) >= 2:
+                            model_a = unique_models[0]
+                            model_b = unique_models[1]
+                        else:
+                            # Fallback
+                            model_a = "model_a"
+                            model_b = "model_b"
+                    
+                    # Extract scores
+                    # Check for score_a/score_b columns first
+                    score_a = matching_row.get("score_a", {})
+                    score_b = matching_row.get("score_b", {})
+
+                    # If empty, check if 'scores' or 'score' contains combined info
+                    if not score_a and not score_b:
+                        combined_score = matching_row.get("score") or matching_row.get("scores")
+                        if combined_score:
+                            # Handle list format [score_a, score_b]
+                            if isinstance(combined_score, list) and len(combined_score) == 2:
+                                score_a = combined_score[0] if isinstance(combined_score[0], dict) else {}
+                                score_b = combined_score[1] if isinstance(combined_score[1], dict) else {}
+                            elif isinstance(combined_score, dict):
+                                # If it's a dict, duplicate it for both
+                                score_a = combined_score
+                                score_b = combined_score
+                            else:
+                                score_a = {}
+                                score_b = {}
+                    
+                    # Extract winner to meta
+                    meta = {}
+                    if "winner" in matching_row:
+                        meta["winner"] = matching_row["winner"]
+                    elif "score" in matching_row and isinstance(matching_row["score"], dict) and "winner" in matching_row["score"]:
+                        meta["winner"] = matching_row["score"]["winner"]
+                    
+                    # Create SxS conversation record
+                    conv = ConversationRecord(
+                        question_id=qid,
+                        model=[model_a, model_b],
+                        prompt=matching_row.get("prompt", ""),
+                        responses=[matching_row.get("model_a_response", ""), matching_row.get("model_b_response", "")],
+                        scores=[score_a, score_b],
+                        meta=meta
+                    )
+                    sxs_conversations.append(conv)
+            
+            if sxs_conversations:
+                logger.info(f"✅ Created {len(sxs_conversations)} side-by-side conversation records in {time.time() - t1:.4f}s")
+                conversations = sxs_conversations
+
         logger.info(f"✅ Matched {matches_found}/{len(property_keys)} conversations with operationalRows")
 
         # Enhanced logging for debugging quality metrics
@@ -933,16 +1017,27 @@ async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             "meta": cluster.meta,
         })
     
-    # Compute metrics using FunctionalMetrics (without bootstrap for speed)
+    # Compute metrics using FunctionalMetrics or SideBySideMetrics
     from stringsight.metrics.functional_metrics import FunctionalMetrics
+    from stringsight.metrics.side_by_side import SideBySideMetrics
     
-    # FunctionalMetrics needs PropertyDataset with clusters populated
-    metrics_computer = FunctionalMetrics(
-        output_dir=None,
-        compute_bootstrap=False,  # Disable bootstrap for API speed
-        log_to_wandb=False,
-        generate_plots=False
-    )
+    # Choose metrics computer based on method
+    if req.method == "side_by_side":
+        logger.info("🚀 Using SideBySideMetrics for computation")
+        metrics_computer = SideBySideMetrics(
+            output_dir=None,
+            compute_bootstrap=True,  # Disable bootstrap for API speed
+            log_to_wandb=False,
+            generate_plots=False
+        )
+    else:
+        logger.info("🚀 Using FunctionalMetrics for computation")
+        metrics_computer = FunctionalMetrics(
+            output_dir=None,
+            compute_bootstrap=True,  # Disable bootstrap for API speed
+            log_to_wandb=False,
+            generate_plots=False
+        )
     
     # Debug: Check what's in clustered_dataset before metrics
     logger.info(f"🔍 Before FunctionalMetrics:")
@@ -1252,8 +1347,6 @@ async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
         sample_model = list(model_cluster_scores_dict.keys())[0]
         sample_cluster = list(model_cluster_scores_dict[sample_model].keys())[0]
         sample_metrics = model_cluster_scores_dict[sample_model][sample_cluster]
-        logger.info(f"🔧 Transforming model_cluster_scores to array format:")
-        logger.info(f"  - Sample model: {sample_model}")
         logger.info(f"  - Sample cluster: {sample_cluster}")
         logger.info(f"  - Sample metrics keys: {list(sample_metrics.keys())}")
         logger.info(f"  - Sample quality: {sample_metrics.get('quality')}")
@@ -1435,6 +1528,29 @@ async def cluster_run(req: ClusterRunRequest) -> Dict[str, Any]:
             logger.info(f"✓ Saved metrics JSONL files under: {results_dir}")
     except Exception as e:
         logger.warning(f"Failed to save metrics JSONL files: {e}")
+
+    # Send email if requested
+    if req.email and results_dir:
+        def _send_email_task():
+            try:
+                logger.info(f"Sending clustering results email to {req.email}")
+                # Determine experiment name
+                exp_name = results_dir_name or "Clustering Results"
+                
+                result = send_results_email(
+                    recipient_email=req.email,
+                    results_dir=str(results_dir),
+                    experiment_name=exp_name
+                )
+                if result.get('success'):
+                    logger.info(f"✅ Clustering email sent successfully: {result.get('message')}")
+                else:
+                    logger.warning(f"⚠️ Clustering email sending failed: {result.get('message')}")
+            except Exception as e:
+                logger.error(f"Failed to send clustering email: {e}")
+
+        background_tasks.add_task(_send_email_task)
+        logger.info(f"📧 Queued email notification for {req.email}")
 
     return {
         "clusters": enriched,
@@ -1682,14 +1798,29 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
     cluster_scores_df.jsonl, model_scores_df.jsonl). If a `full_dataset.json`
     file is present, returns its `conversations`, `properties`, and `clusters`.
 
-    Request path must be within BASE_BROWSE_DIR (default: current working directory).
+    Request path can be:
+    - Relative path from results directory (e.g., "frontend/conversation_...")
+    - Absolute path within BASE_BROWSE_DIR
 
     Implements pagination to reduce initial load time and memory usage:
     - conversations_page/conversations_per_page for conversations pagination
     - properties_page/properties_per_page for properties pagination
     - load_metrics_only flag to skip loading conversations/properties entirely
     """
-    results_dir = _resolve_within_base(req.path)
+    # Try to resolve relative to results directory first (for job.result_path compatibility)
+    path_obj = Path(req.path)
+    if not path_obj.is_absolute():
+        # Try relative to results directory first
+        results_base = _get_results_dir()
+        candidate = (results_base / req.path).resolve()
+        if candidate.exists() and candidate.is_dir():
+            results_dir = candidate
+        else:
+            # Fallback to original behavior (relative to CWD/BASE_BROWSE_DIR)
+            results_dir = _resolve_within_base(req.path)
+    else:
+        results_dir = _resolve_within_base(req.path)
+
     if not results_dir.is_dir():
         raise HTTPException(status_code=400, detail=f"Not a directory: {results_dir}")
 
@@ -1738,6 +1869,25 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
         except Exception as e:
             logger.warning(f"Failed to load properties: {e}")
 
+    # Load clusters from clusters.jsonl or clusters.json
+    # This is critical because if we load conversations/properties from JSONL,
+    # we skip the full_dataset.json block below, so we must load clusters here.
+    clusters_file_jsonl = results_dir / "clusters.jsonl"
+    clusters_file_json = results_dir / "clusters.json"
+    
+    if clusters_file_jsonl.exists():
+        try:
+            clusters = _read_jsonl_as_list(clusters_file_jsonl)
+            logger.info(f"Loaded {len(clusters)} clusters from jsonl")
+        except Exception as e:
+            logger.warning(f"Failed to load clusters from jsonl: {e}")
+    elif clusters_file_json.exists():
+        try:
+            clusters = _read_json_safe(clusters_file_json)
+            logger.info(f"Loaded {len(clusters)} clusters from json")
+        except Exception as e:
+            logger.warning(f"Failed to load clusters from json: {e}")
+
     # Fallback to full_dataset.json only if JSONL files don't exist
     if not conversations and not properties:
         full = results_dir / "full_dataset.json"
@@ -1784,9 +1934,11 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
 
     return {
         "path": str(results_dir),
-        "model_cluster_scores": model_cluster_scores or [],
-        "cluster_scores": cluster_scores or [],
-        "model_scores": model_scores or [],
+        "metrics": {
+            "model_cluster_scores": model_cluster_scores or [],
+            "cluster_scores": cluster_scores or [],
+            "model_scores": model_scores or []
+        },
         "conversations": conversations,
         "properties": properties,
         "clusters": clusters,
@@ -2221,7 +2373,7 @@ class TidyRow(BaseModel):
     Fields:
         question_id: Optional stable ID used to pair A/B responses; pairs by prompt when absent.
         prompt: The task text.
-        model: Model name (e.g., 'gpt-4o').
+        model: Model name (e.g., 'gpt-4.1').
         model_response: The model's response; accepts string or OAI/chat-like structure.
         score: Optional dict of metric name → value.
 
@@ -2481,8 +2633,22 @@ _JOBS_LOCK = threading.Lock()
 _JOBS: Dict[str, ExtractJob] = {}
 
 
-class ExtractJobStartRequest(ExtractBatchRequest):
-    pass  # Inherits all fields from ExtractBatchRequest
+@dataclass
+class ClusterJob:
+    id: str
+    state: str = "queued"  # queued | running | completed | error | cancelled
+    progress: float = 0.0
+    error: Optional[str] = None
+    result: Optional[Dict[str, Any]] = None
+    result_path: Optional[str] = None
+    cancelled: bool = False
+
+
+_CLUSTER_JOBS_LOCK = threading.Lock()
+_CLUSTER_JOBS: Dict[str, ClusterJob] = {}
+
+
+from stringsight.schemas import ExtractBatchRequest, ExtractJobStartRequest
 
 
 def _run_extract_job(job: ExtractJob, req: ExtractJobStartRequest):
@@ -2790,6 +2956,585 @@ async def extract_stream(req: ExtractBatchRequest):
         media_type="application/x-ndjson",
         headers={"X-Extraction-Method": method}
     )
+
+
+# ============================================================================
+# Cluster Job Queue System
+# ============================================================================
+
+def _run_cluster_job(job: ClusterJob, req: ClusterRunRequest):
+    """Sync wrapper for async clustering - runs in background thread."""
+    try:
+        asyncio.run(_run_cluster_job_async(job, req))
+    except Exception as e:
+        logger.error(f"Error in background cluster job: {e}")
+        with _CLUSTER_JOBS_LOCK:
+            job.state = "error"
+            job.error = str(e)
+
+
+async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
+    """Run clustering in background thread."""
+    try:
+        # Import here to avoid circular dependencies
+        from stringsight.core.data_objects import PropertyDataset, Property, ConversationRecord
+        from stringsight.clusterers import get_clusterer
+        import os
+
+        with _CLUSTER_JOBS_LOCK:
+            job.state = "running"
+            job.progress = 0.1
+            if job.cancelled:
+                job.state = "cancelled"
+                return
+
+        # Preserve original cache setting
+        original_cache_setting = os.environ.get("STRINGSIGHT_DISABLE_CACHE", "0")
+        os.environ["STRINGSIGHT_DISABLE_CACHE"] = original_cache_setting
+
+        # Force-drop any pre-initialized global LMDB caches
+        from stringsight.core import llm_utils as _llm_utils
+        from stringsight.clusterers import clustering_utils as _cu
+        _orig_default_cache = getattr(_llm_utils, "_default_cache", None)
+        _orig_default_llm_utils = getattr(_llm_utils, "_default_llm_utils", None)
+        _orig_embed_cache = getattr(_cu, "_cache", None)
+        try:
+            _llm_utils._default_cache = None
+            _llm_utils._default_llm_utils = None
+        except Exception:
+            pass
+        try:
+            if hasattr(_cu, "_cache"):
+                _cu._cache = None
+        except Exception:
+            pass
+
+        # Preprocess operationalRows to handle score_columns conversion
+        score_columns_to_use = req.score_columns
+
+        with _CLUSTER_JOBS_LOCK:
+            job.progress = 0.15
+
+        # Auto-detect score columns if not provided
+        if not score_columns_to_use and req.operationalRows:
+            import pandas as pd
+            operational_df = pd.DataFrame(req.operationalRows)
+
+            score_column_name = None
+            if 'scores' in operational_df.columns:
+                score_column_name = 'scores'
+            elif 'score' in operational_df.columns:
+                score_column_name = 'score'
+
+            if score_column_name:
+                sample_score = operational_df[score_column_name].iloc[0] if len(operational_df) > 0 else None
+                if not isinstance(sample_score, dict):
+                    logger.info(f"'{score_column_name}' column exists but is not a dict - will attempt to detect score columns")
+                else:
+                    logger.info(f"'{score_column_name}' column already in nested dict format - no conversion needed")
+                    score_columns_to_use = None
+                    if score_column_name == 'scores':
+                        operational_df.rename(columns={'scores': 'score'}, inplace=True)
+            else:
+                potential_score_cols = []
+                score_related_keywords = ['score', 'rating', 'quality', 'helpfulness', 'accuracy', 'correctness', 'fluency', 'coherence', 'relevance']
+
+                for col in operational_df.columns:
+                    if not pd.api.types.is_numeric_dtype(operational_df[col]):
+                        continue
+                    if col in ['question_id', 'id', 'size', 'cluster_id'] or col.endswith('_id'):
+                        continue
+                    col_lower = col.lower()
+                    if any(keyword in col_lower for keyword in score_related_keywords):
+                        potential_score_cols.append(col)
+
+                if potential_score_cols:
+                    logger.info(f"Auto-detected potential score columns: {potential_score_cols}")
+                    score_columns_to_use = potential_score_cols
+                else:
+                    logger.info("No score columns detected")
+
+            if score_column_name == 'scores':
+                logger.info("🔄 Normalizing 'scores' column to 'score' for backend compatibility")
+                req.operationalRows = operational_df.to_dict('records')
+
+        # Convert score columns if needed
+        if score_columns_to_use:
+            logger.info(f"Converting score columns to dict format: {score_columns_to_use}")
+            import pandas as pd
+            from stringsight.core.preprocessing import convert_score_columns_to_dict
+
+            operational_df = pd.DataFrame(req.operationalRows)
+            operational_df = convert_score_columns_to_dict(
+                operational_df,
+                score_columns=score_columns_to_use,
+                method=req.method
+            )
+            req.operationalRows = operational_df.to_dict('records')
+            logger.info(f"✓ Score columns converted successfully")
+
+        with _CLUSTER_JOBS_LOCK:
+            job.progress = 0.2
+
+        # Convert properties data to Property objects
+        properties: List[Property] = []
+        for p in req.properties:
+            try:
+                raw_question_id = str(p.get("question_id", ""))
+                base_question_id = raw_question_id.split('-')[0] if '-' in raw_question_id else raw_question_id
+
+                prop = Property(
+                    id=str(p.get("id", "")),
+                    question_id=base_question_id,
+                    model=str(p.get("model", "")),
+                    property_description=p.get("property_description"),
+                    category=p.get("category"),
+                    reason=p.get("reason"),
+                    evidence=p.get("evidence"),
+                    behavior_type=p.get("behavior_type"),
+                    raw_response=p.get("raw_response"),
+                    contains_errors=p.get("contains_errors"),
+                    unexpected_behavior=p.get("unexpected_behavior"),
+                    meta=p.get("meta", {})
+                )
+                properties.append(prop)
+            except Exception as e:
+                logger.warning(f"Skipping invalid property: {e}")
+                continue
+
+        if not properties:
+            with _CLUSTER_JOBS_LOCK:
+                job.state = "completed"
+                job.progress = 1.0
+                job.result = {"clusters": []}
+            return
+
+        with _CLUSTER_JOBS_LOCK:
+            job.progress = 0.25
+
+        # Create minimal conversations that match the properties
+        conversations: List[ConversationRecord] = []
+        all_models = set()
+        property_keys = {(prop.question_id, prop.model) for prop in properties}
+
+        logger.info(f"Found {len(property_keys)} unique (question_id, model) pairs from {len(properties)} properties")
+
+        # Create exactly one conversation per unique (question_id, model) pair
+        matches_found = 0
+        for question_id, model in property_keys:
+            all_models.add(model)
+
+            # Find matching operational row for this conversation
+            matching_row = None
+            for row in req.operationalRows:
+                row_qid = str(row.get("question_id", ""))
+                row_model = str(row.get("model", ""))
+
+                # Try exact match first
+                if row_qid == question_id and row_model == model:
+                    matching_row = row
+                    matches_found += 1
+                    break
+
+                # If no exact match, try matching on base question_id (strip suffix after '-')
+                row_qid_base = row_qid.split('-')[0] if '-' in row_qid else row_qid
+                question_id_base = question_id.split('-')[0] if '-' in question_id else question_id
+
+                if (row_qid_base == question_id or row_qid == question_id_base) and row_model == model:
+                    matching_row = row
+                    matches_found += 1
+                    break
+
+            # Create minimal conversation (use empty data if no matching row found)
+            if matching_row:
+                scores = matching_row.get("score") or matching_row.get("scores") or {}
+            else:
+                scores = {}
+
+            # Try both 'model_response' and 'responses' for compatibility
+            response_value = ""
+            if matching_row:
+                response_value = matching_row.get("responses") or matching_row.get("model_response") or ""
+
+            # Strip property index suffix from question_id to get base conversation ID
+            base_question_id = question_id.split('-')[0] if '-' in question_id else question_id
+
+            conv = ConversationRecord(
+                question_id=base_question_id,
+                model=model,
+                prompt=matching_row.get("prompt", "") if matching_row else "",
+                responses=response_value,
+                scores=scores,
+                meta={}
+            )
+            conversations.append(conv)
+
+        # Handle side-by-side specific logic if detected
+        if req.method == "single_model" and req.operationalRows:
+            first_row = req.operationalRows[0]
+            if "model_a" in first_row and "model_b" in first_row:
+                logger.info("🔄 Auto-detected side_by_side method from operationalRows columns")
+                req.method = "side_by_side"
+
+        if req.method == "side_by_side":
+            logger.info("🔄 Reconstructing conversations for side-by-side metrics...")
+
+            # Group properties by base question_id to identify pairs
+            properties_by_qid = {}
+            for p in properties:
+                if p.question_id not in properties_by_qid:
+                    properties_by_qid[p.question_id] = []
+                properties_by_qid[p.question_id].append(p)
+
+            # Pre-index operational rows for faster lookup
+            operational_rows_map = {}
+            for row in req.operationalRows:
+                row_qid = str(row.get("question_id", ""))
+                operational_rows_map[row_qid] = row
+                # Also index by base ID if it's a compound ID
+                if '-' in row_qid:
+                    base_id = row_qid.split('-')[0]
+                    if base_id not in operational_rows_map:
+                        operational_rows_map[base_id] = row
+
+            sxs_conversations = []
+
+            for qid, props in properties_by_qid.items():
+                # Find matching operational row using lookup map
+                matching_row = operational_rows_map.get(qid)
+
+                # If not found by exact match, try base ID match
+                if not matching_row and '-' in qid:
+                    matching_row = operational_rows_map.get(qid.split('-')[0])
+
+                if matching_row:
+                    # Extract models
+                    model_a = matching_row.get("model_a")
+                    model_b = matching_row.get("model_b")
+
+                    # If models not in row, try to infer from properties
+                    if not model_a or not model_b:
+                        unique_models = list(set(p.model for p in props))
+                        if len(unique_models) >= 2:
+                            model_a = unique_models[0]
+                            model_b = unique_models[1]
+                        else:
+                            model_a = "model_a"
+                            model_b = "model_b"
+
+                    # Extract scores
+                    score_a = matching_row.get("score_a", {})
+                    score_b = matching_row.get("score_b", {})
+
+                    # If empty, check if 'scores' or 'score' contains combined info
+                    if not score_a and not score_b:
+                        combined_score = matching_row.get("score") or matching_row.get("scores")
+                        if combined_score:
+                            if isinstance(combined_score, list) and len(combined_score) == 2:
+                                score_a = combined_score[0] if isinstance(combined_score[0], dict) else {}
+                                score_b = combined_score[1] if isinstance(combined_score[1], dict) else {}
+                            elif isinstance(combined_score, dict):
+                                score_a = combined_score
+                                score_b = combined_score
+                            else:
+                                score_a = {}
+                                score_b = {}
+
+                    # Extract winner to meta
+                    meta = {}
+                    if "winner" in matching_row:
+                        meta["winner"] = matching_row["winner"]
+                    elif "score" in matching_row and isinstance(matching_row["score"], dict) and "winner" in matching_row["score"]:
+                        meta["winner"] = matching_row["score"]["winner"]
+
+                    # Create SxS conversation record
+                    conv = ConversationRecord(
+                        question_id=qid,
+                        model=[model_a, model_b],
+                        prompt=matching_row.get("prompt", ""),
+                        responses=[matching_row.get("model_a_response", ""), matching_row.get("model_b_response", "")],
+                        scores=[score_a, score_b],
+                        meta=meta
+                    )
+                    sxs_conversations.append(conv)
+
+            if sxs_conversations:
+                logger.info(f"✅ Created {len(sxs_conversations)} side-by-side conversation records")
+                conversations = sxs_conversations
+
+        logger.info(f"✅ Matched {matches_found}/{len(property_keys)} conversations with operationalRows")
+
+        with _CLUSTER_JOBS_LOCK:
+            job.progress = 0.3
+
+        # Create PropertyDataset
+        dataset = PropertyDataset(
+            conversations=conversations,
+            all_models=list(all_models),
+            properties=properties,
+            clusters=[],
+            model_stats={}
+        )
+
+        # Get clustering parameters
+        params = req.params
+        min_cluster_size = params.minClusterSize if params and params.minClusterSize else 3
+        embedding_model = params.embeddingModel if params else "text-embedding-3-small"
+        groupby_column = None if params.groupBy == "none" else params.groupBy
+
+        with _CLUSTER_JOBS_LOCK:
+            job.progress = 0.35
+
+        # Run clustering
+        logger.info(f"Starting clustering with {len(properties)} properties, min_cluster_size={min_cluster_size}")
+
+        clusterer = get_clusterer(
+            method="hdbscan",
+            min_cluster_size=min_cluster_size,
+            embedding_model=embedding_model,
+            assign_outliers=False,
+            include_embeddings=False,
+            cache_embeddings=True,
+            groupby_column=groupby_column,
+        )
+
+        with _CLUSTER_JOBS_LOCK:
+            job.progress = 0.4
+
+        clustered = await clusterer.run(dataset, column_name="property_description")
+
+        with _CLUSTER_JOBS_LOCK:
+            job.progress = 0.7
+
+        logger.info(f"✓ Clustering complete - found {len(clustered.clusters)} clusters")
+
+        # Save results to disk if output_dir specified
+        results_dir_name = None
+        results_dir_full_path = None
+        if req.output_dir:
+            base_results_dir = _get_results_dir()
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            results_dir_name = f"{req.output_dir}_{timestamp}"
+            results_dir = base_results_dir / results_dir_name
+            results_dir_full_path = str(results_dir)
+            results_dir.mkdir(parents=True, exist_ok=True)
+
+            # Save clusters, properties, and conversations
+            clusters_file = results_dir / "clusters.jsonl"
+            properties_file = results_dir / "validated_properties.jsonl"
+            conversations_file = results_dir / "conversations.jsonl"
+
+            import json
+            from dataclasses import asdict
+
+            with open(clusters_file, 'w') as f:
+                for cluster in clustered.clusters:
+                    f.write(json.dumps(cluster.to_dict()) + '\n')
+
+            with open(properties_file, 'w') as f:
+                for prop in properties:
+                    f.write(json.dumps(prop.to_dict()) + '\n')
+
+            with open(conversations_file, 'w') as f:
+                for conv in conversations:
+                    f.write(json.dumps(asdict(conv)) + '\n')
+
+            logger.info(f"✓ Results saved to {results_dir}")
+
+            with _CLUSTER_JOBS_LOCK:
+                job.result_path = str(results_dir_name)
+
+        with _CLUSTER_JOBS_LOCK:
+            job.progress = 0.75
+
+        # Compute metrics using FunctionalMetrics or SideBySideMetrics
+        from stringsight.metrics.functional_metrics import FunctionalMetrics
+        from stringsight.metrics.side_by_side import SideBySideMetrics
+
+        # Choose metrics computer based on method
+        if req.method == "side_by_side":
+            logger.info("🚀 Using SideBySideMetrics for computation")
+            metrics_computer = SideBySideMetrics(
+                output_dir=None,
+                compute_bootstrap=True,
+                log_to_wandb=False,
+                generate_plots=False
+            )
+        else:
+            logger.info("🚀 Using FunctionalMetrics for computation")
+            metrics_computer = FunctionalMetrics(
+                output_dir=None,
+                compute_bootstrap=True,
+                log_to_wandb=False,
+                generate_plots=False
+            )
+
+        # Run metrics computation on the clustered dataset
+        clustered = metrics_computer.run(clustered)
+
+        # Extract the computed metrics from model_stats
+        model_cluster_scores_df = clustered.model_stats.get("model_cluster_scores", None)
+        cluster_scores_df = clustered.model_stats.get("cluster_scores", None)
+        model_scores_df = clustered.model_stats.get("model_scores", None)
+
+        # Convert DataFrames to list of dicts for JSON serialization
+        model_cluster_scores_array = []
+        cluster_scores_array = []
+        model_scores_array = []
+
+        if model_cluster_scores_df is not None and hasattr(model_cluster_scores_df, 'to_dict'):
+            model_cluster_scores_array = model_cluster_scores_df.to_dict('records')
+
+        if cluster_scores_df is not None and hasattr(cluster_scores_df, 'to_dict'):
+            cluster_scores_array = cluster_scores_df.to_dict('records')
+
+        if model_scores_df is not None and hasattr(model_scores_df, 'to_dict'):
+            model_scores_array = model_scores_df.to_dict('records')
+
+        logger.info(f"✓ Metrics computed: {len(model_cluster_scores_array)} model_cluster_scores, "
+                   f"{len(cluster_scores_array)} cluster_scores, {len(model_scores_array)} model_scores")
+
+        # Save metrics if output_dir specified
+        if req.output_dir and results_dir_name:
+            results_dir = _get_results_dir() / results_dir_name
+
+            import json
+            if model_cluster_scores_array:
+                with open(results_dir / "model_cluster_scores.jsonl", 'w') as f:
+                    for item in model_cluster_scores_array:
+                        f.write(json.dumps(item) + '\n')
+
+            if cluster_scores_array:
+                with open(results_dir / "cluster_scores.jsonl", 'w') as f:
+                    for item in cluster_scores_array:
+                        f.write(json.dumps(item) + '\n')
+
+            if model_scores_array:
+                with open(results_dir / "model_scores.jsonl", 'w') as f:
+                    for item in model_scores_array:
+                        f.write(json.dumps(item) + '\n')
+
+            logger.info("✓ Metrics saved to disk")
+
+        with _CLUSTER_JOBS_LOCK:
+            job.progress = 0.9
+
+        # Build enriched response
+        enriched = []
+        total_conversations = {}
+        for model in all_models:
+            model_convs = [c for c in conversations if c.model == model]
+            total_conversations[model] = len(model_convs)
+
+        total_unique_conversations = len({c.question_id for c in conversations})
+
+        for cluster in clustered.clusters:
+            cluster_dict = cluster.to_dict()
+            enriched.append(cluster_dict)
+
+        # Build final result
+        result = {
+            "clusters": enriched,
+            "total_conversations_by_model": total_conversations,
+            "total_unique_conversations": total_unique_conversations,
+            "results_dir": results_dir_name,
+            "metrics": {
+                "model_cluster_scores": model_cluster_scores_array,
+                "cluster_scores": cluster_scores_array,
+                "model_scores": model_scores_array,
+            }
+        }
+
+        # Send email if requested
+        if req.email and results_dir_full_path:
+            def _send_email_task():
+                try:
+                    from stringsight.email_service import send_results_email
+                    result = send_results_email(
+                        recipient_email=req.email,
+                        results_dir=results_dir_full_path,
+                        experiment_name=f"Clustering_{results_dir_name}"
+                    )
+                    if result.get("success"):
+                        logger.info(f"📧 Email sent to {req.email}")
+                    else:
+                        logger.error(f"Failed to send email: {result.get('message')}")
+                except Exception as e:
+                    logger.error(f"Failed to send clustering email: {e}")
+
+            import threading
+            threading.Thread(target=_send_email_task, daemon=True).start()
+            logger.info(f"📧 Queued email notification for {req.email}")
+
+        # Mark job as completed
+        with _CLUSTER_JOBS_LOCK:
+            job.state = "completed"
+            job.progress = 1.0
+            job.result = result
+
+        logger.info(f"✓ Cluster job {job.id} completed successfully")
+
+    except Exception as e:
+        logger.error(f"Error in background cluster job: {e}", exc_info=True)
+        with _CLUSTER_JOBS_LOCK:
+            job.state = "error"
+            job.error = str(e)
+
+
+@app.post("/cluster/job/start")
+async def cluster_job_start(req: ClusterRunRequest) -> Dict[str, Any]:
+    """Start a clustering job in the background."""
+    job_id = str(uuid.uuid4())
+    job = ClusterJob(id=job_id)
+
+    with _CLUSTER_JOBS_LOCK:
+        _CLUSTER_JOBS[job_id] = job
+
+    # Start background thread
+    thread = threading.Thread(target=_run_cluster_job, args=(job, req), daemon=True)
+    thread.start()
+
+    logger.info(f"Started cluster job {job_id}")
+
+    return {
+        "job_id": job_id,
+        "state": job.state,
+        "progress": job.progress
+    }
+
+
+@app.get("/cluster/job/status/{job_id}")
+def cluster_job_status(job_id: str) -> Dict[str, Any]:
+    """Get the status of a clustering job."""
+    with _CLUSTER_JOBS_LOCK:
+        job = _CLUSTER_JOBS.get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+        return {
+            "job_id": job_id,
+            "status": job.state,
+            "progress": job.progress,
+            "error_message": job.error
+        }
+
+
+@app.get("/cluster/job/result/{job_id}")
+def cluster_job_result(job_id: str) -> Dict[str, Any]:
+    """Get the result of a completed clustering job."""
+    with _CLUSTER_JOBS_LOCK:
+        job = _CLUSTER_JOBS.get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+        if job.state != "completed":
+            raise HTTPException(status_code=400, detail=f"Job is not completed yet (state: {job.state})")
+
+        return {
+            "job_id": job_id,
+            "result": job.result,
+            "result_path": job.result_path
+        }
 
 
 if __name__ == "__main__":

@@ -1,0 +1,232 @@
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, BackgroundTasks
+from sqlalchemy.orm import Session
+from typing import Dict, Any, Optional
+from uuid import UUID
+import uuid
+
+from stringsight.database import get_db
+from stringsight.models.job import Job
+from stringsight.models.user import User
+from stringsight.routers.auth import get_current_user_optional
+from stringsight.schemas import ExtractJobStartRequest, PipelineJobRequest, ClusterJobRequest, DemoEmailRequest
+from stringsight.workers.tasks import run_extract_job, run_pipeline_job, run_cluster_job, _run_cluster_job_async
+from stringsight.storage.adapter import get_storage_adapter
+from stringsight.email_service import send_results_email
+from stringsight.utils.paths import _get_results_dir
+import logging
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/v1/jobs", tags=["jobs"])
+
+@router.post("/pipeline")
+def start_pipeline_job(
+    req: PipelineJobRequest,
+    response: Response,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    # Create job record
+    job_id = uuid.uuid4()
+    job = Job(
+        id=job_id,
+        user_id=current_user.id if current_user else None,
+        status="queued",
+        progress=0.0,
+        job_type="pipeline"
+    )
+    db.add(job)
+    db.commit()
+    
+    # Inject email from current_user if not provided
+    if not req.email and current_user and current_user.email:
+        req.email = current_user.email
+        logger.info(f"Injecting email {req.email} for job {job_id}")
+    
+    # Convert request to dict for serialization
+    req_data = req.dict()
+    
+    # Enqueue task
+    run_pipeline_job.delay(str(job_id), req_data)
+    
+    return {"job_id": str(job_id), "status": "queued", "job_type": "pipeline"}
+
+@router.post("/extract")
+def start_extract_job(
+    req: ExtractJobStartRequest,
+    response: Response,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    # Create job record
+    job_id = uuid.uuid4()
+    job = Job(
+        id=job_id,
+        user_id=current_user.id if current_user else None,
+        status="queued",
+        progress=0.0
+    )
+    db.add(job)
+    db.commit()
+    
+    # Inject email from current_user if not provided
+    if not req.email and current_user and current_user.email:
+        req.email = current_user.email
+        logger.info(f"Injecting email {req.email} for job {job_id}")
+    
+    # Convert request to dict for serialization
+    req_data = req.dict()
+    
+    # Enqueue task
+    run_extract_job.delay(str(job_id), req_data)
+    
+    return {"job_id": str(job_id), "status": "queued"}
+
+@router.post("/cluster")
+def start_cluster_job(
+    req: ClusterJobRequest,
+    response: Response,
+    background_tasks: BackgroundTasks,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    # Create job record
+    job_id = uuid.uuid4()
+    job = Job(
+        id=job_id,
+        user_id=current_user.id if current_user else None,
+        status="queued",
+        progress=0.0,
+        job_type="cluster"
+    )
+    db.add(job)
+    db.commit()
+    
+    # Inject email from current_user if not provided
+    if not req.email and current_user and current_user.email:
+        req.email = current_user.email
+        logger.info(f"Injecting email {req.email} for job {job_id}")
+    
+    # Convert request to dict for serialization
+    req_data = req.dict()
+    
+    # Run in background task (in-process) instead of Celery
+    # This avoids issues with Celery workers not picking up new code
+    background_tasks.add_task(_run_cluster_job_async, str(job_id), req_data)
+    
+    return {"job_id": str(job_id), "status": "queued", "job_type": "cluster"}
+
+@router.post("/email-demo")
+def email_demo_results(
+    req: DemoEmailRequest,
+    background_tasks: BackgroundTasks,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Send demo results via email."""
+    # Determine demo directory
+    demo_dir_name = "taubench_airline_data_sbs" if req.method == "side_by_side" else "taubench_airline_data"
+    results_base = _get_results_dir()
+    demo_dir = results_base / demo_dir_name
+    
+    if not demo_dir.exists():
+        raise HTTPException(status_code=404, detail=f"Demo results not found at {demo_dir}")
+        
+    def _send_email_task():
+        try:
+            logger.info(f"Sending demo results email to {req.email}")
+            result = send_results_email(
+                recipient_email=req.email,
+                results_dir=str(demo_dir),
+                experiment_name=f"Demo Data ({req.method})"
+            )
+            if result.get('success'):
+                logger.info(f"✅ Demo email sent successfully: {result.get('message')}")
+            else:
+                logger.warning(f"⚠️ Demo email sending failed: {result.get('message')}")
+        except Exception as e:
+            logger.error(f"Failed to send demo email: {e}")
+
+    background_tasks.add_task(_send_email_task)
+    
+    return {"status": "queued", "message": "Email sending queued"}
+
+@router.get("/{job_id}")
+def get_job_status(
+    job_id: UUID,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Check ownership only if user is logged in and job has a user
+    if current_user and job.user_id and job.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this job")
+        
+    return {
+        "id": str(job.id),
+        "status": job.status,
+        "progress": job.progress,
+        "result_path": job.result_path,
+        "error_message": job.error_message,
+        "created_at": job.created_at
+    }
+
+@router.get("/{job_id}/results")
+def get_job_results(
+    job_id: UUID,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    """
+    Fetch the actual results content from the job's result_path.
+    Returns the properties extracted by the job.
+    """
+    import json
+    from pathlib import Path
+    
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Check ownership only if user is logged in and job has a user
+    if current_user and job.user_id and job.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this job")
+    
+    if job.status != "completed":
+        raise HTTPException(status_code=400, detail=f"Job not completed yet. Status: {job.status}")
+    
+    if not job.result_path:
+        raise HTTPException(status_code=404, detail="No results available for this job")
+ 
+    # Read the results from storage (works with both filesystem and S3)
+    from stringsight.utils.paths import _get_results_dir
+    from pathlib import Path
+
+    storage = get_storage_adapter()
+
+    # Resolve result_path relative to results directory if it's not absolute
+    result_path_obj = Path(job.result_path)
+    if not result_path_obj.is_absolute():
+        results_base = _get_results_dir()
+        full_result_path = results_base / job.result_path
+    else:
+        full_result_path = result_path_obj
+
+    result_file_path = str(full_result_path / "validated_properties.jsonl")
+
+    if not storage.exists(result_file_path):
+        raise HTTPException(status_code=404, detail=f"Results file not found: {result_file_path}")
+
+    try:
+        # Read JSONL file using storage adapter
+        properties = storage.read_jsonl(result_file_path)
+
+        return {
+            "properties": properties,
+            "result_path": job.result_path,
+            "count": len(properties)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read results: {str(e)}")

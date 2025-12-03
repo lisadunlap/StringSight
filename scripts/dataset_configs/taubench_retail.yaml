@@ -2,7 +2,9 @@ data_path: data/taubench/retail_data.jsonl
 output_dir: results/taubench_retail
 method: single_model
 min_cluster_size: 5
-embedding_model: text-embedding-3-small
+extraction_model: gpt-5
+summary_model: gpt-5
+embedding_model: text-embedding-3-large
 max_workers: 16
 groupby_column: behavior_type
 assign_outliers: false

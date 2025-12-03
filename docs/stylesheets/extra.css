@@ -1,17 +1,21 @@
 /* Custom styles for StringSight documentation */
 
-/* StringSight app-aligned color palette */
+/* Retro Tech color palette - matching UI theme */
 :root {
-  --ss-color-primary: #4C6EF5;           /* Indigo primary */
-  --ss-color-primary-light: #647CF7;     /* Lighter indigo for hovers */
-  --ss-color-primary-dark: #364FC7;      /* Darker indigo for focus states */
-  --ss-color-accent: #7C3AED;            /* Purple accent */
-  --ss-color-link: #646CFF;              /* Link accent */
-  --ss-color-bg: #F8FAFC;                /* App background */
-  --ss-color-surface: #FFFFFF;           /* Surfaces/cards */
-  --ss-color-text-primary: #111827;      /* Primary text */
-  --ss-color-text-secondary: #6B7280;    /* Secondary text */
-  --ss-color-border: #E5E7EB;            /* Borders/dividers */
+  --ss-color-primary: #4A90E2;           /* Retro blue (blueSubdued) */
+  --ss-color-primary-light: #5B8DEE;      /* Brighter retro blue for hovers */
+  --ss-color-primary-dark: #3A7BC8;       /* Darker retro blue for focus states */
+  --ss-color-accent: #8B5FBF;             /* Retro purple (purpleSubdued) */
+  --ss-color-accent-vibrant: #9B6FCF;     /* Vibrant grape purple */
+  --ss-color-link: #4A90E2;               /* Link accent (matches primary) */
+  --ss-color-green: #52C991;              /* Terminal green */
+  --ss-color-orange: #FF8C42;             /* Vivid amber */
+  --ss-color-red: #E85D75;                /* Error red */
+  --ss-color-bg: #F8FAFC;                 /* App background */
+  --ss-color-surface: #FFFFFF;            /* Surfaces/cards */
+  --ss-color-text-primary: #111827;       /* Primary text */
+  --ss-color-text-secondary: #6B7280;     /* Secondary text */
+  --ss-color-border: #E5E7EB;             /* Borders/dividers */
 }
 
 /* Light mode (default scheme) */
@@ -68,7 +72,7 @@
 
 /* Inline code: keep subtle, no shadow */
 .md-typeset :not(pre) > code {
-    background-color: rgba(76, 110, 245, 0.08);
+    background-color: rgba(74, 144, 226, 0.08); /* Retro blue tint */
     border-radius: 3px;
     padding: 2px 4px;
     font-size: 0.85em;
@@ -88,7 +92,7 @@
 
 /* Custom callout boxes */
 .callout {
-    background-color: rgba(76, 110, 245, 0.04);
+    background-color: rgba(74, 144, 226, 0.04); /* Retro blue tint */
     border-left: 4px solid var(--ss-color-primary);
     padding: 1rem;
     margin: 1rem 0;
@@ -97,22 +101,22 @@
 
 .callout-info {
     border-left-color: var(--ss-color-link);
-    background-color: rgba(100, 108, 255, 0.06);
+    background-color: rgba(74, 144, 226, 0.06); /* Retro blue */
 }
 
 .callout-warning {
-    border-left-color: var(--ss-color-accent);
-    background-color: rgba(124, 58, 237, 0.06);
+    border-left-color: var(--ss-color-orange);
+    background-color: rgba(255, 140, 66, 0.06); /* Retro amber */
 }
 
 .callout-danger {
-    border-left-color: var(--ss-color-primary-dark);
-    background-color: rgba(54, 79, 199, 0.06);
+    border-left-color: var(--ss-color-red);
+    background-color: rgba(232, 93, 117, 0.06); /* Retro red */
 }
 
 .callout-success {
-    border-left-color: #16A34A;
-    background-color: rgba(22, 163, 74, 0.06);
+    border-left-color: var(--ss-color-green);
+    background-color: rgba(82, 201, 145, 0.06); /* Terminal green */
 }
 
 /* Table styling */
@@ -145,7 +149,7 @@
 }
 
 .md-nav__link:hover {
-    background-color: rgba(76, 110, 245, 0.06);
+    background-color: rgba(74, 144, 226, 0.06); /* Retro blue tint */
 }
 
 [data-md-color-scheme="slate"] .md-nav__link:hover {

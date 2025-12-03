@@ -230,12 +230,12 @@ The validation feature checks whether the induced behaviors are actually detecta
 
 ### What Validation Does
 
-1. **Multi-Label Classification**: For each response, an LLM (default: gpt-4o-mini) identifies ALL behaviors present (not just one)
+1. **Multi-Label Classification**: For each response, an LLM (default: gpt-4.1-mini) identifies ALL behaviors present (not just one)
 2. **Confusion Matrix**: Calculate precision, recall, F1 for each behavior
 3. **Co-Occurrence Analysis**: Identify which behaviors frequently appear together
 4. **Purity Metrics**: Show which behaviors are "pure" (detected alone) vs "mixed" (detected with others)
 
-**Note**: Validation uses gpt-4o-mini by default for cost efficiency. You can change this with `--validation-model` if you want higher-quality validation.
+**Note**: Validation uses gpt-4.1-mini by default for cost efficiency. You can change this with `--validation-model` if you want higher-quality validation.
 
 ### When to Use Validation
 
@@ -294,7 +294,7 @@ When validation is enabled, each response includes:
 --base-system-prompt TEXT     # Base system prompt (default: "You are a helpful assistant.")
 --output-dir PATH             # Output directory (default: benchmark/results/)
 --enable-validation           # Enable behavior validation (adds extra LLM calls)
---validation-model MODEL      # Model for validation (default: gpt-4o-mini)
+--validation-model MODEL      # Model for validation (default: gpt-4.1-mini)
 --validation-max-workers N    # Parallel workers for validation (default: 10)
 ```
 
@@ -303,8 +303,8 @@ When validation is enabled, each response includes:
 ```python
 @dataclass
 class BenchmarkConfig:
-    behavior_generation_model: str = "gpt-4o"
-    response_generation_model: str = "gpt-4o-mini"
+    behavior_generation_model: str = "gpt-4.1"
+    response_generation_model: str = "gpt-4.1-mini"
     sample_size: Optional[int] = None
     num_behaviors: int = 10
     num_fewshot_examples: int = 10
@@ -313,7 +313,7 @@ class BenchmarkConfig:
     random_seed: int = 42
     base_system_prompt: str = "You are a helpful assistant."
     enable_validation: bool = False
-    validation_model: str = "gpt-4o-mini"
+    validation_model: str = "gpt-4.1-mini"
     validation_max_workers: int = 10
 ```
 
@@ -492,7 +492,7 @@ clustered_df, model_stats = explain(
     stringsight_input.head(100),
     method="side_by_side",
     min_cluster_size=5,
-    embedding_model="text-embedding-3-small",
+    embedding_model="text-embedding-3-large",
     hierarchical=True,
     output_dir="stringsight_results/"
 )
@@ -583,7 +583,7 @@ Format your response as JSON:
 
 # Run LLM judge (pseudo-code)
 from stringsight.core.llm_utils import single_completion
-result = single_completion(judge_prompt, model="gpt-4o")
+result = single_completion(judge_prompt, model="gpt-4.1")
 ```
 
 ### Step 5: Metrics Calculation
@@ -643,7 +643,7 @@ python benchmark/evaluate_stringsight.py \
     --min-cluster-size 5 \
     --extraction-model gpt-4.1-mini \
     --judge-model gpt-4.1 \
-    --embedding-model text-embedding-3-small \
+    --embedding-model text-embedding-3-large \
     --match-threshold 0.7 \
     --hierarchical \
     --output-dir evaluation_results/
@@ -655,7 +655,7 @@ python benchmark/evaluate_stringsight.py \
 - `--min-cluster-size`: Minimum cluster size for StringSight (default: 5)
 - `--extraction-model`: Model for property extraction (default: gpt-4.1-mini)
 - `--judge-model`: Model for LLM-as-judge (default: gpt-4.1)
-- `--embedding-model`: Embedding model for clustering (default: text-embedding-3-small)
+- `--embedding-model`: Embedding model for clustering (default: text-embedding-3-large)
 - `--match-threshold`: Confidence threshold for partial matches (default: 0.7)
 - `--hierarchical`: Enable hierarchical clustering
 - `--output-dir`: Directory for evaluation results

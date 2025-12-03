@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stringsight-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: stringsight-api
+  template:
+    metadata:
+      labels:
+        app: stringsight-api
+    spec:
+      containers:
+      - name: api
+        image: stringsight:latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: stringsight-config
+        - secretRef:
+            name: stringsight-secrets
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stringsight-api
+spec:
+  selector:
+    app: stringsight-api
+  ports:
+  - port: 80
+    targetPort: 8000
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stringsight-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: stringsight-worker
+  template:
+    metadata:
+      labels:
+        app: stringsight-worker
+    spec:
+      containers:
+      - name: worker
+        image: stringsight:latest
+        command: ["celery", "-A", "stringsight.celery_app", "worker", "--loglevel=info"]
+        envFrom:
+        - configMapRef:
+            name: stringsight-config
+        - secretRef:
+            name: stringsight-secrets

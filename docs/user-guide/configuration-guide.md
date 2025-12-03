@@ -56,14 +56,14 @@ explain(df, min_cluster_size=25)
 
 | Model | Cost | Speed | Quality | Best For |
 |-------|------|-------|---------|----------|
-| `"text-embedding-3-small"` | $0.02/1M tokens | Fast | Very Good | **Default - best balance** |
+| `"text-embedding-3-large"` | $0.02/1M tokens | Fast | Very Good | **Default - best balance** |
 | `"text-embedding-3-large"` | $0.13/1M tokens | Medium | Excellent | Production quality analysis |
 | `"all-MiniLM-L6-v2"` | Free | Very Fast | Good | Development, large datasets |
 | `"all-mpnet-base-v2"` | Free | Medium | Very Good | Cost-conscious production |
 
 ```python
 # OpenAI embeddings (requires API key, costs $)
-explain(df, embedding_model="text-embedding-3-small")  # Default
+explain(df, embedding_model="text-embedding-3-large")  # Default
 
 # Local embeddings (free, no API calls)
 explain(df, embedding_model="all-MiniLM-L6-v2")
@@ -103,7 +103,7 @@ explain(df, assign_outliers=False)
 |-------|--------------|-------------|
 | `"gpt-4.1"` | $$$ / Excellent | Production, research papers, high-stakes decisions |
 | `"gpt-4.1-mini"` | $$ / Very Good | **Default - balanced cost/quality** |
-| `"gpt-4o-mini"` | $ / Good | Development, iteration, large-scale experiments |
+| `"gpt-4.1-mini"` | $ / Good | Development, iteration, large-scale experiments |
 | `"gpt-4.1-nano"` | ¢ / Decent | Massive datasets, proof-of-concepts |
 
 ```python
@@ -111,7 +111,7 @@ explain(df, assign_outliers=False)
 explain(df, model_name="gpt-4.1")
 
 # Cost-effective extraction
-explain(df, model_name="gpt-4o-mini")
+explain(df, model_name="gpt-4.1-mini")
 ```
 
 ### temperature
@@ -158,7 +158,7 @@ For cost-effective analysis without sacrificing too much quality:
 ```python
 explain(
     df,
-    model_name="gpt-4o-mini",              # Cheap extraction
+    model_name="gpt-4.1-mini",              # Cheap extraction
     embedding_model="all-MiniLM-L6-v2",    # Free embeddings
     min_cluster_size=50,                    # Fewer, larger clusters
     use_wandb=False                         # Turn off W&B (default True)
@@ -191,7 +191,7 @@ For fast experimentation:
 ```python
 explain(
     df,
-    model_name="gpt-4o-mini",            # Fast extraction
+    model_name="gpt-4.1-mini",            # Fast extraction
     embedding_model="all-MiniLM-L6-v2",   # Fast embeddings
     min_cluster_size=20,                   # Quick clustering
     max_workers=32,                        # Maximize parallelism
@@ -326,10 +326,10 @@ explain(df, min_cluster_size=30)
 explain(df, model_name="gpt-4.1", embedding_model="text-embedding-3-large")
 
 # Production dashboard (speed + quality balance)
-explain(df, model_name="gpt-4.1-mini", embedding_model="text-embedding-3-small")
+explain(df, model_name="gpt-4.1-mini", embedding_model="text-embedding-3-large")
 
 # Exploration/development (speed matters most)
-explain(df, model_name="gpt-4o-mini", embedding_model="all-MiniLM-L6-v2")
+explain(df, model_name="gpt-4.1-mini", embedding_model="all-MiniLM-L6-v2")
 ```
 
 ## Next Steps

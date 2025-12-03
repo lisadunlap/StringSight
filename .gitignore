@@ -65,5 +65,9 @@ ENV/
 .DS_Store
 Thumbs.db
 
+# Docker
+docker-compose.override.yml
+.env
+
 # Package lock (only in frontend)
 /package-lock.json

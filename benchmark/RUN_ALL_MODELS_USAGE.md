@@ -72,7 +72,7 @@ To customize parameters, edit the configuration variables at the top of the scri
 
 --subset-size         Number of prompts to sample (None = all)
 --min-cluster-size    Minimum cluster size (default: 5)
---embedding-model     Embedding model (default: text-embedding-3-small)
+--embedding-model     Embedding model (default: text-embedding-3-large)
 --extraction-model    Property extraction model (default: gpt-4.1-mini)
 --judge-model         LLM-as-judge model (default: gpt-4.1)
 --top-k              Top K behaviors to evaluate (default: 10)

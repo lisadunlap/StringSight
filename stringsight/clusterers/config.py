@@ -101,7 +101,7 @@ class ClusterConfig:
             min_samples=getattr(args, "min_samples", None),
             cluster_selection_epsilon=getattr(args, "cluster_selection_epsilon", 0.0),
             groupby_column=getattr(args, "groupby_column", None),
-            cluster_positive=getattr(args, "cluster_positive", False),
+            cluster_positive=getattr(args, "cluster_positive", True),
             # Dimension reduction settings
             dim_reduction_method=getattr(args, "dim_reduction_method", "adaptive"),
             umap_n_components=getattr(args, "umap_n_components", 100),

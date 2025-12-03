@@ -412,7 +412,7 @@ def balance_dataset_by_task_trials(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.D
     Balance datasets by ensuring each task_id has the same number of trials from each model.
     For each task_id, samples the same trials (0,1,2,3...) from both models.
     """
-    print(f"Initial GPT-4o conversations: {len(df1)}")
+    print(f"Initial gpt-4.1 conversations: {len(df1)}")
     print(f"Initial Claude conversations: {len(df2)}")
     
     # Get unique task_ids from both datasets
@@ -420,7 +420,7 @@ def balance_dataset_by_task_trials(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.D
     claude_task_ids = set(df2['task_id'].unique())
     common_task_ids = gpt_task_ids.intersection(claude_task_ids)
     
-    print(f"GPT-4o unique task_ids: {len(gpt_task_ids)}")
+    print(f"gpt-4.1 unique task_ids: {len(gpt_task_ids)}")
     print(f"Claude unique task_ids: {len(claude_task_ids)}")
     print(f"Common task_ids: {len(common_task_ids)}")
     
@@ -461,8 +461,8 @@ def balance_dataset_by_task_trials(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.D
 
 
 def process_airline_data(incorrect_only: bool = False, balance: bool = True) -> list[dict]:
-    df1 = process_data("./data/taubench/gpt-4o-airline.json", incorrect_only)
-    df1["model"] = "gpt-4o"
+    df1 = process_data("./data/taubench/gpt-4.1-airline.json", incorrect_only)
+    df1["model"] = "gpt-4.1"
     df2 = process_data("./data/taubench/sonnet-35-new-airline.json", incorrect_only)
     df2["model"] = "claude-sonnet-35"
     if balance:
@@ -471,8 +471,8 @@ def process_airline_data(incorrect_only: bool = False, balance: bool = True) -> 
         return pd.concat([df1, df2])
 
 def process_retail_data(incorrect_only: bool = False, balance: bool = True) -> list[dict]:
-    df1 = process_data("./data/taubench/gpt-4o-retail.json", incorrect_only)
-    df1["model"] = "gpt-4o"
+    df1 = process_data("./data/taubench/gpt-4.1-retail.json", incorrect_only)
+    df1["model"] = "gpt-4.1"
     df2 = process_data("./data/taubench/sonnet-35-new-retail.json", incorrect_only)
     df2["model"] = "claude-sonnet-35"
     if balance:

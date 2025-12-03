@@ -162,7 +162,7 @@ def main():
         clusterer=args.clusterer,
         min_cluster_size=args.min_cluster_size,
         max_coarse_clusters=args.max_coarse_clusters,
-        embedding_model="text-embedding-3-small",
+        embedding_model="text-embedding-3-large",
         hierarchical=args.hierarchical,
         max_workers=args.max_workers,
         use_wandb=args.use_wandb,

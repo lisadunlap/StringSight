@@ -124,6 +124,9 @@ class SideBySideMetrics(FunctionalMetrics):
                 )
 
         conversations_df = pd.DataFrame(expanded_rows)
+        if conversations_df.empty:
+            # Ensure required columns exist even if empty to prevent merge errors
+            conversations_df = pd.DataFrame(columns=["conversation_id", "model", "scores", "conversation_metadata"])
 
         # ------------------------------------------------------------------
         # 4) Join: properties ↔ conversations ↔ clusters
@@ -214,7 +217,13 @@ class SideBySideMetrics(FunctionalMetrics):
         # Handle list format [scores_a, scores_b]
         if isinstance(all_scores, list) and len(all_scores) == 2:
             scores_a, scores_b = all_scores[0], all_scores[1]
-            
+
+            # Ensure scores_a and scores_b are dicts
+            if not isinstance(scores_a, dict):
+                scores_a = {}
+            if not isinstance(scores_b, dict):
+                scores_b = {}
+
             # Match this_model to the appropriate scores based on conversation order
             if conversation and isinstance(conversation.model, (list, tuple)) and len(conversation.model) == 2:
                 model_a, model_b = conversation.model[0], conversation.model[1]
@@ -228,11 +237,12 @@ class SideBySideMetrics(FunctionalMetrics):
             else:
                 # Fallback: use scores_a for first model, scores_b for second
                 model_scores = scores_a if this_model < other_model else scores_b
-            
+
             # Copy all numeric metrics from the model's scores
-            for k, v in model_scores.items():
-                if isinstance(v, (int, float)):
-                    result[k] = float(v)
+            if isinstance(model_scores, dict):
+                for k, v in model_scores.items():
+                    if isinstance(v, (int, float)):
+                        result[k] = float(v)
             
             # Handle winner if present in meta field
             if conversation and hasattr(conversation, 'meta'):
@@ -256,6 +266,42 @@ class SideBySideMetrics(FunctionalMetrics):
             if isinstance(val, dict) and val:
                 return list(val.keys())
         return []
+
+    def _compute_salience(self, model_cluster_scores: Dict[str, Dict[str, Dict[str, Any]]]) -> Dict[str, Dict[str, Dict[str, Any]]]:
+        """Compute salience for side-by-side as difference between the two models.
+
+        For SxS, proportion_delta = this_model_proportion - other_model_proportion
+        (instead of deviation from average across all models).
+        """
+        df = pd.DataFrame(model_cluster_scores).reset_index().rename({"index": "cluster"}, axis=1)
+
+        model_names = [col for col in df.columns if col not in ['cluster']]
+
+        # Extract proportion values
+        for model in model_names:
+            df[f'{model}_proportion'] = df[model].apply(lambda x: x.get('proportion', 0) if isinstance(x, dict) else 0)
+
+        # For side-by-side with exactly 2 models, compute pairwise difference
+        if len(model_names) == 2:
+            model_a, model_b = model_names[0], model_names[1]
+            df[f'{model_a}_deviation'] = df[f'{model_a}_proportion'] - df[f'{model_b}_proportion']
+            df[f'{model_b}_deviation'] = df[f'{model_b}_proportion'] - df[f'{model_a}_proportion']
+        else:
+            # Fallback to average-based deviation if not exactly 2 models
+            proportion_cols = [f'{model}_proportion' for model in model_names]
+            df['avg_proportion'] = df[proportion_cols].mean(axis=1)
+            for model in model_names:
+                df[f'{model}_deviation'] = df[f'{model}_proportion'] - df['avg_proportion']
+
+        # Add deviation into model_cluster_scores
+        for i, row in df.iterrows():
+            cluster = row['cluster']
+            for model in model_names:
+                deviation_value = row[f'{model}_deviation']
+                if model in model_cluster_scores and cluster in model_cluster_scores[model]:
+                    model_cluster_scores[model][cluster]['proportion_delta'] = deviation_value
+
+        return model_cluster_scores
 
     def compute_cluster_metrics(self, df: pd.DataFrame, clusters: List[str] | str, models: List[str] | str, *, include_metadata: bool = True) -> Dict[str, Any]:
         """Override to avoid indexing into empty DataFrames during bootstrap.

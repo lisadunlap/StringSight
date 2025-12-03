@@ -76,7 +76,7 @@ def run_pipeline(
     task_description: Optional[str] = None,
     clusterer="hdbscan",
     min_cluster_size=15,
-    embedding_model="text-embedding-3-small",
+    embedding_model="text-embedding-3-large",
     max_workers=16,
     use_wandb=True,
     verbose=False,
@@ -317,7 +317,7 @@ def main():
                         help="Clustering algorithm (default: hdbscan)")
     parser.add_argument("--min_cluster_size", type=int, default=15,
                         help="Minimum cluster size (default: 15)")
-    parser.add_argument("--embedding_model", type=str, default="text-embedding-3-small",
+    parser.add_argument("--embedding_model", type=str, default="text-embedding-3-large",
                         help="Embedding model to use (default: openai)")
     parser.add_argument("--max_workers", type=int, default=64,
                         help="Maximum number of workers (default: 64)")

@@ -21,7 +21,7 @@ def test_behavior_generation():
 
     config = BenchmarkConfig(
         dataset_description_path="input_dataset_descriptions/instructeval.yaml",
-        behavior_generation_model="gpt-4o",
+        behavior_generation_model="gpt-4.1",
         num_behaviors=10
     )
 

@@ -33,7 +33,7 @@ extraction:
 
 clustering:
   min_cluster_size: 30
-  embedding_model: "text-embedding-3-small"
+  embedding_model: "text-embedding-3-large"
   cache_dir: "/data/cache/clustering"
 
 metrics:
@@ -65,41 +65,61 @@ gunicorn stringsight.api:app \
   --timeout 300
 ```
 
-### Using Docker
+### Using Docker Compose
 
-Create `Dockerfile`:
+StringSight includes a complete Docker Compose setup with all infrastructure dependencies (PostgreSQL, Redis, MinIO) for production deployments.
 
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application
-COPY . .
-RUN pip install -e ".[full]"
-
-# Expose port
-EXPOSE 8000
-
-# Run application
-CMD ["uvicorn", "stringsight.api:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-Build and run:
+**Setup:**
 
 ```bash
-docker build -t stringsight:latest .
-docker run -p 8000:8000 -e OPENAI_API_KEY=$OPENAI_API_KEY stringsight:latest
+# Clone repository
+git clone https://github.com/lisabdunlap/stringsight.git
+cd stringsight
+
+# Configure environment
+cp .env.example .env
+# Edit .env and add your OPENAI_API_KEY and other credentials
+
+# Start all services
+docker compose up -d
+
+# The API will be available at http://localhost:8000
 ```
+
+**What's included:**
+- API server (FastAPI with auto-reload)
+- Celery workers for async job processing
+- PostgreSQL database
+- Redis for job queue
+- MinIO for object storage
+
+**Production deployment:**
+
+```bash
+# Build and start in detached mode
+docker compose up -d --build
+
+# View logs
+docker compose logs -f api
+docker compose logs -f worker
+
+# Scale workers
+docker compose up -d --scale worker=4
+
+# Stop services
+docker compose down
+```
+
+**Health checks:**
+```bash
+# Check API health
+curl http://localhost:8000/health
+
+# View all running services
+docker compose ps
+```
+
+For development with live code reloading, see the [Development with Live Reload](../getting-started/installation.md#docker-development) section.
 
 ### Deploying on Render
 

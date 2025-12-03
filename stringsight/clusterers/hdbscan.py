@@ -126,7 +126,7 @@ class HDBSCANClusterer(BaseClusterer):
         )
 
 
-    async def cluster(self, data: PropertyDataset, column_name: str) -> pd.DataFrame:
+    async def cluster(self, data: PropertyDataset, column_name: str, progress_callback=None) -> pd.DataFrame:
         """Cluster the dataset.
 
         If ``self.config.groupby_column`` is provided and present in the data, the
@@ -215,7 +215,9 @@ class HDBSCANClusterer(BaseClusterer):
                 tasks = [asyncio.ensure_future(coro) for coro in coros]
 
                 # Add progress bar for parallel clustering
-                with tqdm(total=len(groups), desc=f"Clustering {len(groups)} groups in parallel", disable=not getattr(self, "verbose", False)) as pbar:
+                total_groups = len(groups)
+                completed_groups = 0
+                with tqdm(total=total_groups, desc=f"Clustering {total_groups} groups in parallel", disable=not getattr(self, "verbose", False)) as pbar:
                     for task in asyncio.as_completed(tasks):
                         group, part = await task
                         # Add meta column with group information as a dictionary
@@ -223,6 +225,12 @@ class HDBSCANClusterer(BaseClusterer):
                         part["meta"] = [{"group": group} for _ in range(len(part))]
                         clustered_parts.append(part)
                         pbar.update(1)
+                        completed_groups += 1
+                        if progress_callback:
+                            try:
+                                progress_callback(completed_groups / total_groups)
+                            except Exception:
+                                pass
                 clustered_df = pd.concat(clustered_parts, ignore_index=True)
             else:
                 # Process groups sequentially (default behavior)
@@ -230,7 +238,8 @@ class HDBSCANClusterer(BaseClusterer):
                 groups = list(df.groupby(group_col))
 
                 # Add progress bar for sequential clustering
-                for group, group_df in tqdm(groups, desc=f"Clustering {len(groups)} groups sequentially", disable=not getattr(self, "verbose", False)):
+                total_groups = len(groups)
+                for i, (group, group_df) in enumerate(tqdm(groups, desc=f"Clustering {len(groups)} groups sequentially", disable=not getattr(self, "verbose", False))):
                     if getattr(self, "verbose", False):
                         logger.info(f"--------------------------------\nClustering group {group}\n--------------------------------")
                     part = await hdbscan_cluster_categories(
@@ -242,6 +251,11 @@ class HDBSCANClusterer(BaseClusterer):
                     # Use list comprehension to create independent dict objects for each row
                     part["meta"] = [{"group": group} for _ in range(len(part))]
                     clustered_parts.append(part)
+                    if progress_callback:
+                        try:
+                            progress_callback((i + 1) / total_groups)
+                        except Exception:
+                            pass
                 clustered_df = pd.concat(clustered_parts, ignore_index=True)
         else:
             clustered_df = await hdbscan_cluster_categories(
@@ -369,6 +383,6 @@ class LLMOnlyClusterer(HDBSCANClusterer):
     clustering/hierarchical_clustering.py into the pipeline architecture.
     """
 
-    def run(self, data: PropertyDataset, column_name: str = "property_description") -> PropertyDataset:
+    def run(self, data: PropertyDataset, column_name: str = "property_description", progress_callback=None) -> PropertyDataset:
         """Cluster properties using HDBSCAN (delegates to base)."""
-        return super().run(data, column_name)
+        return super().run(data, column_name, progress_callback=progress_callback)
