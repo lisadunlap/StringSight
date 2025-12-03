@@ -1,5 +1,5 @@
 data_path: data/taubench/airline_data.jsonl
-output_dir: results/taubench_airline_data_sbs_gpt41
+output_dir: results/taubench_airline_data_sbs_gpt41-new
 method: side_by_side
 model_a: gpt-4o
 model_b: claude-sonnet-35

@@ -1,5 +1,5 @@
 data_path: data/taubench/airline_data.jsonl
-output_dir: results/taubench_airline_data_gpt41
+output_dir: results/taubench_airline_data_gpt41-new
 method: single_model
 min_cluster_size: 5
 extraction_model: gpt-4.1
