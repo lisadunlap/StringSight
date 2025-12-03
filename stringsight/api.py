@@ -3310,11 +3310,13 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
 
         # Save results to disk if output_dir specified
         results_dir_name = None
+        results_dir_full_path = None
         if req.output_dir:
             base_results_dir = _get_results_dir()
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             results_dir_name = f"{req.output_dir}_{timestamp}"
             results_dir = base_results_dir / results_dir_name
+            results_dir_full_path = str(results_dir)
             results_dir.mkdir(parents=True, exist_ok=True)
 
             # Save clusters, properties, and conversations
@@ -3444,17 +3446,19 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
         }
 
         # Send email if requested
-        if req.email:
+        if req.email and results_dir_full_path:
             def _send_email_task():
                 try:
-                    from stringsight.email_service import send_cluster_email
-                    send_cluster_email(
-                        to_email=req.email,
-                        num_clusters=len(enriched),
-                        num_properties=len(properties),
-                        output_dir=results_dir_name
+                    from stringsight.email_service import send_results_email
+                    result = send_results_email(
+                        recipient_email=req.email,
+                        results_dir=results_dir_full_path,
+                        experiment_name=f"Clustering_{results_dir_name}"
                     )
-                    logger.info(f"📧 Email sent to {req.email}")
+                    if result.get("success"):
+                        logger.info(f"📧 Email sent to {req.email}")
+                    else:
+                        logger.error(f"Failed to send email: {result.get('message')}")
                 except Exception as e:
                     logger.error(f"Failed to send clustering email: {e}")
 
