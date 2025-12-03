@@ -36,7 +36,7 @@ def test_explain_single_model_without_score_columns():
     df = load_test_data(max_rows=30)
     
     # Filter to just one model
-    df_single = df[df["model"] == "openai/gpt-4o-mini-2024-07-18"].copy()
+    df_single = df[df["model"] == "openai/gpt-4.1-mini-2024-07-18"].copy()
     
     print(f"Loaded {len(df_single)} rows for single model")
     print(f"Columns: {df_single.columns.tolist()}")
@@ -83,7 +83,7 @@ def test_explain_single_model_with_score_columns():
     df = load_test_data(max_rows=30)
     
     # Filter to just one model
-    df_single = df[df["model"] == "openai/gpt-4o-mini-2024-07-18"].copy()
+    df_single = df[df["model"] == "openai/gpt-4.1-mini-2024-07-18"].copy()
     
     # Extract score metrics to separate columns
     score_cols = ['medication_qa_accuracy', 'gpt_accuracy', 'llama_accuracy', 'claude_accuracy']
@@ -137,7 +137,7 @@ def test_explain_side_by_side_with_score_columns():
     
     # Use tidy format with two models
     model_a = 'google/gemini-2.0-flash-001'
-    model_b = 'openai/gpt-4o-mini-2024-07-18'
+    model_b = 'openai/gpt-4.1-mini-2024-07-18'
     
     df_tidy = df[df["model"].isin([model_a, model_b])].copy()
     
@@ -196,7 +196,7 @@ def test_label_single_model_without_score_columns():
     df = load_test_data(max_rows=30)
     
     # Filter to just one model
-    df_single = df[df["model"] == "openai/gpt-4o-mini-2024-07-18"].copy()
+    df_single = df[df["model"] == "openai/gpt-4.1-mini-2024-07-18"].copy()
     
     print(f"Loaded {len(df_single)} rows for single model")
     print(f"Sample score: {df_single['score'].iloc[0]}")
@@ -237,7 +237,7 @@ def test_label_single_model_with_score_columns():
     df = load_test_data(max_rows=30)
     
     # Filter to just one model
-    df_single = df[df["model"] == "openai/gpt-4o-mini-2024-07-18"].copy()
+    df_single = df[df["model"] == "openai/gpt-4.1-mini-2024-07-18"].copy()
     
     # Extract score metrics to separate columns
     score_cols = ['medication_qa_accuracy', 'gpt_accuracy', 'llama_accuracy', 'claude_accuracy']

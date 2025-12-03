@@ -106,7 +106,7 @@ def send_results_email(
             payload = {
                 "sender": {"email": sender_email},
                 "to": [{"email": recipient_email}],
-                "subject": "Your StringSight Clustering Results are Here!",
+                "subject": "Your StringSight Results are Here!",
                 "htmlContent": """
 <html>
 <body>
@@ -196,7 +196,7 @@ Some Berkeley Folks</p>
         msg = MIMEMultipart()
         msg['From'] = sender_email
         msg['To'] = recipient_email
-        msg['Subject'] = f'Your StringSight Clustering Results are Here!'
+        msg['Subject'] = f'Your StringSight Results are Here!'
 
         body = f"""
 <html>

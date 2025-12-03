@@ -1,8 +1,10 @@
 data_path: data/helm_capabilities/instructeval_grok_gpt_5_mini.jsonl
-output_dir: results/instructeval_grok_gpt_5_mini-2_test
+output_dir: results/instructeval_grok_gpt_5_mini-anthropic
 method: side_by_side
 model_a: xai/grok-3-mini-beta
 model_b: openai/gpt-5-nano-2025-08-07
+extraction_model: anthropic/claude-sonnet-4-20250514
+summary_model: anthropic/claude-sonnet-4-20250514
 min_cluster_size: 5
 sample_size: 50
 embedding_model: text-embedding-3-large
