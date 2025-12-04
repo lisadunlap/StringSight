@@ -6,6 +6,8 @@ benchmark/evaluation_results/
 helm/
 tests/outputs/
 
+stringsight/stringsight/frontend_dist/
+
 # Large downloaded SDKs and archives
 google-cloud-sdk/
 *.tar.gz
@@ -71,3 +73,9 @@ docker-compose.override.yml
 
 # Package lock (only in frontend)
 /package-lock.json
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+stringsight/frontend_dist/

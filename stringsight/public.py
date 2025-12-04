@@ -24,12 +24,16 @@ def _run_pipeline_smart(pipeline, dataset, progress_callback=None):
     try:
         # Check if we're already in an event loop
         loop = asyncio.get_running_loop()
-        # We're in an async context but this is a sync function
-        # This shouldn't happen if callers use the right API
-        raise RuntimeError(
-            "Cannot call sync explain() from async context (e.g., FastAPI). "
-            "This is a bug - FastAPI endpoints should use explain_async() instead."
-        )
+        # We're in a Jupyter notebook or similar - use nest_asyncio
+        try:
+            import nest_asyncio
+            nest_asyncio.apply()
+            return asyncio.run(pipeline.run(dataset, progress_callback=progress_callback))
+        except ImportError:
+            raise RuntimeError(
+                "Running in a Jupyter notebook or async context requires nest_asyncio. "
+                "Install it with: pip install nest_asyncio"
+            )
     except RuntimeError as e:
         if "no running event loop" in str(e).lower():
             # No event loop - safe to use asyncio.run()

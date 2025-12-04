@@ -2076,9 +2076,6 @@ def email_results(req: EmailResultsRequest) -> Dict[str, Any]:
         experiment_name=req.experiment_name
     )
 
-    if not result['success']:
-        raise HTTPException(status_code=500, detail=result['message'])
-
     return result
 
 
