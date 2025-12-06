@@ -58,13 +58,13 @@ class DummyClusterer(BaseClusterer):
             include_embeddings=include_embeddings,
         )
 
-    def run(self, data: PropertyDataset, column_name: str = "property_description") -> PropertyDataset:
+    async def run(self, data: PropertyDataset, column_name: str = "property_description", progress_callback=None) -> PropertyDataset:
         """Execute clustering using `property_description` as the key for fixed-axes.
 
         We intentionally ignore the incoming `column_name` and cluster by
         the `property_description` field emitted by the fixed-axes extractor.
         """
-        return super().run(data, column_name="property_description")
+        return await super().run(data, column_name="property_description", progress_callback=progress_callback)
 
     def cluster(self, data: PropertyDataset, column_name: str) -> pd.DataFrame:
         """Map properties to a fixed taxonomy and return a standardized DataFrame."""

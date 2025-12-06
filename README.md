@@ -30,6 +30,22 @@
   <strong>Annoyed at having to look through your long model conversations or agentic traces? Fear not, StringSight has come to ease your woes. Understand and compare model behavior by automatically extracting behavioral properties from their responses, grouping similar behaviors together, and quantifying how important these behaviors are.</strong>
 </p>
 
+## Quick Start
+
+**Install and launch the web UI:**
+```bash
+# Install
+pip install stringsight
+
+# Launch the web interface
+stringsight launch
+
+# Or run in background with multiple workers
+stringsight launch --daemon --workers 4
+```
+
+The UI will be available at [http://localhost:5180](http://localhost:5180).
+
 ## Installation
 
 ```bash
@@ -47,13 +63,20 @@ pip install "stringsight[full]"
 For local development or contributing, you can install from source in editable mode:
 
 ```bash
-# Clone the repository
-git clone https://github.com/lisabdunlap/stringsight.git
+# Clone the repository with submodules
+git clone --recurse-submodules https://github.com/lisabdunlap/stringsight.git
 cd stringsight
+
+# If you already cloned without submodules, initialize them:
+git submodule update --init --recursive
 
 # (Optional) create and activate a dedicated environment
 conda create -n stringsight python=3.11
 conda activate stringsight
+
+# Build the frontend (required for the web UI)
+chmod +x build_frontend.sh
+./build_frontend.sh
 
 # Install StringSight in editable mode with full extras
 pip install -e ".[full]"
@@ -112,7 +135,37 @@ The development setup mounts your local code into the containers, so changes to 
 - Use the basic setup (rebuild containers when you make changes)
 - Run the API locally: `pip install -e . && uvicorn stringsight.api:app --reload`
 
-## Quick Start
+## Usage
+
+### Web UI
+
+The easiest way to use StringSight is through the web interface:
+
+```bash
+# Simple mode - runs in your terminal (Ctrl+C to stop)
+stringsight launch
+
+# Daemon mode - runs in background, survives disconnects
+stringsight launch --daemon --workers 4
+
+# Check if running
+stringsight status
+
+# View logs
+stringsight logs
+stringsight logs --follow  # tail -f style
+
+# Stop the server
+stringsight stop
+```
+
+**Daemon mode features:**
+- ✅ Runs in background (survives terminal disconnects)
+- ✅ Multiple workers for concurrent request handling
+- ✅ Logs saved to `~/.stringsight/logs/server.log`
+- ✅ Easy process management with `stop`/`status` commands
+
+### Python API
 
 For a comprehensive tutorial with detailed explanations, see [starter_notebook.ipynb](starter_notebook.ipynb) or open it directly in [Google Colab](https://colab.research.google.com/drive/1XBQqDqTK6-9wopqRB51j8cPfnTS5Wjqh?usp=drive_link).
 
@@ -537,6 +590,46 @@ Specific behaviors to look for:
 **Note:** Prompt expansion adds one additional LLM call before extraction begins. The expanded description is cached and reused throughout the pipeline, so it only adds minimal overhead.
 
 ## CLI Usage
+
+### Launch the Web UI
+
+**Simple mode (foreground):**
+```bash
+# Launch in your terminal (Ctrl+C to stop)
+stringsight launch
+
+# Launch on a custom port
+stringsight launch --port 8080
+
+# Launch with debug logging
+stringsight launch --debug
+```
+
+**Daemon mode (background):**
+```bash
+# Launch in background (survives terminal disconnects)
+stringsight launch --daemon --workers 4
+
+# Check if server is running
+stringsight status
+
+# View logs
+stringsight logs
+stringsight logs --follow  # tail -f equivalent
+
+# Stop the server
+stringsight stop
+```
+
+The UI will be available at [http://localhost:5180](http://localhost:5180) by default.
+
+**Daemon mode features:**
+- Runs in background (survives terminal disconnects)
+- Multiple workers for concurrent request handling
+- Logs saved to `~/.stringsight/logs/server.log`
+- PID file for process management
+
+### Run Pipeline from Command Line
 
 ```bash
 # Run full pipeline from command line
