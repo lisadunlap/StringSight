@@ -3318,8 +3318,8 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
 
             # Save clusters, properties, and conversations
             clusters_file = results_dir / "clusters.jsonl"
-            properties_file = results_dir / "validated_properties.jsonl"
-            conversations_file = results_dir / "conversations.jsonl"
+            properties_file = results_dir / "properties.jsonl"
+            conversations_file = results_dir / "conversation.jsonl"
 
             import json
             from dataclasses import asdict
@@ -3332,9 +3332,43 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
                 for prop in properties:
                     f.write(json.dumps(prop.to_dict()) + '\n')
 
+            # Convert conversations to dataframe format with correct column names
+            conv_rows = []
+            for conv in conversations:
+                if isinstance(conv.model, str):
+                    # Single model format
+                    conv_row = {
+                        'question_id': conv.question_id,
+                        'prompt': conv.prompt,
+                        'model': conv.model,
+                        'model_response': conv.responses,
+                        'score': conv.scores,
+                        **conv.meta
+                    }
+                else:
+                    # Side-by-side format
+                    if isinstance(conv.scores, list) and len(conv.scores) == 2:
+                        scores_a, scores_b = conv.scores[0], conv.scores[1]
+                    else:
+                        scores_a, scores_b = {}, {}
+
+                    conv_row = {
+                        'question_id': conv.question_id,
+                        'prompt': conv.prompt,
+                        'model_a': conv.model[0],
+                        'model_b': conv.model[1],
+                        'model_a_response': conv.responses[0],
+                        'model_b_response': conv.responses[1],
+                        'score_a': scores_a,
+                        'score_b': scores_b,
+                        'winner': conv.meta.get('winner'),
+                        **{k: v for k, v in conv.meta.items() if k != 'winner'}
+                    }
+                conv_rows.append(conv_row)
+
             with open(conversations_file, 'w') as f:
-                for conv in conversations:
-                    f.write(json.dumps(asdict(conv)) + '\n')
+                for row in conv_rows:
+                    f.write(json.dumps(row) + '\n')
 
             logger.info(f"✓ Results saved to {results_dir}")
 
@@ -3397,7 +3431,7 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
 
             import json
             if model_cluster_scores_array:
-                with open(results_dir / "model_cluster_scores.jsonl", 'w') as f:
+                with open(results_dir / "model_cluster_scores_df.jsonl", 'w') as f:
                     for item in model_cluster_scores_array:
                         f.write(json.dumps(item) + '\n')
 

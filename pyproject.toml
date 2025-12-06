@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stringsight"
-version = "0.3.2"
+version = "0.3.3"
 authors = [
     {name = "Lisa Dunlap", email = "lisabdunlap@berkeley.edu"},
 ]
@@ -49,6 +49,7 @@ dependencies = [
     "lmdb>=1.4.1",
     "orjson>=3.9.0",
     "xxhash>=3.4.0",
+    "nest-asyncio>=1.5.0",
 ]
 
 [project.optional-dependencies]
@@ -88,5 +89,16 @@ Documentation = "https://github.com/lisabdunlap/stringsight/blob/main/README.md"
 include = ["stringsight*"]
 
 [tool.setuptools.package-data]
-stringsight = ["**/*.yaml", "**/*.json", "**/*.txt"]
+stringsight = [
+    "**/*.yaml",
+    "**/*.json",
+    "**/*.txt",
+    "frontend_dist/**/*"
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[project.scripts]
+stringsight = "stringsight.cli:main"
 
