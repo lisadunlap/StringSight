@@ -73,7 +73,7 @@ StringSight includes a complete Docker Compose setup with all infrastructure dep
 
 ```bash
 # Clone repository
-git clone https://github.com/lisabdunlap/stringsight.git
+git clone https://github.com/lisadunlap/stringsight.git
 cd stringsight
 
 # Configure environment

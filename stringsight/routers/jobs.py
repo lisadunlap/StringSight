@@ -6,8 +6,6 @@ import uuid
 
 from stringsight.database import get_db
 from stringsight.models.job import Job
-from stringsight.models.user import User
-from stringsight.routers.auth import get_current_user_optional
 from stringsight.schemas import ExtractJobStartRequest, PipelineJobRequest, ClusterJobRequest, DemoEmailRequest
 from stringsight.workers.tasks import run_extract_job, run_pipeline_job, run_cluster_job, _run_cluster_job_async
 from stringsight.storage.adapter import get_storage_adapter
@@ -23,14 +21,13 @@ router = APIRouter(prefix="/api/v1/jobs", tags=["jobs"])
 def start_pipeline_job(
     req: PipelineJobRequest,
     response: Response,
-    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     # Create job record
     job_id = uuid.uuid4()
     job = Job(
         id=job_id,
-        user_id=current_user.id if current_user else None,
+        user_id=None,
         status="queued",
         progress=0.0,
         job_type="pipeline"
@@ -39,9 +36,9 @@ def start_pipeline_job(
     db.commit()
     
     # Inject email from current_user if not provided
-    if not req.email and current_user and current_user.email:
-        req.email = current_user.email
-        logger.info(f"Injecting email {req.email} for job {job_id}")
+    # if not req.email and current_user and current_user.email:
+    #     req.email = current_user.email
+    #     logger.info(f"Injecting email {req.email} for job {job_id}")
     
     # Convert request to dict for serialization
     req_data = req.dict()
@@ -55,14 +52,13 @@ def start_pipeline_job(
 def start_extract_job(
     req: ExtractJobStartRequest,
     response: Response,
-    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     # Create job record
     job_id = uuid.uuid4()
     job = Job(
         id=job_id,
-        user_id=current_user.id if current_user else None,
+        user_id=None,
         status="queued",
         progress=0.0
     )
@@ -70,9 +66,9 @@ def start_extract_job(
     db.commit()
     
     # Inject email from current_user if not provided
-    if not req.email and current_user and current_user.email:
-        req.email = current_user.email
-        logger.info(f"Injecting email {req.email} for job {job_id}")
+    # if not req.email and current_user and current_user.email:
+    #     req.email = current_user.email
+    #     logger.info(f"Injecting email {req.email} for job {job_id}")
     
     # Convert request to dict for serialization
     req_data = req.dict()
@@ -87,14 +83,13 @@ def start_cluster_job(
     req: ClusterJobRequest,
     response: Response,
     background_tasks: BackgroundTasks,
-    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     # Create job record
     job_id = uuid.uuid4()
     job = Job(
         id=job_id,
-        user_id=current_user.id if current_user else None,
+        user_id=None,
         status="queued",
         progress=0.0,
         job_type="cluster"
@@ -103,9 +98,9 @@ def start_cluster_job(
     db.commit()
     
     # Inject email from current_user if not provided
-    if not req.email and current_user and current_user.email:
-        req.email = current_user.email
-        logger.info(f"Injecting email {req.email} for job {job_id}")
+    # if not req.email and current_user and current_user.email:
+    #     req.email = current_user.email
+    #     logger.info(f"Injecting email {req.email} for job {job_id}")
     
     # Convert request to dict for serialization
     req_data = req.dict()
@@ -119,8 +114,7 @@ def start_cluster_job(
 @router.post("/email-demo")
 def email_demo_results(
     req: DemoEmailRequest,
-    background_tasks: BackgroundTasks,
-    current_user: Optional[User] = Depends(get_current_user_optional)
+    background_tasks: BackgroundTasks
 ):
     """Send demo results via email."""
     # Determine demo directory
@@ -153,7 +147,6 @@ def email_demo_results(
 @router.get("/{job_id}")
 def get_job_status(
     job_id: UUID,
-    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     job = db.query(Job).filter(Job.id == job_id).first()
@@ -161,8 +154,8 @@ def get_job_status(
         raise HTTPException(status_code=404, detail="Job not found")
     
     # Check ownership only if user is logged in and job has a user
-    if current_user and job.user_id and job.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized to access this job")
+    # if current_user and job.user_id and job.user_id != current_user.id:
+    #     raise HTTPException(status_code=403, detail="Not authorized to access this job")
         
     return {
         "id": str(job.id),
@@ -176,7 +169,6 @@ def get_job_status(
 @router.get("/{job_id}/results")
 def get_job_results(
     job_id: UUID,
-    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """
@@ -191,8 +183,8 @@ def get_job_results(
         raise HTTPException(status_code=404, detail="Job not found")
     
     # Check ownership only if user is logged in and job has a user
-    if current_user and job.user_id and job.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized to access this job")
+    # if current_user and job.user_id and job.user_id != current_user.id:
+    #     raise HTTPException(status_code=403, detail="Not authorized to access this job")
     
     if job.status != "completed":
         raise HTTPException(status_code=400, detail=f"Job not completed yet. Status: {job.status}")

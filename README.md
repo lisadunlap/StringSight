@@ -64,7 +64,7 @@ For local development or contributing, you can install from source in editable m
 
 ```bash
 # Clone the repository with submodules
-git clone --recurse-submodules https://github.com/lisabdunlap/stringsight.git
+git clone --recurse-submodules https://github.com/lisadunlap/stringsight.git
 cd stringsight
 
 # If you already cloned without submodules, initialize them:
@@ -101,7 +101,7 @@ For multi-user deployments or to run StringSight with all infrastructure depende
 
 ```bash
 # Clone the repository
-git clone https://github.com/lisabdunlap/stringsight.git
+git clone https://github.com/lisadunlap/stringsight.git
 cd stringsight
 
 # Copy the environment template and add your API key
@@ -661,4 +661,4 @@ python scripts/run_full_pipeline.py \
 - **Examples**: See `examples/` directory
   
 
-Contributing & Help: PRs welcome. Questions or issues? Open an issue on GitHub (https://github.com/lisabdunlap/stringsight/issues)
+Contributing & Help: PRs welcome. Questions or issues? Open an issue on GitHub (https://github.com/lisadunlap/stringsight/issues)

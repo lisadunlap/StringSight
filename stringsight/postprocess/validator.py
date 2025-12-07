@@ -123,4 +123,18 @@ class PropertyValidator(LoggingMixin, PipelineStage):
     def _is_valid_property(self, prop: Property) -> bool:
         """Check if a property is valid."""
         # Basic validation - property description should exist and not be empty
-        return bool(prop.property_description and prop.property_description.strip()) 
+        if not (prop.property_description and prop.property_description.strip()):
+            return False
+
+        # Validate behavior_type if present
+        if prop.behavior_type:
+            allowed_types = {
+                "Positive",
+                "Negative (critical)",
+                "Negative (non-critical)",
+                "Style"
+            }
+            if prop.behavior_type not in allowed_types:
+                return False
+
+        return True 

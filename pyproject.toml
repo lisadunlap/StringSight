@@ -57,7 +57,6 @@ dev = [
     "pytest>=6.0",
     "pytest-cov>=2.0",
     "black>=21.0",
-    "flake8>=3.8",
     "mypy>=0.900",
 ]
 local-embeddings = [
@@ -80,10 +79,10 @@ full = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/lisabdunlap/stringsight"
-Repository = "https://github.com/lisabdunlap/stringsight"
-Documentation = "https://github.com/lisabdunlap/stringsight/blob/main/README.md"
-"Bug Tracker" = "https://github.com/lisabdunlap/stringsight/issues"
+Homepage = "https://github.com/lisadunlap/stringsight"
+Repository = "https://github.com/lisadunlap/stringsight"
+Documentation = "https://github.com/lisadunlap/stringsight/blob/main/README.md"
+"Bug Tracker" = "https://github.com/lisadunlap/stringsight/issues"
 
 [tool.setuptools.packages.find]
 include = ["stringsight*"]

@@ -163,6 +163,6 @@ clusterer = HDBSCANClusterer(disable_dim_reduction=True)
 
 ## Getting Help
 
-- **GitHub Issues**: [Report bugs](https://github.com/lisabdunlap/stringsight/issues)
+- **GitHub Issues**: [Report bugs](https://github.com/lisadunlap/stringsight/issues)
 - **Documentation**: [Read the docs](index.md)
 - **Logs**: Check console output for error details

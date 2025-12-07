@@ -30,7 +30,7 @@ conda activate stringsight
 pip install "stringsight[full]"
 
 # Or, for local development from source:
-# git clone https://github.com/lisabdunlap/stringsight.git
+# git clone https://github.com/lisadunlap/stringsight.git
 # cd stringsight
 # pip install -e ".[full]"
 ```
@@ -112,7 +112,7 @@ For multi-user deployments or to run StringSight with all infrastructure depende
 
 ```bash
 # Clone the repository
-git clone https://github.com/lisabdunlap/stringsight.git
+git clone https://github.com/lisadunlap/stringsight.git
 cd stringsight
 
 # Copy the environment template and add your API key

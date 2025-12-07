@@ -43,7 +43,6 @@ from functools import lru_cache
 from datetime import datetime, timedelta
 from datetime import datetime, timedelta
 import hashlib
-from stringsight.routers.auth import get_current_user_optional
 
 logger = get_logger(__name__)
 
@@ -359,10 +358,8 @@ app.add_middleware(
     expose_headers=["*"],  # Expose all headers to frontend
 )
 
-from stringsight.routers.auth import router as auth_router
 from stringsight.routers.jobs import router as jobs_router
 
-app.include_router(auth_router)
 app.include_router(jobs_router)
 
 # Include metrics endpoints (basic file serving)
@@ -561,7 +558,6 @@ class ClusterRunRequest(BaseModel):
 async def cluster_run(
     req: ClusterRunRequest,
     background_tasks: BackgroundTasks,
-    current_user: Optional[User] = Depends(get_current_user_optional)
 ) -> Dict[str, Any]:
     """Run clustering directly on existing properties without re-running extraction.
     

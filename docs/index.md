@@ -135,8 +135,8 @@ See the [Installation Guide](getting-started/installation.md) for detailed setup
 ## Support
 
 - **Documentation**: You're reading it!
-- **Issues**: [GitHub Issues](https://github.com/lisabdunlap/stringsight/issues)
-- **Source Code**: [GitHub Repository](https://github.com/lisabdunlap/stringsight)
+- **Issues**: [GitHub Issues](https://github.com/lisadunlap/stringsight/issues)
+- **Source Code**: [GitHub Repository](https://github.com/lisadunlap/stringsight)
 
 ## License
 
