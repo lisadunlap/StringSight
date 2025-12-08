@@ -79,6 +79,9 @@ class ConversationRecord:
     
     def __post_init__(self):
         """Migrate legacy score formats to the new list format for side-by-side."""
+        # Ensure question_id is a string
+        self.question_id = str(self.question_id)
+        
         # Handle migration of score_a/score_b from meta field to scores list for side-by-side
         if isinstance(self.model, list) and len(self.model) == 2:
             # Check if scores is empty and we have score_a/score_b in meta
@@ -112,6 +115,10 @@ class Property:
     
     def __post_init__(self):
         """Validate property fields after initialization."""
+        # Ensure ids are strings
+        self.id = str(self.id)
+        self.question_id = str(self.question_id)
+        
         # Require that the model has been resolved to a known value
         if isinstance(self.model, str) and self.model.lower() == "unknown":
             raise ValueError("Property must have a known model; got 'unknown'.")
@@ -126,6 +133,15 @@ class Cluster:
     property_ids: List[str] = field(default_factory=list) # property ids in the cluster
     question_ids: List[str] = field(default_factory=list) # ids of the conversations in the cluster
     meta: Dict[str, Any] = field(default_factory=dict) # all other metadata
+
+    def __post_init__(self):
+        """Ensure consistent types."""
+        self.id = str(self.id)
+        # Ensure lists contain strings
+        if self.property_ids:
+            self.property_ids = [str(pid) for pid in self.property_ids]
+        if self.question_ids:
+            self.question_ids = [str(qid) for qid in self.question_ids]
 
     def to_dict(self):
         return asdict(self)
@@ -414,6 +430,9 @@ class PropertyDataset:
             rows.append(base_row)
         
         df = pd.DataFrame(rows)
+        # Ensure question_id is a string
+        if not df.empty and "question_id" in df.columns:
+            df["question_id"] = df["question_id"].astype(str)
         logger.debug(f"Original unique questions: {df.question_id.nunique()}")
         
         # Add properties if they exist
@@ -428,6 +447,9 @@ class PropertyDataset:
             
             # create property df
             prop_df = pd.DataFrame([p.to_dict() for p in self.properties])
+            # Ensure question_id is a string in properties df
+            if not prop_df.empty and "question_id" in prop_df.columns:
+                prop_df["question_id"] = prop_df["question_id"].astype(str)
             logger.debug(f"len of base df {len(df)}")
             if "model_a" in df.columns and "model_b" in df.columns:
                 # For side-by-side inputs, merge properties by question_id (both models share the question)

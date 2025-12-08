@@ -2483,21 +2483,28 @@ async def extract_single(req: ExtractSingleRequest) -> Dict[str, Any]:
             "available": list(df.columns),
         })
 
-    result = await public_api.extract_properties_only_async(
-        df,
-        method=method,
-        system_prompt=req.system_prompt,
-        task_description=req.task_description,
-        model_name=req.model_name or "gpt-4.1",
-        temperature=req.temperature or 0.7,
-        top_p=req.top_p or 0.95,
-        max_tokens=req.max_tokens or 16000,
-        max_workers=req.max_workers or 64,
-        include_scores_in_prompt=False if req.include_scores_in_prompt is None else req.include_scores_in_prompt,
-        use_wandb=req.use_wandb or False,
-        output_dir=req.output_dir,
-        return_debug=req.return_debug or False,
-    )
+    try:
+        result = await public_api.extract_properties_only_async(
+            df,
+            method=method,
+            system_prompt=req.system_prompt,
+            task_description=req.task_description,
+            model_name=req.model_name or "gpt-4.1",
+            temperature=req.temperature or 0.7,
+            top_p=req.top_p or 0.95,
+            max_tokens=req.max_tokens or 16000,
+            max_workers=req.max_workers or 64,
+            include_scores_in_prompt=False if req.include_scores_in_prompt is None else req.include_scores_in_prompt,
+            use_wandb=req.use_wandb or False,
+            output_dir=req.output_dir,
+            return_debug=req.return_debug or False,
+        )
+    except ValueError as e:
+        # Surface configuration / validation errors (e.g., missing API keys) to the frontend
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("Unexpected error during single-row extraction")
+        raise HTTPException(status_code=500, detail=f"Extraction failed: {e}")
 
     if isinstance(result, tuple):
         dataset, failures = result
@@ -2536,21 +2543,28 @@ async def extract_batch(req: ExtractBatchRequest) -> Dict[str, Any]:
             "available": list(df.columns),
         })
 
-    result = await public_api.extract_properties_only_async(
-        df,
-        method=method,
-        system_prompt=req.system_prompt,
-        task_description=req.task_description,
-        model_name=req.model_name or "gpt-4.1",
-        temperature=req.temperature or 0.7,
-        top_p=req.top_p or 0.95,
-        max_tokens=req.max_tokens or 16000,
-        max_workers=req.max_workers or 64,
-        include_scores_in_prompt=False if req.include_scores_in_prompt is None else req.include_scores_in_prompt,
-        use_wandb=req.use_wandb or False,
-        output_dir=req.output_dir,
-        return_debug=req.return_debug or False,
-    )
+    try:
+        result = await public_api.extract_properties_only_async(
+            df,
+            method=method,
+            system_prompt=req.system_prompt,
+            task_description=req.task_description,
+            model_name=req.model_name or "gpt-4.1",
+            temperature=req.temperature or 0.7,
+            top_p=req.top_p or 0.95,
+            max_tokens=req.max_tokens or 16000,
+            max_workers=req.max_workers or 64,
+            include_scores_in_prompt=False if req.include_scores_in_prompt is None else req.include_scores_in_prompt,
+            use_wandb=req.use_wandb or False,
+            output_dir=req.output_dir,
+            return_debug=req.return_debug or False,
+        )
+    except ValueError as e:
+        # Surface configuration / validation errors (e.g., missing API keys) to the frontend
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("Unexpected error during batch extraction")
+        raise HTTPException(status_code=500, detail=f"Extraction failed: {e}")
     if isinstance(result, tuple):
         dataset, failures = result
     else:

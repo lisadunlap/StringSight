@@ -4,18 +4,6 @@ Prompts module for StringSight.
 This module contains system prompts and prompt utilities for property extraction.
 """
 
-# Import from new organized structure
-from .extraction.standard import (
-    single_model_system_prompt_custom_revised,
-    sbs_system_prompt_custom_revised,
-)
-
-from .extraction.agent import (
-    agent_system_prompt_custom_revised,
-    agent_sbs_system_prompt_custom_revised,
-)
-
-# Import task descriptions
 from .task_descriptions import (
     sbs_default_task_description,
     single_model_default_task_description,
@@ -247,11 +235,6 @@ __all__ = [
     "get_default_system_prompt",
     "get_system_prompt",
     "PROMPTS",
-    # Supported prompt templates (revised only)
-    "single_model_system_prompt_custom_revised",
-    "sbs_system_prompt_custom_revised",
-    "agent_system_prompt_custom_revised",
-    "agent_sbs_system_prompt_custom_revised",
     # Universal prompt system
     "format_universal_prompt",
     "get_single_model_prompt",

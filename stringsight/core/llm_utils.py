@@ -23,6 +23,16 @@ from .caching import UnifiedCache
 
 logger = logging.getLogger(__name__)
 
+# ------------------------------------------------------------------
+# Global LiteLLM configuration
+# ------------------------------------------------------------------
+# Some providers (e.g., Bedrock) do not support certain parameters such as
+# `max_completion_tokens`. Enabling `drop_params` tells LiteLLM to silently
+# drop any unsupported parameters instead of raising UnsupportedParamsError.
+# This keeps StringSight's higher-level LLM plumbing provider-agnostic while
+# still allowing us to set sensible defaults for providers that support them.
+litellm.drop_params = True
+
 
 # ==================== LiteLLM Timing Callback ====================
 try:
