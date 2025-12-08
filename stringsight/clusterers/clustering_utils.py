@@ -22,7 +22,7 @@ from tqdm import tqdm
 import os
 import pickle
 import pandas as pd
-import wandb
+# wandb is optional - imported lazily when needed
 # import weave
 
 import numpy as np
@@ -750,6 +750,11 @@ def save_clustered_results(df, base_filename, include_embeddings=True, config=No
 
 def log_results_to_wandb(df_light, light_json_path, base_filename, config):
     """Log clustering results to wandb."""
+    try:
+        import wandb
+    except ImportError:
+        logger.error("wandb is required for logging but is not installed. Install with: pip install wandb")
+        return
     
     if not wandb.run:
         logger.warning("⚠️ wandb not initialized, skipping logging")
@@ -839,6 +844,12 @@ def log_results_to_wandb(df_light, light_json_path, base_filename, config):
 def initialize_wandb(config, method_name, input_file):
     """Initialize wandb logging if enabled."""
     if not config.use_wandb:
+        return
+    
+    try:
+        import wandb
+    except ImportError:
+        logger.error("wandb is required for logging but is not installed. Install with: pip install wandb")
         return
     
     logger.info("🔧 Initializing wandb...")
