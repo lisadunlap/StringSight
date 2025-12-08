@@ -366,6 +366,9 @@ class HDBSCANClusterer(BaseClusterer):
                 .agg(lambda s: s.iloc[0])
                 .to_dict()
             )
+            # Convert keys to strings to match Cluster.id type
+            id_to_group = {str(k): v for k, v in id_to_group.items()}
+            
             for c in clusters:
                 cid = getattr(c, "id", None)
                 if cid in id_to_group:
