@@ -17,3 +17,4 @@ class User(Base):
     # Relationships are defined in the other models using backref or explicitly here
     # Job model defines: user = relationship("User", backref="jobs")
 
+

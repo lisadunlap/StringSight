@@ -10,8 +10,8 @@ This guide will help you install StringSight and set up your development environ
 - **OpenAI API key** (required for LLM-powered features)
 
 ### Optional
-- **Node.js 20+** (for React frontend interface)
-- **Weights & Biases account** (for experiment tracking)
+- **Node.js 20+** (for React frontend interface - only needed for development)
+- **Weights & Biases account** (for experiment tracking - optional, install with `pip install "stringsight[wandb]"`)
 
 ## Quick Installation
 
@@ -26,16 +26,35 @@ conda activate stringsight
 ### 2. Install StringSight
 
 ```bash
-# From PyPI (recommended): install core package + optional ML/embedding tooling
+# From PyPI (recommended): install core package
+pip install stringsight
+
+# Or with all optional extras (ML tools, wandb, etc.)
 pip install "stringsight[full]"
 
 # Or, for local development from source:
-# git clone https://github.com/lisadunlap/stringsight.git
+# git clone --recurse-submodules https://github.com/lisadunlap/stringsight.git
 # cd stringsight
 # pip install -e ".[full]"
 ```
 
-### 3. Set API Key(s)
+**Note:** `wandb` is now optional. Install it separately if needed:
+```bash
+pip install "stringsight[wandb]"  # or: pip install wandb
+```
+
+### 3. (Optional) Download Demo Data
+
+If you want to use the demo features in the web UI:
+
+```bash
+# Download demo data (requires local repo or GitHub access)
+stringsight download-demo-data
+```
+
+**Note:** Demo data (~130MB) is not included in the pip package to keep it under PyPI's size limit. The demo data is only needed if you want to use the "Load Demo Data" feature in the UI.
+
+### 4. Set API Key(s)
 
 ```bash
 # Add to your shell profile (.bashrc, .zshrc, etc.)
@@ -46,7 +65,7 @@ export OPENAI_API_KEY="your-api-key-here"
 
 **Local Models**: StringSight uses LiteLLM, so you can use vLLM, Ollama, or any OpenAI-compatible server. See the [LiteLLM docs](https://docs.litellm.ai/docs/providers) for provider-specific setup. 
 
-### 4. Verify Installation
+### 5. Verify Installation
 
 ```bash
 # Test core package
@@ -64,10 +83,12 @@ curl http://127.0.0.1:8000/health
 
 ### Core Package Only
 ```bash
-# From PyPI
+# From PyPI (wandb is optional and not required)
 pip install stringsight
 
 # From a local clone (development)
+# Note: Requires frontend submodule initialized
+git submodule update --init --recursive
 pip install -e .
 ```
 
@@ -256,7 +277,7 @@ StringSight uses the following environment variables:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `OPENAI_API_KEY` | Yes | OpenAI API key for LLM calls |
-| `WANDB_API_KEY` | No | Weights & Biases API key for experiment tracking |
+| `WANDB_API_KEY` | No | Weights & Biases API key for experiment tracking (requires `wandb` package) |
 
 ## Dependencies
 

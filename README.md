@@ -37,6 +37,9 @@
 # Install
 pip install stringsight
 
+# (Optional) Download demo data for the UI
+stringsight download-demo-data
+
 # Launch the web interface
 stringsight launch
 
@@ -46,6 +49,8 @@ stringsight launch --daemon --workers 4
 
 The UI will be available at [http://localhost:5180](http://localhost:5180).
 
+**Note:** Demo data (~130MB) is not included in the pip package to keep it under PyPI's size limit. Run `stringsight download-demo-data` after installation if you want to use the demo features in the UI.
+
 ## Installation
 
 ```bash
@@ -53,11 +58,15 @@ The UI will be available at [http://localhost:5180](http://localhost:5180).
 conda create -n stringsight python=3.11
 conda activate stringsight
 
-# Install the core library from PyPI
+# Install the core library from PyPI (wandb is optional and not required)
 pip install stringsight
 
 # Install with all optional extras (recommended for notebooks and advanced workflows)
+# This includes wandb for experiment tracking
 pip install "stringsight[full]"
+
+# Or install wandb separately if you need experiment tracking
+pip install "stringsight[wandb]"
 ```
 
 For local development or contributing, you can install from source in editable mode:
@@ -74,16 +83,26 @@ git submodule update --init --recursive
 conda create -n stringsight python=3.11
 conda activate stringsight
 
+# Upgrade pip and setuptools to ensure wheel support
+pip install --upgrade pip setuptools wheel
+
 # Build the frontend (required for the web UI)
 chmod +x build_frontend.sh
 ./build_frontend.sh
 
-# Install StringSight in editable mode with full extras
+# Install StringSight in editable mode (wandb is optional and not required)
+pip install -e .
+
+# Install StringSight in editable mode with full extras (includes wandb)
 pip install -e ".[full]"
 
 # Install StringSight in editable mode with dev dependencies
 pip install -e ".[dev]"
 ```
+
+**Note:** `wandb` is now an optional dependency. If you need experiment tracking with wandb, install it separately:
+- `pip install "stringsight[wandb]"` - installs StringSight with wandb
+- `pip install wandb` - or install wandb separately if you encounter build issues
 
 Set your API keys (required for running LLM-backed pipelines):
 

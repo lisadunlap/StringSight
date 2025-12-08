@@ -37,6 +37,7 @@ from stringsight.clusterers import get_clusterer
 from stringsight.metrics.cluster_subset import enrich_clusters_with_metrics, compute_total_conversations_by_model
 from stringsight.logging_config import get_logger
 from stringsight.email_service import send_results_email
+from stringsight.schemas import ExtractBatchRequest, ExtractJobStartRequest
 import threading, uuid
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -2639,9 +2640,6 @@ class ClusterJob:
 
 _CLUSTER_JOBS_LOCK = threading.Lock()
 _CLUSTER_JOBS: Dict[str, ClusterJob] = {}
-
-
-from stringsight.schemas import ExtractBatchRequest, ExtractJobStartRequest
 
 
 def _run_extract_job(job: ExtractJob, req: ExtractJobStartRequest):
