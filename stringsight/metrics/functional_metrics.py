@@ -169,8 +169,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 import pandas as pd
 
-import wandb
-# import weave
+import importlib.util
 
 from ..core.stage import PipelineStage
 from ..core.mixins import LoggingMixin, TimingMixin
@@ -916,6 +915,13 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
 
     def _log_to_wandb(self, model_cluster_scores, cluster_scores, model_scores):
         """Log the three score dataframes to wandb as tables."""
+        if importlib.util.find_spec("wandb") is None:
+            raise ModuleNotFoundError(
+                "wandb is not installed, but log_to_wandb=True. "
+                "Install it with: pip install 'stringsight[wandb]' (or: pip install wandb), "
+                "or set log_to_wandb=False."
+            )
+        import wandb
         self.log("📊 Logging metrics to wandb...")
         
         # Create dataframes for wandb (reusing the logic from _save_dataframe_files)
@@ -1017,19 +1023,25 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
     def _generate_plots(self, model_cluster_scores, cluster_scores, model_scores):
         """Generate comprehensive plots using the plotting module."""
         self.log("📊 Generating comprehensive metric plots...")
-        
+
+        if importlib.util.find_spec("wandb") is None:
+            log_to_wandb = False
+        else:
+            import wandb
+            log_to_wandb = self.log_to_wandb and wandb.run is not None
+
         # Use the plotting module to generate all plots
         num_quality_metrics = plotting.generate_all_plots(
             model_cluster_scores=model_cluster_scores,
             cluster_scores=cluster_scores,
             model_scores=model_scores,
             output_dir=self.output_dir / "plots" if self.output_dir else Path("plots"),
-            log_to_wandb=self.log_to_wandb and wandb.run is not None
+            log_to_wandb=log_to_wandb
         )
         
         # Informational logging (no local files are saved)
         self.log(f"✅ Generated interactive figures for {num_quality_metrics} quality metrics (no local files saved)")
-        if self.log_to_wandb and wandb.run:
+        if log_to_wandb:
             self.log("📊 Figures logged to wandb under the 'Plots/' namespace")
 
     def _convert_to_legacy_format(self, model_cluster_scores, cluster_scores, model_scores) -> Dict[str, Any]:

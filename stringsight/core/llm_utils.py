@@ -20,6 +20,7 @@ import logging
 # Weave removed
 
 from .caching import UnifiedCache
+from ..utils.validation import validate_openai_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +175,10 @@ class LLMUtils:
         Returns:
             List of completion responses in the same order as input
         """
+        # Fail fast with a clear message if the configured model requires OpenAI credentials.
+        # This avoids cryptic provider errors deep in LiteLLM/OpenAI client code.
+        validate_openai_api_key(model=config.model)
+
         if not messages:
             return []
             

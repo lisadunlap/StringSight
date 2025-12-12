@@ -12,26 +12,32 @@ StringSight is a comprehensive analysis framework for evaluating and comparing L
 
 2. **Clusters similar behaviors** - Groups related properties together to identify common patterns (e.g., "Reasoning Transparency", "Communication Style")
 
-3. **Quantifies importance** - Calculates statistical metrics to show which models excel at which behaviors and by how much
+3. **Computes cluster statistics** - Compute statistics on these clusters to understand:
+   - Which behaviors are most prominent?
+   - Which behaviors are seen in some models more than others?
+   - Which behaviors are correlated with any metrics that are provided?
 
 4. **Provides insights** - Explains *why* your model is failing, compare the behaviors of different models/methods, and find instances of reward hacking. 
 
 ## Key Features
 
 **StringSight tells you what the heck is going on with your traces with minimal to no prompt tuning on your part.**
-Upload you traces and automatically discover interesting behaviors through the following pipeline:
+Upload your traces and automatically discover interesting behaviors through the following pipeline:
+
 - **Automatic property extraction** - LLM-powered analysis identifies behavioral patterns without manual coding
 - **Clustering** - Groups similar behaviors into meaningful clusters
 - **Statistical analysis** - Computes significance testing, confidence intervals, and quality scores
 
 Easily visualize and analyze your traces in our UI:
-- **Trace visualization** No money or compute required! Simply upload your data and easily view and search through your traces
-- **Run Automatic Behavior Extraction and Explore Insights Dashboard**
+
+- **Trace visualization**: No money or compute required. Upload your data to view and search through your traces.
+- **Run automatic behavior extraction and explore the insights dashboard**:
   - Common failure modes
-  - Model comparrison
-  - Instances of misaligned metrics 
+  - Model comparison
+  - Instances of misaligned metrics
 
 We also support:
+
 - **Side-by-side analysis** - Compare methods with side-by-side comparisons (find behaviors that differ across traces) or extract behaviors per trace
 - **Multimodal support** - Allows for text, image, or interleaved text image conversations
 - **Fixed-taxonomy labeling** - If you have a predefined list of behaviors, LLM-as-judge with predefined behavioral axes
@@ -89,13 +95,6 @@ Analyze how model behavior changes across:
 - Model versions/checkpoints
 - Fine-tuning approaches
 - Temperature settings
-
-### Task-Specific Evaluation
-Focus on behaviors relevant to your domain:
-
-- Call center responses (empathy, clarity, policy adherence)
-- Code generation (correctness, efficiency, edge case handling)
-- Creative writing (originality, coherence, style)
 
 ## How It Works
 

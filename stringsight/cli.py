@@ -116,6 +116,7 @@ def launch(host: str = "127.0.0.1", port: int = 5180, debug: bool = False,
         pid_file = get_pid_file()
 
         print(f"Starting StringSight UI in background...")
+        print("Note: First startup can take 1–2 minutes (installing/loading components).")
         print(f"Access at: http://{host}:{port}")
         print(f"Logs: {log_file}")
         print(f"Workers: {workers}")
@@ -218,6 +219,7 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
     else:
         # Run in foreground
         print(f"Starting StringSight UI...")
+        print("Note: First startup can take 1–2 minutes (installing/loading components).")
         print(f"Access at: http://{host}:{port}")
         if debug:
             print(f"Debug mode: enabled")

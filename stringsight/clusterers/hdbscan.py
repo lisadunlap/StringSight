@@ -56,10 +56,6 @@ class HDBSCANClusterer(BaseClusterer):
         cluster_selection_epsilon: float = 0.0,
         disable_dim_reduction: bool = False,
         dim_reduction_method: str = "adaptive",
-        umap_n_components: int = 100,
-        umap_n_neighbors: int = 30,
-        umap_min_dist: float = 0.1,
-        umap_metric: str = "cosine",
         context: Optional[str] = None,
         groupby_column: Optional[str] = None,
         parallel_clustering: bool = True,
@@ -76,7 +72,7 @@ class HDBSCANClusterer(BaseClusterer):
         """Initialize the HDBSCAN clusterer with explicit, overridable parameters.
         
         Args:
-            use_gpu: Enable GPU acceleration for embeddings, UMAP, and HDBSCAN.
+            use_gpu: Enable GPU acceleration for embeddings and HDBSCAN.
                     None (default) = auto-detect based on CUDA availability.
                     True = force GPU (requires cuML and CuPy, falls back to CPU if not available).
                     False = force CPU.
@@ -112,10 +108,6 @@ class HDBSCANClusterer(BaseClusterer):
             llm_max_workers=llm_max_workers,
             # dim reduction
             dim_reduction_method=dim_reduction_method,
-            umap_n_components=umap_n_components,
-            umap_n_neighbors=umap_n_neighbors,
-            umap_min_dist=umap_min_dist,
-            umap_metric=umap_metric,
             # groupby
             groupby_column=groupby_column,
             parallel_clustering=parallel_clustering,

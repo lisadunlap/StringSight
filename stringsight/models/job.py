@@ -1,6 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Float, DateTime, ForeignKey, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, DateTime, Float, ForeignKey, String, Text, Uuid
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from stringsight.database import Base
@@ -8,8 +7,8 @@ from stringsight.database import Base
 class Job(Base):
     __tablename__ = "jobs"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
     
     # Job type: extract, pipeline, cluster
     job_type = Column(String, default="extract", index=True)

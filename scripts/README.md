@@ -17,11 +17,16 @@ This directory contains scripts for running the complete StringSight pipeline on
 ### `run_full_pipeline.py`
 The main script that provides a flexible command-line interface for running the pipeline on any dataset.
 
-### `run_metrics_only.py` ⭐ NEW
-Run only the metrics computation stage on existing pipeline results. Useful for:
-- Recomputing metrics with different parameters
-- Running metrics on results from previous pipeline runs  
-- Debugging metrics computation without re-running the full pipeline
+### `recompute_metrics.py` ⭐ NEW
+Recompute metrics on existing pipeline results with a simplified interface. Automatically:
+- Loads existing pipeline results (conversations, properties, clusters)
+- Recomputes all metrics with updated parameters
+- Saves to a new directory with `-new_metrics` suffix (customizable)
+
+This is useful for:
+- Recomputing metrics with different bootstrap sample sizes
+- Updating metrics after algorithm changes
+- Running metrics with/without confidence intervals
 
 ### Dataset-specific convenience scripts:
 - `run_arena_pipeline.py` - For the Arena dataset
@@ -42,39 +47,43 @@ python scripts/run_full_pipeline.py \
     --output_dir results/arena_full_results
 ```
 
-### Metrics-Only Mode ⭐ NEW
+### Recompute Metrics ⭐ NEW
 
-Run just the metrics computation on existing pipeline results:
+Recompute metrics on existing pipeline results:
 
 ```bash
-# Run metrics on existing pipeline results
-python scripts/run_metrics_only.py \
-    --input results/previous_run/full_dataset.json \
-    --output results/metrics_only \
-    --method single_model
+# Basic usage - recomputes metrics from a results directory
+python scripts/recompute_metrics.py results/webdev_20250101_120000
 
-# Run metrics on a directory containing pipeline outputs
-python scripts/run_metrics_only.py \
-    --input results/previous_run/ \
-    --output results/metrics_only \
-    --method side_by_side
+# Specify method for side-by-side comparisons
+python scripts/recompute_metrics.py results/arena_sbs --method side_by_side
 
-# Run metrics with custom output directory for metrics files
-python scripts/run_metrics_only.py \
-    --input results/previous_run/full_dataset.parquet \
-    --output results/metrics_custom \
-    --method single_model \
-    --metrics-output-dir custom_metrics_output
+# Use more bootstrap samples for tighter confidence intervals
+python scripts/recompute_metrics.py results/my_results --bootstrap_samples 500
+
+# Disable bootstrap computation for faster processing
+python scripts/recompute_metrics.py results/my_results --no-bootstrap
+
+# Custom output directory suffix
+python scripts/recompute_metrics.py results/my_results --output_suffix "_updated"
+
+# Enable wandb logging
+python scripts/recompute_metrics.py results/my_results --use_wandb
 ```
 
 **Supported Input Formats:**
-- Individual files: `.json`, `.parquet`, `.pkl`
-- Directories: Automatically detects `full_dataset.json`, `full_dataset.parquet`, `clustered_results.parquet`, etc.
+- Directories containing: `full_dataset.json`, `full_dataset.parquet`, `clustered_results.parquet`, `dataset.json`, or `dataset.parquet`
+
+**Output Directory:**
+- By default: `<input_dir>_new_metrics` (e.g., `results/my_results_new_metrics`)
+- Customizable with `--output_suffix`
 
 **Output Files:**
-- `metrics_results.parquet` - DataFrame with metrics results
-- `metrics_dataset.json` - Complete PropertyDataset with metrics
-- `metrics_stats.json` - Model statistics and rankings
+- `model_cluster_scores.json` - Per model-cluster metrics
+- `cluster_scores.json` - Per cluster aggregates
+- `model_scores.json` - Per model aggregates
+- `*_df.jsonl` - DataFrame versions of the above
+- `full_dataset.json` - Complete dataset with updated metrics
 
 ### Convenience Scripts
 

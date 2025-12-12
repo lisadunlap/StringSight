@@ -3,8 +3,6 @@ include LICENSE
 include requirements.txt
 include config.yaml
 recursive-include stringsight *.py
-recursive-include stringsight *.yaml
-recursive-include stringsight *.json
-recursive-include stringsight *.txt
+recursive-include stringsight/frontend_dist *
 
 

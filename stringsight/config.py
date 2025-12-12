@@ -1,9 +1,28 @@
-from pydantic_settings import BaseSettings
+from __future__ import annotations
+
+from pathlib import Path
 from typing import Optional
+
+from pydantic import Field
+from pydantic_settings import BaseSettings
+
+
+def _default_database_url() -> str:
+    """Return the default database URL for local installs.
+
+    Returns:
+        A SQLAlchemy database URL string. Defaults to a SQLite file under
+        `~/.stringsight/stringsight.db` so `stringsight launch` works without
+        requiring a running Postgres instance.
+    """
+    base_dir = Path.home() / ".stringsight"
+    base_dir.mkdir(parents=True, exist_ok=True)
+    db_path = base_dir / "stringsight.db"
+    return f"sqlite:///{db_path}"
 
 class Settings(BaseSettings):
     # Database
-    DATABASE_URL: str = "postgresql://stringsight:stringsight_dev@localhost:5432/stringsight"
+    DATABASE_URL: str = Field(default_factory=_default_database_url)
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"

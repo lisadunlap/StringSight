@@ -30,6 +30,7 @@ import litellm  # type: ignore
 # sentence-transformers is optional - imported lazily when needed
 from stringsight.prompts.clustering.prompts import clustering_systems_prompt, coarse_clustering_systems_prompt, deduplication_clustering_systems_prompt
 from stringsight.logging_config import get_logger
+from ..utils.validation import validate_openai_api_key
 
 logger = get_logger(__name__)
 from ..core.llm_utils import parallel_completions_async
@@ -60,6 +61,8 @@ from ..core.llm_utils import _normalize_embedding_model_name
 
 def _get_openai_embeddings_batch(batch: List[str], model: str, retries: int = 3, sleep_time: float = 2.0):
     """Fetch embeddings for one batch with simple exponential back-off."""
+    # Fail fast with a clear message if OpenAI embeddings are requested without credentials.
+    validate_openai_api_key(embedding_model=model)
     
     # Check cache first for each text in batch
     cached_embeddings = []

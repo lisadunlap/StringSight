@@ -46,12 +46,8 @@ from stringsight.prompts.clustering.prompts import coarse_clustering_systems_pro
 # Optional imports (will be checked when needed)
 # sentence-transformers is optional - imported lazily when needed
 import hdbscan
-import umap
 import litellm
-import wandb
 # import weave
-from bertopic import BERTopic
-from bertopic.backend import OpenAIBackend
 
 # =============================================================================
 # CONFIGURATION CLASSES
@@ -129,86 +125,15 @@ def prepare_embeddings(unique_values: List[Any], config: ClusterConfig) -> np.nd
                 # For very small datasets, skip dimension reduction entirely
                 method = "none"
             elif n_points > 5000 or n_dims > 200:
-                # For large datasets, use UMAP
-                method = "umap"
+                # For large datasets, use PCA (portable, avoids compiled UMAP/numba/llvmlite stack)
+                method = "pca"
             else:
                 # For medium datasets, skip dimension reduction
                 method = "none"
         else:
             method = config.dim_reduction_method
         
-        if method == "umap":
-            use_gpu = getattr(config, 'use_gpu', False)
-            if config.verbose:
-                device_msg = "on GPU (cuML)" if use_gpu else "on CPU"
-                logger.info(f"Applying UMAP dimensionality reduction {device_msg}...")
-
-            # Adaptive parameters with better safeguards
-            # n_components must be less than n_points for spectral embedding
-            n_components = min(config.umap_n_components, n_dims - 1, n_points - 1)
-            # Ensure n_neighbors is much smaller than n_points to avoid spectral embedding issues
-            n_neighbors = min(config.umap_n_neighbors, max(5, n_points // 3))
-
-            # UMAP requires at least n_neighbors + n_components + 1 samples for spectral embedding
-            min_samples_required = max(n_neighbors + n_components + 1, 10)  # Absolute minimum of 10 samples
-
-            # Additional safety check
-            if n_points < min_samples_required:
-                if config.verbose:
-                    logger.warning(f"Dataset too small for UMAP (n_points={n_points}, need at least {min_samples_required}), skipping dimension reduction")
-                method = "none"
-            else:
-                # Try GPU first if requested, fallback to CPU if cuML not available
-                if use_gpu:
-                    try:
-                        from cuml import UMAP as cumlUMAP
-                        import cupy as cp
-                        if config.verbose:
-                            logger.info("Using cuML UMAP on GPU")
-                        # Convert to CuPy array for GPU computation
-                        embeddings_gpu = cp.asarray(embeddings)
-                        reducer = cumlUMAP(
-                            n_components=n_components,
-                            n_neighbors=n_neighbors,
-                            min_dist=config.umap_min_dist,
-                            metric=config.umap_metric,
-                            random_state=42,
-                            verbose=False  # Disable UMAP's own verbose to use tqdm
-                        )
-                        with tqdm(total=1, desc="UMAP dimensionality reduction (GPU)", disable=not config.verbose) as pbar:
-                            embeddings_reduced = reducer.fit_transform(embeddings_gpu)
-                            pbar.update(1)
-                        # Convert back to numpy
-                        embeddings = cp.asnumpy(embeddings_reduced)
-                    except ImportError as e:
-                        reducer = umap.UMAP(
-                            n_components=n_components,
-                            n_neighbors=n_neighbors,
-                            min_dist=config.umap_min_dist,
-                            metric=config.umap_metric,
-                            random_state=42,
-                            verbose=False  # Disable UMAP's own verbose to use tqdm
-                        )
-                        with tqdm(total=1, desc="UMAP dimensionality reduction (CPU)", disable=not config.verbose) as pbar:
-                            embeddings = reducer.fit_transform(embeddings)
-                            pbar.update(1)
-                else:
-                    reducer = umap.UMAP(
-                        n_components=n_components,
-                        n_neighbors=n_neighbors,
-                        min_dist=config.umap_min_dist,
-                        metric=config.umap_metric,
-                        random_state=42,
-                        verbose=False  # Disable UMAP's own verbose to use tqdm
-                    )
-                    with tqdm(total=1, desc="UMAP dimensionality reduction (CPU)", disable=not config.verbose) as pbar:
-                        embeddings = reducer.fit_transform(embeddings)
-                        pbar.update(1)
-                
-                if config.verbose:
-                    logger.info(f"Reduced to shape: {embeddings.shape}")
-                
-        elif method == "pca":
+        if method == "pca":
             if config.verbose:
                 logger.info(f"Applying PCA dimensionality reduction...")
             
@@ -351,7 +276,7 @@ def format_clustering_results(df: pd.DataFrame, column_name: str,
 async def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.DataFrame:
     """
     Fast HDBSCAN clustering for medium to large datasets.
-    Now supports BERTopic-based outlier reduction if config.assign_outliers is True.
+    Supports optional LLM-based outlier reassignment if config.assign_outliers is True.
     """
     # Handle backward compatibility by creating config from kwargs
     if config is None:
@@ -512,37 +437,7 @@ async def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> 
         n_noise = list(cluster_labels).count(-1)
         logger.info(f"HDBSCAN clustering completed! Found {n_initial_clusters} clusters and {n_noise} outliers")
 
-    # Step 3: Handle outlier assignment if requested, using BERTopic
-    if clusterer is not None and config.assign_outliers and -1 in cluster_labels:
-        if config.verbose:
-            logger.info("Assigning outliers using BERTopic.reduce_outliers...")
-        # Use OpenAIBackend if openai model, else None
-        if config.embedding_model == "openai":
-            import openai
-            client = openai.OpenAI()
-            bertopic_embedding_model = OpenAIBackend(client, "text-embedding-3-large")
-        else:
-            bertopic_embedding_model = None  # Let BERTopic use default
-        # Minimal BERTopic setup for outlier reduction
-        topic_model = BERTopic(
-            embedding_model=bertopic_embedding_model,
-            hdbscan_model=clusterer,
-            calculate_probabilities=False,
-            verbose=config.verbose
-        )
-        # Fit-transform to get topics (simulate)
-        topics, _ = topic_model.fit_transform(unique_strings, embeddings=embeddings)
-        # Reduce outliers
-        new_topics = topic_model.reduce_outliers(unique_strings, topics, strategy="c-tf-idf", threshold=0.1)
-        new_topics = topic_model.reduce_outliers(unique_strings, new_topics, strategy="distributions")
-        topic_model.update_topics(unique_strings, topics=new_topics)
-        cluster_labels = np.array(new_topics)
-        if config.verbose:
-            n_final_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
-            n_final_noise = list(cluster_labels).count(-1)
-            logger.info(f"After BERTopic outlier reduction: {n_final_clusters} clusters, {n_final_noise} outliers")
-
-    # Step 4: Generate cluster summaries
+    # Step 3: Generate cluster summaries
     from collections import defaultdict
     cluster_values = defaultdict(list)
     for value, cluster_id in zip(unique_values, cluster_labels):
@@ -551,16 +446,16 @@ async def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> 
     cluster_label_map = generate_cluster_summaries(cluster_values, config, column_name)
 
     # -------------------------------------------------------------
-    # Step 4a: Cluster outliers using LLM
+    # Step 3a: Optionally cluster outliers using LLM
     # -------------------------------------------------------------
-    if config.verbose:
+    if config.assign_outliers and config.verbose:
         logger.info("Clustering outliers using LLM...")
 
     # Get outlier items
     outlier_items = [unique_values[i] for i, label in enumerate(cluster_labels) if label < 0]
 
     # Skip LLM-based outlier clustering if fewer than min_cluster_size * 2 outliers (not worth the overhead)
-    if len(outlier_items) >= effective_min_cluster_size * 2:
+    if config.assign_outliers and len(outlier_items) >= effective_min_cluster_size * 2:
         # Generate outlier cluster summaries
         outlier_cluster_names = generate_coarse_labels(
             outlier_items,
@@ -755,17 +650,9 @@ def main():
     parser.add_argument('--precomputed-embeddings', 
                        help='Path to precomputed embeddings file (.pkl or .npy)')
     parser.add_argument('--disable-dim-reduction', action='store_true',
-                       help='Disable UMAP dimensionality reduction (default: False)')
-    parser.add_argument('--dim-reduction-method', choices=['adaptive', 'umap', 'pca', 'none'], default='adaptive',
-                       help='Dimension reduction method: adaptive (auto-choose), umap, pca, or none (default: adaptive)')
-    parser.add_argument('--umap-n-components', type=int, default=100,
-                       help='Number of UMAP components (default: 100)')
-    parser.add_argument('--umap-n-neighbors', type=int, default=30,
-                       help='Number of UMAP neighbors (default: 30)')
-    parser.add_argument('--umap-min-dist', type=float, default=0.1,
-                       help='UMAP minimum distance (default: 0.1)')
-    parser.add_argument('--umap-metric', default='cosine',
-                       help='UMAP distance metric (default: cosine)')
+                       help='Disable dimensionality reduction (default: False)')
+    parser.add_argument('--dim-reduction-method', choices=['adaptive', 'pca', 'none'], default='adaptive',
+                       help='Dimension reduction method: adaptive (auto-choose), pca, or none (default: adaptive)')
     parser.add_argument('--assign-outliers', action='store_true',
                        help='Assign HDBSCAN outliers to their nearest clusters (default: False)')
     parser.add_argument('--input-model-name', 
@@ -842,11 +729,6 @@ def main():
     save_clustered_results(df_clustered, output_prefix, include_embeddings=include_embeddings, config=config)
     
     logger.info(f"\n✅ Clustering complete! Final dataset shape: {df_clustered.shape}")
-    
-    # Close wandb run if it was initialized
-    if config.use_wandb:
-        wandb.finish()
-        logger.info("Wandb run completed")
     
     return df_clustered
 

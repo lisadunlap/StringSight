@@ -63,11 +63,7 @@ class ClusterConfig:
     use_gpu: Optional[bool] = None  # None means auto-detect; will be set in __post_init__
 
     # Dimension reduction settings
-    dim_reduction_method: str = "adaptive"  # "adaptive", "umap", "pca", "none"
-    umap_n_components: int = 100
-    umap_n_neighbors: int = 30
-    umap_min_dist: float = 0.1
-    umap_metric: str = "cosine"
+    dim_reduction_method: str = "adaptive"  # "adaptive", "pca", "none"
 
     # wandb configuration
     use_wandb: bool = True
@@ -104,10 +100,6 @@ class ClusterConfig:
             cluster_positive=getattr(args, "cluster_positive", True),
             # Dimension reduction settings
             dim_reduction_method=getattr(args, "dim_reduction_method", "adaptive"),
-            umap_n_components=getattr(args, "umap_n_components", 100),
-            umap_n_neighbors=getattr(args, "umap_n_neighbors", 30),
-            umap_min_dist=getattr(args, "umap_min_dist", 0.1),
-            umap_metric=getattr(args, "umap_metric", "cosine"),
             # wandb
             use_wandb=use_wandb,
             wandb_project=getattr(args, "wandb_project", None),

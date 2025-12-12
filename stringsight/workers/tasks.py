@@ -7,7 +7,7 @@ import pandas as pd
 import uuid
 
 from stringsight.celery_app import celery_app
-from stringsight.database import SessionLocal
+from stringsight.database import SessionLocal, init_db
 from stringsight.models.job import Job
 from stringsight.utils.paths import _get_results_dir
 from stringsight.storage.adapter import get_storage_adapter
@@ -24,11 +24,26 @@ from stringsight import explain
 
 logger = logging.getLogger(__name__)
 
+def _coerce_job_id(job_id: str | uuid.UUID) -> uuid.UUID:
+    """Coerce a job identifier to a UUID.
+
+    Args:
+        job_id: Job identifier as a UUID or a UUID string.
+
+    Returns:
+        A `uuid.UUID` instance.
+    """
+    if isinstance(job_id, uuid.UUID):
+        return job_id
+    return uuid.UUID(job_id)
+
 async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
     """Async implementation of the extraction logic."""
+    init_db()
+    job_uuid = _coerce_job_id(job_id)
     db = SessionLocal()
     try:
-        job = db.query(Job).filter(Job.id == job_id).first()
+        job = db.query(Job).filter(Job.id == job_uuid).first()
         if not job:
             logger.error(f"Job {job_id} not found in database")
             return
@@ -70,7 +85,7 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
                 try:
                     # Create new session for update to avoid transaction issues
                     with SessionLocal() as session:
-                        current_job = session.query(Job).filter(Job.id == job_id).first()
+                        current_job = session.query(Job).filter(Job.id == job_uuid).first()
                         if current_job:
                             current_job.progress = completed / total_count if total_count > 0 else 0.0
                             session.commit()
@@ -119,7 +134,7 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
         
         # Update job with success
         # Refresh job object
-        job = db.query(Job).filter(Job.id == job_id).first()
+        job = db.query(Job).filter(Job.id == job_uuid).first()
         job.status = "completed"
         job.progress = 1.0
         job.result_path = req.output_dir if req.output_dir else f"extract_{job_id}_{timestamp}"
@@ -136,7 +151,7 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Error in extract job {job_id}: {e}", exc_info=True)
         try:
-            job = db.query(Job).filter(Job.id == job_id).first()
+            job = db.query(Job).filter(Job.id == job_uuid).first()
             if job:
                 job.status = "failed"
                 job.error_message = str(e)
@@ -151,12 +166,29 @@ def run_extract_job(self, job_id: str, req_data: Dict[str, Any]):
     """Celery task wrapper for async extraction."""
     asyncio.run(_run_extract_job_async(job_id, req_data))
 
-@celery_app.task(bind=True, name="stringsight.workers.tasks.run_pipeline_job")
-def run_pipeline_job(self, job_id: str, req_data: Dict[str, Any]):
-    """Celery task for full pipeline (extraction + clustering)."""
+
+def run_extract_job_inprocess(job_id: str, req_data: Dict[str, Any]) -> None:
+    """In-process runner for extraction jobs (no Celery/Redis required).
+
+    Args:
+        job_id: Job id as a UUID string.
+        req_data: Serialized ExtractJobStartRequest.
+    """
+    asyncio.run(_run_extract_job_async(job_id, req_data))
+
+
+def _run_pipeline_job(job_id: str, req_data: Dict[str, Any]) -> None:
+    """Synchronous implementation of the full pipeline (extraction + clustering).
+
+    Args:
+        job_id: Job id as a UUID string.
+        req_data: Serialized PipelineJobRequest.
+    """
+    init_db()
+    job_uuid = _coerce_job_id(job_id)
     db = SessionLocal()
     try:
-        job = db.query(Job).filter(Job.id == job_id).first()
+        job = db.query(Job).filter(Job.id == job_uuid).first()
         if not job:
             logger.error(f"Job {job_id} not found")
             return
@@ -206,37 +238,27 @@ def run_pipeline_job(self, job_id: str, req_data: Dict[str, Any]):
         if req.cluster_assignment_model:
             explain_kwargs["cluster_assignment_model"] = req.cluster_assignment_model
             
-        # Run the pipeline (sync)
-        # Note: explain() handles its own sampling if sample_size is passed,
-        # but here we might want to sample beforehand or pass it.
-        # explain() signature: explain(df, ...)
-        
         if req.sample_size and req.sample_size < len(df):
-             # Simple random sampling if not using the complex sampling logic in run_full_pipeline
-             # For full parity, we should use sample_prompts_evenly if available, but simple sample is ok for now
              df = df.sample(n=req.sample_size, random_state=42)
         
-        # Helper to update progress
-        def update_progress(progress: float):
+        def update_progress(progress: float) -> None:
             try:
                 with SessionLocal() as session:
-                    current_job = session.query(Job).filter(Job.id == job_id).first()
+                    current_job = session.query(Job).filter(Job.id == job_uuid).first()
                     if current_job:
                         current_job.progress = progress
                         session.commit()
             except Exception as e:
                 logger.error(f"Failed to update progress: {e}")
 
-        clustered_df, model_stats = explain(df, **explain_kwargs, progress_callback=update_progress)
+        explain(df, **explain_kwargs, progress_callback=update_progress)
 
-        job = db.query(Job).filter(Job.id == job_id).first()
+        job = db.query(Job).filter(Job.id == job_uuid).first()
         job.status = "completed"
         job.progress = 1.0
-        # Store relative path from results directory for API compatibility
         job.result_path = req.output_dir if req.output_dir else f"pipeline_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         db.commit()
         
-        # Send email if requested (Async)
         if req.email:
             send_email_task.delay(
                 email=req.email,
@@ -247,7 +269,7 @@ def run_pipeline_job(self, job_id: str, req_data: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Error in pipeline job {job_id}: {e}", exc_info=True)
         try:
-            job = db.query(Job).filter(Job.id == job_id).first()
+            job = db.query(Job).filter(Job.id == job_uuid).first()
             if job:
                 job.status = "failed"
                 job.error_message = str(e)
@@ -256,6 +278,17 @@ def run_pipeline_job(self, job_id: str, req_data: Dict[str, Any]):
             logger.error(f"Failed to update job error state: {db_e}")
     finally:
         db.close()
+
+
+@celery_app.task(bind=True, name="stringsight.workers.tasks.run_pipeline_job")
+def run_pipeline_job(self, job_id: str, req_data: Dict[str, Any]):
+    """Celery task for full pipeline (extraction + clustering)."""
+    _run_pipeline_job(job_id, req_data)
+
+
+def run_pipeline_job_inprocess(job_id: str, req_data: Dict[str, Any]) -> None:
+    """In-process runner for pipeline jobs (no Celery/Redis required)."""
+    _run_pipeline_job(job_id, req_data)
 
 @celery_app.task(bind=True, name="stringsight.workers.tasks.send_email_task")
 def send_email_task(self, email: str, output_dir: str, job_name: str):
@@ -279,6 +312,11 @@ def run_cluster_job(self, job_id: str, req_data: Dict[str, Any]):
     """Celery task for clustering existing properties (no extraction)."""
     asyncio.run(_run_cluster_job_async(job_id, req_data))
 
+
+def run_cluster_job_inprocess(job_id: str, req_data: Dict[str, Any]) -> None:
+    """In-process runner for clustering jobs (no Celery/Redis required)."""
+    asyncio.run(_run_cluster_job_async(job_id, req_data))
+
 async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
     """Async implementation of clustering logic."""
     from stringsight.schemas import ClusterJobRequest
@@ -290,9 +328,11 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
     import json
     import time
     
+    init_db()
+    job_uuid = _coerce_job_id(job_id)
     db = SessionLocal()
     try:
-        job = db.query(Job).filter(Job.id == job_id).first()
+        job = db.query(Job).filter(Job.id == job_uuid).first()
         if not job:
             logger.error(f"Job {job_id} not found")
             return
@@ -311,7 +351,7 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
         def update_progress(progress: float):
             try:
                 with SessionLocal() as session:
-                    current_job = session.query(Job).filter(Job.id == job_id).first()
+                    current_job = session.query(Job).filter(Job.id == job_uuid).first()
                     if current_job:
                         current_job.progress = progress
                         session.commit()
@@ -572,18 +612,12 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
         
         # Update job completion
         update_progress(1.0)
-        job = db.query(Job).filter(Job.id == job_id).first()
+        job = db.query(Job).filter(Job.id == job_uuid).first()
         job.status = "completed"
         job.progress = 1.0
         # Store relative path from results directory for API compatibility
         relative_path = req.output_dir if req.output_dir else f"{base_filename}_{timestamp}"
         job.result_path = relative_path
-        job.result = {
-            "output_dir": str(results_dir),
-            "cluster_count": len(clustered_dataset.clusters),
-            "property_count": len(properties),
-            "models": clustered_dataset.all_models
-        }
         db.commit()
         
         # Send email if requested (Async)
@@ -599,7 +633,7 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Error in cluster job {job_id}: {e}", exc_info=True)
         try:
-            job = db.query(Job).filter(Job.id == job_id).first()
+            job = db.query(Job).filter(Job.id == job_uuid).first()
             if job:
                 job.status = "failed"
                 job.error_message = str(e)

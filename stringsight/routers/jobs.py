@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional
@@ -7,7 +9,7 @@ import uuid
 from stringsight.database import get_db
 from stringsight.models.job import Job
 from stringsight.schemas import ExtractJobStartRequest, PipelineJobRequest, ClusterJobRequest, DemoEmailRequest
-from stringsight.workers.tasks import run_extract_job, run_pipeline_job, run_cluster_job, _run_cluster_job_async
+from stringsight.workers.tasks import run_extract_job_inprocess, run_pipeline_job_inprocess, _run_cluster_job_async
 from stringsight.storage.adapter import get_storage_adapter
 from stringsight.email_service import send_results_email
 from stringsight.utils.paths import _get_results_dir
@@ -18,9 +20,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/jobs", tags=["jobs"])
 
 @router.post("/pipeline")
-def start_pipeline_job(
+async def start_pipeline_job(
     req: PipelineJobRequest,
     response: Response,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     # Create job record
@@ -43,15 +46,16 @@ def start_pipeline_job(
     # Convert request to dict for serialization
     req_data = req.dict()
     
-    # Enqueue task
-    run_pipeline_job.delay(str(job_id), req_data)
+    # Enqueue task (in-process for easy installs; avoids requiring Celery/Redis)
+    background_tasks.add_task(run_pipeline_job_inprocess, str(job_id), req_data)
     
     return {"job_id": str(job_id), "status": "queued", "job_type": "pipeline"}
 
 @router.post("/extract")
-def start_extract_job(
+async def start_extract_job(
     req: ExtractJobStartRequest,
     response: Response,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     # Create job record
@@ -73,8 +77,8 @@ def start_extract_job(
     # Convert request to dict for serialization
     req_data = req.dict()
     
-    # Enqueue task
-    run_extract_job.delay(str(job_id), req_data)
+    # Enqueue task (in-process for easy installs; avoids requiring Celery/Redis)
+    background_tasks.add_task(run_extract_job_inprocess, str(job_id), req_data)
     
     return {"job_id": str(job_id), "status": "queued"}
 
@@ -105,8 +109,7 @@ def start_cluster_job(
     # Convert request to dict for serialization
     req_data = req.dict()
     
-    # Run in background task (in-process) instead of Celery
-    # This avoids issues with Celery workers not picking up new code
+    # Schedule the coroutine directly; FastAPI/Starlette will await it as a background task.
     background_tasks.add_task(_run_cluster_job_async, str(job_id), req_data)
     
     return {"job_id": str(job_id), "status": "queued", "job_type": "cluster"}

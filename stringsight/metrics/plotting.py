@@ -18,8 +18,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 import plotly.io as pio
 
-import wandb
-# import weave
+import importlib.util
 
 # Set plotly template
 pio.templates.default = "plotly_white"
@@ -785,7 +784,12 @@ def save_plotly_figure(fig: go.Figure, output_path: Path, wandb_key: Optional[st
         None
     """
     # Only log to wandb; do not write any local files
-    if wandb_key and wandb.run:
+    if not wandb_key:
+        return
+    if importlib.util.find_spec("wandb") is None:
+        return
+    import wandb
+    if wandb.run:
         wandb.log({wandb_key: fig})
 
 

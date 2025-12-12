@@ -2,32 +2,21 @@
 pandas>=2.0.0
 numpy>=1.19.3,<2.0
 scipy>=1.9.0
-scikit-learn>=1.7.1
+scikit-learn>=1.3.0,<1.6.0
 tqdm>=4.65.0
 pydantic[email]>=2.0.0
 email-validator>=2.0.0
 litellm>=1.0.0
 
 # ML/Clustering dependencies
-# Note: Installing bertopic without sentence-transformers dependency
-# This saves ~6.6GB (PyTorch + NVIDIA CUDA libraries)
-# sentence-transformers is optional - only needed for local embedding models
 hdbscan>=0.8.40
-umap-learn>=0.5.9
-llvmlite  # Required by numba/hdbscan
 plotly>=5.15.0
-wandb>=0.15.0  # Optional - install with: pip install "stringsight[wandb]" or pip install wandb
-
-# Install bertopic but skip sentence-transformers
-# Your code already has lazy imports for sentence-transformers
-# Default embedding model is openai/text-embedding-3-large (API-based)
-# bertopic>=0.17.3  <-- REMOVED to install manually with --no-deps
+wandb>=0.15.0  # Optional
 
 # LLM
 openai>=1.0.0
 
 # Data handling
-pyarrow>=12.0.0
 lmdb>=1.4.1
 orjson>=3.9.0
 xxhash>=3.4.0

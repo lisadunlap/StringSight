@@ -340,6 +340,16 @@ def _resolve_df_and_method(
 
 app = FastAPI(title="StringSight API", version="0.1.0")
 
+# Ensure local installs work without external services.
+# When using the default SQLite DB, create tables on startup.
+from stringsight.database import init_db
+
+
+@app.on_event("startup")
+def _startup_init_db() -> None:
+    """Initialize local SQLite database tables on application startup."""
+    init_db()
+
 # Initialize persistent disk configuration on startup
 # This sets up environment variables for cache and results directories
 _get_cache_dir()  # Call this to auto-configure cache if RENDER_DISK_PATH is set
