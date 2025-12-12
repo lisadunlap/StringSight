@@ -519,7 +519,7 @@ dataset = PropertyDataset.load("results/full_dataset.json")
       "size": 150,
       "proportion": 0.25,
       "quality": {"accuracy": 0.92, "helpfulness": 4.5},
-      "quality_delta": {"accuracy": 0.15, "helpfulness": 0.3},
+      "quality_delta": {"accuracy": 0.0375, "helpfulness": 0.075},
       "proportion_delta": 0.12,
       "examples": ["q1", "q2", "q3"],
       "proportion_ci": {"lower": 0.22, "upper": 0.28},

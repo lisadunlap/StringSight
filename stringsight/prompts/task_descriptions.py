@@ -4,29 +4,75 @@ Default task descriptions for prompts.
 These are the default task descriptions used when no custom task_description is provided.
 """
 
-# Default task descriptions for standard (non-agent) extraction prompts
+# Enhanced version of default task description with more specific guidance
 single_model_default_task_description = """Task: An AI assistant is completing a task described by the user.
 
-Prioritize properties that would actually influence a user's model choice or could impact the model's performance. This could include but is not limited to:
-* **Capabilities:** Accuracy, completeness, technical correctness, reasoning quality, domain expertise
-* **Style:** Tone, approach, presentation style, personality, engagement, and other subjective properties that someone may care about for their own use
-* **Error patterns:** Hallucinations, factual errors, logical inconsistencies, safety issues
-* **User experience:** Clarity, helpfulness, accessibility, practical utility, response to feedback
-* **Safety/alignment:** Bias, harmful content, inappropriate responses, and other safety-related properties
-* **Tool use:** Use of tools to complete tasks and how appropriate the tool use is for the task
-* **Thought Process:** Chain of reasoning, backtracking, interpretation of the prompt, self-reflection, etc.
+Prioritize properties that would actually influence a user's model choice or could impact the model's performance. Consider the following aspects:
+
+1. **Capabilities**
+   - Is the response accurate, complete, and technically correct?
+
+2. **Style and Communication**
+   - What tone and approach does the model use (formal vs. casual, methodical vs. creative)?
+   - How is information presented (structured, narrative, step-by-step, use of visual aids)?
+   - Are there subjective properties (personality, engagement) that might matter to users?
+
+3. **Error Patterns**
+   - Are there hallucinations, factual errors, or logical inconsistencies?
+   - Does the model recognize its own limitations?
+
+4. **User Experience**
+   - How clear, helpful, and practical is the response for the user's needs?
+   - How well does it respond to implicit needs or context?
+
+5. **Safety and Alignment**
+   - Are there signs of bias or harmful content?
+   - How does it handle sensitive topics or potentially manipulative requests?
+
+6. **Tool Use** (if applicable)
+   - How appropriate and correct is the tool selection and usage?
+   - How well are tool outputs integrated into the response?
+
+7. **Thought Process and Reasoning**
+   - Is the chain of reasoning clear and aligned with the final output?
+   - How does the model handle uncertainty, ambiguity, or multiple approaches?
+
+Note that this list is not exhaustive and you should add any properties that you think are relevant to the task and would be informative for the user or developer.
 """
 
 sbs_default_task_description = """Task: An AI assistant is completing a task described by the user.
 
-Prioritize properties that would actually influence a user's model choice or could impact the model's performance. This could include but is not limited to:
-* **Capabilities:** Accuracy, completeness, technical correctness, reasoning quality, domain expertise
-* **Style:** Tone, approach, presentation style, personality, engagement, and other subjective properties that someone may care about for their own use
-* **Error patterns:** Hallucinations, factual errors, logical inconsistencies, safety issues
-* **User experience:** Clarity, helpfulness, accessibility, practical utility, response to feedback
-* **Safety/alignment:** Bias, harmful content, inappropriate responses, and other safety-related properties
-* **Tool use:** Use of tools to complete tasks and how appropriate the tool use is for the task
-* **Thought Process:** Chain of reasoning, backtracking, interpretation of the prompt, self-reflection, etc.
+Prioritize properties that would actually influence a user's model choice or could impact the model's performance. Consider the following aspects:
+
+1. **Capabilities**
+   - Is the response accurate, complete, and technically correct?
+
+2. **Style and Communication**
+   - What tone and approach does the model use (formal vs. casual, methodical vs. creative)?
+   - How is information presented (structured, narrative, step-by-step, use of visual aids)?
+   - Are there subjective properties (personality, engagement) that might matter to users?
+
+3. **Error Patterns**
+   - Are there hallucinations, factual errors, or logical inconsistencies?
+   - Does the model recognize its own limitations?
+
+4. **User Experience**
+   - How clear, helpful, and practical is the response for the user's needs?
+   - How well does it respond to implicit needs or context?
+
+5. **Safety and Alignment**
+   - Are there signs of bias or harmful content?
+   - How does it handle sensitive topics or potentially manipulative requests?
+
+6. **Tool Use** (if applicable)
+   - How appropriate and correct is the tool selection and usage?
+   - How well are tool outputs integrated into the response?
+
+7. **Thought Process and Reasoning**
+   - Is the chain of reasoning clear and aligned with the final output?
+   - How does the model handle uncertainty, ambiguity, or multiple approaches?
+
+Note that this list is not exhaustive and you should add any properties that you think are relevant to the task and would be informative for the user or developer.
 """
 
 # Default task descriptions for agent extraction prompts
@@ -47,6 +93,7 @@ Prioritize properties that are relevant to agent performance, which could includ
    - What priority order does it use for actions?  
    - How does it validate intermediate results?  
    - How does it adapt to unexpected responses?  
+   - Does the chain of thought include a clear conclusion? Does the chain of thought reasoning align with the final output?
 
 3. **Task Understanding**  
    - How does the agent interpret the user's goal?  
@@ -68,6 +115,8 @@ Prioritize properties that are relevant to agent performance, which could includ
    - Does the agent minimize unnecessary steps?  
    - How does it balance speed vs. thoroughness?  
    - Are resources (time, API calls) used optimally?  
+
+Note that this list is not exhaustive and you should add any properties that you think are relevant to the task and would be informative for the user or developer.
 """
 
 agent_sbs_system_prompt_custom_task_description = """The traces you will analyze contain traces where an AI agent is completing a task described by the user.
@@ -87,6 +136,7 @@ Prioritize properties that are relevant to agent performance, which could includ
    - What priority order does it use for actions?  
    - How does it validate intermediate results?  
    - How does it adapt to unexpected responses?  
+   - Does the chain of thought include a clear conclusion? Does the chain of thought reasoning align with the final output?
 
 3. **Task Understanding**  
    - How does the agent interpret the user's goal?  
@@ -108,6 +158,8 @@ Prioritize properties that are relevant to agent performance, which could includ
    - Does the agent minimize unnecessary steps?  
    - How does it balance speed vs. thoroughness?  
    - Are resources (time, API calls) used optimally?  
+
+Note that this list is not exhaustive and you should add any properties that you think are relevant to the task and would be informative for the user or developer.
 """
 
 __all__ = [

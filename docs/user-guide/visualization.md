@@ -26,15 +26,16 @@ Shows how well models perform within specific behavioral clusters.
   - Higher values = better performance in this behavior cluster
   - Compare across models to see strengths/weaknesses
 
-#### Delta Plots
-Shows relative differences from baseline/median performance.
+#### Impact Plots (formerly Delta Plots)
+Shows the attributable impact of each cluster on the model's overall score.
 
 - **Y-axis**: Cluster names
-- **X-axis**: Delta value (can be positive/negative)
-- **Zero line**: Baseline performance
+- **X-axis**: Impact value (Score Delta × Proportion)
+- **Zero line**: No impact
 - **Interpretation**:
-  - Positive = over-represented / better than average
-  - Negative = under-represented / worse than average
+  - Positive = This cluster is *raising* the model's overall average
+  - Negative = This cluster is *lowering* the model's overall average
+  - Magnitude = How many total points this behavior contributes to the global score
 
 ### Filtering Strategies
 
@@ -51,8 +52,8 @@ Shows relative differences from baseline/median performance.
 **For Quality Analysis:**
 1. Switch to **Quality plot type**
 2. Select quality metric (e.g., "accuracy", "helpfulness")
-3. Sort by **Quality Delta Δ**
-4. Identify where each model excels
+3. Sort by **Attributable Impact** (formerly Quality Delta)
+4. Identify which behaviors drive the biggest gains/losses
 
 ### Performance Optimization
 

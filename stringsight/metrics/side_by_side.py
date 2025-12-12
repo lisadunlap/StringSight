@@ -244,17 +244,6 @@ class SideBySideMetrics(FunctionalMetrics):
                     if isinstance(v, (int, float)):
                         result[k] = float(v)
             
-            # Handle winner if present in meta field
-            if conversation and hasattr(conversation, 'meta'):
-                winner = conversation.meta.get("winner")
-                if isinstance(winner, str):
-                    if winner == this_model:
-                        result["winner"] = 1.0
-                    elif "tie" in winner.lower():
-                        result["winner"] = 0.0
-                    else:
-                        result["winner"] = -1.0
-        
         return result
 
     # --- Robust metrics computation for SxS to handle empty bootstrap subsets ---
@@ -341,8 +330,11 @@ class SideBySideMetrics(FunctionalMetrics):
             if k not in cluster_model_scores:
                 cluster_model_scores[k] = 0.0
 
-        quality_delta = self.compute_relative_quality(cluster_model_scores, model_scores)
+        quality_raw_delta = self.compute_relative_quality(cluster_model_scores, model_scores)
         proportion = cluster_model_size / model_size if model_size != 0 else 0
+
+        # Quality delta is just the raw difference in scores (no proportion weighting)
+        quality_delta = quality_raw_delta
 
         # Extract cluster metadata (take the first non-empty metadata from the cluster)
         cluster_metadata = {}

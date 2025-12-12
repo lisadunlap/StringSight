@@ -33,7 +33,7 @@ You will return a list of json objects, where each object represents a single, d
   {
     "behavior_type": "Negative (critical)|Negative (non-critical)|Positive|Style",
     "property_description": "lowercase verb + exact action + trigger + consequence/policy impact (1-3 sentences)",
-    "category": "1-4 word category (e.g., 'Regex Failure', 'Safety Robustness', 'Response to Jailbreaking Attempts')",
+    "category": "1-4 word category (e.g., 'Tone', 'Writing Style', 'Safety Violation', ..)",
     "evidence": "exact quote one", "exact quote two", "exact quote three",
     "reason": "1-2 sentence explanation of why this property is notable or important",
     "contains_errors": "True|False",
@@ -46,10 +46,10 @@ You will return a list of json objects, where each object represents a single, d
 Below are in detail the definitions and rules for each field:
 
 {model_naming_rule}1. BEHAVIOR TYPES
-* **Negative (Critical):** Direct causes of task failure, hallucinations, gibberish, or safety violations.
-* **Negative (Non-Critical):** Inefficiencies, formatting slips, or partial errors that were rectified later that do not cause complete failure.
-* **Positive:** Uncommon but effective strategies, self-correction, or exceptional safety handling. (Maximum 1 per trace; most correct answers should not be included as positive unless notably unique.) For instance, "The model follows X policy" is a positive property but is not notable since this provides no information that isn't already known by whatever accuracy metric is being used. 
-* **Style:** Distinctive persona, tone, or formatting choices (e.g., friendly tone, providing exhaustive markdown lists, affirming the user's emotions, etc.). Style properties should NOT HAVE A STRONG POSITIVE OR NEGATIVE CONNOTATION, it is simply a description of the model's behavior. If you are including phrases like "correctly, accurately, in adherence with, following the instructions of, ect" then this is not a style property as it is a behavior required to complete the task. Below are some examples of good and bad style properties:
+* **Negative (Critical):** Direct causes of task failure as described by the initial prompt instructions. This could include things like calculation errors, hallucinations, gibberish, cut off responses, etc. Think about whether this error causes the original instruction or user request to be failed. If it does, then it is a critical negative behavior. If it does not, then it is a non-critical negative behavior.
+* **Negative (Non-Critical):** Behaviors which are likely not desired but do not directly lead to failure of the task as decsribed by the intiial prompt instructions. These could include things like inefficiencies, formatting slips, or partial errors that were rectified later that do not cause complete failure. 
+* **Positive:** Uncommon but effective strategies, self-correction, or exceptional safety handling which assists in completing the task as described by the initial prompt instructions. Note that we are looking for EXCEPTIONAL behaviors, not positive behaviors which are expected or required to complete the task. (Maximum 1 per trace; most correct answers should not be included as positive unless notably unique.) For instance, "The model follows X policy" is a positive property but is not notable since this provides no information that isn't already known by whatever accuracy metric is being used. 
+* **Style:** Behaviors which are independednt of the task as described by the prompt but which may differentiate a model from other or may affect a users experience. This includes things like distinctive persona, tone, or formatting choices (e.g., friendly tone, providing exhaustive markdown lists, affirming the user's emotions, etc.). Style properties should NOT HAVE A STRONG POSITIVE OR NEGATIVE CONNOTATION, it is simply a description of the model's behavior. If you are including phrases like "correctly, accurately, in adherence with, following the instructions of, ect" then this is not a style property as it is a behavior required to complete the task. Below are some examples of good and bad style properties:
   * Bad style property: "uses tables which is in line with the users instructions" would not be considered a style property because it is an expected behavior for a model that is able to follow instructions.
   * Good style property: "uses tables to organize its response when the user asks to explain a complex concept in a way that is easy to understand." would be considered a style property because it is a choice the model made (how to present information) to solve a task without an objective correct answer. Thus this behavior is not necessarily good or bad, it is simply a choice the model made which some users may prefer and some may not.
   * Bad style property: "adheres to system policy by listing booking action details and obtaining explicit user confirmation before making booking tool calls." would not be considered a style property because it is expected as per the system policy. A model which did not do this would be objectively worse as it would be in violation of the system policy, thus this is not a style property.
@@ -143,7 +143,7 @@ sbs_config = {
     "model": "The name of the model that exhibits this behavior",
     "behavior_type": "Negative (critical)|Negative (non-critical)|Positive|Style",
     "property_description": "string (following the Property Description Formula in Section 2: [lowercase verb] + [specific trigger/context] + [consequence])",
-    "category": "1-4 word category (e.g., 'Regex Failure', 'Safety Robustness', 'Response to Jailbreaking Attempts')",
+    "category": "1-4 word category (e.g., 'Tone', 'Writing Style', 'Safety Violation', ..)",
     "evidence": "exact quote one", "exact quote two", "exact quote three",
     "reason": "1-2 sentence explanation of why this property is notable or important",
     "contains_errors": "True|False",
@@ -174,7 +174,7 @@ agent_single_model_config = {
     "json_schema": """[
   {
     "property_description": "lowercase verb + exact action + trigger + consequence/policy impact (1-3 sentences, exactly like the examples in Section 2: [lowercase verb] + [specific trigger/context] + [consequence])",
-    "category": "1-4 word category (e.g., 'Refund Policy Violation', 'Safety Refusal', 'Deception Handling', 'Internal Reasoning Leak', 'Manipulation Resistance')",
+    "category": "1-4 word category (e.g., 'Tone', 'Writing Style', 'Safety Violation', ..)",
     "reason": "Why this property is notable/important — explain impact only (1-2 sentences)",
     "evidence": "exact quote one", "exact quote two", "exact quote three",
     "behavior_type": "Negative (critical)|Negative (non-critical)|Positive|Style",
@@ -203,7 +203,7 @@ agent_sbs_config = {
   {
     "model": "The name of the model that exhibits this behavior",
     "property_description": "lowercase verb + exact action + trigger + consequence/policy impact (1-3 sentences, exactly like the examples in Section 2: [lowercase verb] + [specific trigger/context] + [consequence])",
-    "category": "1-4 word category (e.g., 'Refund Policy Violation', 'Safety Refusal', 'Deception Handling', 'Internal Reasoning Leak', 'Manipulation Resistance')",
+    "category": "1-4 word category (e.g., 'Tone', 'Writing Style', 'Safety Violation', ..)",
     "reason": "Why this property is notable/important — explain impact only (1-2 sentences)",
     "evidence": "exact quote one", "exact quote two", "exact quote three",
     "behavior_type": "Negative (critical)|Negative (non-critical)|Positive|Style",

@@ -23,8 +23,8 @@ This module produces 3 separate JSON files with the following structure:
          "quality": {                    # Raw quality scores for this model-cluster combination
            "metric_name": float          # e.g., "helpfulness": 4.2, "accuracy": 3.8
          },
-         "quality_delta": {              # Relative quality: how much better/worse than model's overall average
-           "metric_name": float          # e.g., "helpfulness": +0.3 (cluster is 0.3 points above model baseline)
+         "quality_delta": {              # Raw difference: (Cluster Score - Model Average)
+           "metric_name": float          # e.g., "helpfulness": +0.15 (this cluster is 0.15 higher than model's average)
          },
          "proportion_delta": float,      # Salience: how much this model over/under-represents vs average across all models
          "metadata": {},                 # Cluster metadata (e.g., group information from stratified clustering)
@@ -55,7 +55,7 @@ This module produces 3 separate JSON files with the following structure:
        "quality": {                      # Average quality scores across all models for this cluster
          "metric_name": float
        },
-       "quality_delta": {                # How this cluster compares to overall average quality
+       "quality_delta": {                # Raw difference: (Cluster Score - Global Average)
          "metric_name": float
        },
        "metadata": {},                   # Cluster metadata (e.g., group information from stratified clustering)
@@ -81,7 +81,7 @@ This module produces 3 separate JSON files with the following structure:
        "quality": {                      # Average quality scores for this model across all clusters
          "metric_name": float
        },
-       "quality_delta": {                # How this model compares to cross-model average
+       "quality_delta": {                # Raw difference: (Model Score - Cross-Model Average)
          "metric_name": float
        },
        "examples": [...],                # Sample conversations for this model across all clusters
@@ -102,7 +102,7 @@ KEY CONCEPTS
 
 - **proportion**: What fraction of the parent set (model/all) falls into this subset
 - **quality**: Raw quality scores (e.g., helpfulness, accuracy ratings)
-- **quality_delta**: Relative quality compared to baseline (positive = better than average)
+- **quality_delta**: Raw difference in scores = (Score - Baseline). Shows how much better/worse this cluster/model is compared to baseline.
 - **proportion_delta** (salience): How much a model over/under-represents in a cluster
   - Positive = model appears more than average in this cluster
   - Negative = model appears less than average in this cluster
@@ -227,8 +227,8 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
             }
             return data
 
-        # Extract cluster names and models
-        cluster_names = df["cluster"].unique()
+        # Extract cluster names and models, ensuring no NaN values
+        cluster_names = [c for c in df["cluster"].unique() if pd.notna(c)]
         model_names = df["model"].unique()
 
         self.log(f"Computing metrics for {len(model_names)} models and {len(cluster_names)} clusters")
@@ -382,6 +382,10 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         
         properties = properties[important_columns]
 
+        # Ensure "cluster" column has no NaN values
+        if "cluster" in properties.columns:
+            properties["cluster"] = properties["cluster"].fillna("Outliers")
+
         return properties
 
     def compute_quality_scores(self, df: pd.DataFrame, metrics: List[str] = None) -> Dict[str, float]:
@@ -485,14 +489,17 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
                 if not non_empty_metadata.empty:
                     cluster_metadata = non_empty_metadata.iloc[0]
 
-        quality = self.compute_relative_quality(cluster_model_scores, model_scores)
+        quality_raw_delta = self.compute_relative_quality(cluster_model_scores, model_scores)
         proportion = cluster_model_size / model_size if model_size != 0 else 0
+
+        # Quality delta is just the raw difference in scores (no proportion weighting)
+        quality_delta = quality_raw_delta
 
         return {
             "size": cluster_model_size,
             "proportion": proportion,
             "quality": cluster_model_scores,
-            "quality_delta": quality,
+            "quality_delta": quality_delta,
             "metadata": cluster_metadata if include_metadata else {},
             "examples": list(zip(
                 cluster_model_df["conversation_id"],

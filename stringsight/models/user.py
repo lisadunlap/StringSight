@@ -18,3 +18,8 @@ class User(Base):
     # Job model defines: user = relationship("User", backref="jobs")
 
 
+
+
+
+
+

@@ -201,7 +201,7 @@
 - **Used by**: Server/API path and Folder upload path
 - **Purpose**: Per-model per-cluster metrics showing how each model performs on each behavioral cluster
 - **Format**: JSONL (one JSON object per line)
-- **Description**: Each line represents metrics for a specific model-cluster combination. Shows the size (number of properties), proportion of that model's total properties in this cluster, delta compared to baseline, and quality scores for each metric. Used for model comparison charts and cluster breakdowns.
+- **Description**: Each line represents metrics for a specific model-cluster combination. Shows the size (number of properties), proportion of that model's total properties in this cluster, attributable impact (weighted delta) compared to baseline, and quality scores for each metric. Used for model comparison charts and cluster breakdowns.
 
 **Sample row**:
 ```json
@@ -212,9 +212,9 @@
   "proportion": 0.35,
   "proportion_delta": 0.05,
   "quality_helpfulness": 0.82,
-  "quality_helpfulness_delta": 0.03,
+  "quality_helpfulness_delta": 0.0105,
   "quality_conciseness": 0.78,
-  "quality_conciseness_delta": 0.01
+  "quality_conciseness_delta": 0.0035
 }
 ```
 

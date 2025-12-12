@@ -287,6 +287,13 @@ class HDBSCANClusterer(BaseClusterer):
         label_col = f"{column_name}_cluster_label"
         id_col = f"{column_name}_cluster_id"
 
+        # Ensure no NaN values in label column (causes downstream issues in metrics)
+        if label_col in df.columns and df[label_col].isna().any():
+            n_nans = df[label_col].isna().sum()
+            self.log(f"Found {n_nans} properties with NaN cluster labels. Assigning to 'Outliers'.")
+            df[label_col] = df[label_col].fillna("Outliers")
+            df.loc[df[label_col] == "Outliers", id_col] = -1
+
         df = await super().postprocess_clustered_df(df, label_col, prettify_labels)
 
         # 1️⃣  Move tiny clusters to Outliers

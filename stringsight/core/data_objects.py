@@ -83,13 +83,56 @@ class ConversationRecord:
         self.question_id = str(self.question_id)
         
         # Handle migration of score_a/score_b from meta field to scores list for side-by-side
-        if isinstance(self.model, list) and len(self.model) == 2:
-            # Check if scores is empty and we have score_a/score_b in meta
+        if isinstance(self.model, (list, tuple)) and len(self.model) == 2:
+            model_a, model_b = self.model[0], self.model[1]
+            
+            # 1. Handle migration of score_a/score_b from meta field
             if (not self.scores or self.scores == {}) and ('score_a' in self.meta and 'score_b' in self.meta):
-                # Migrate scores from meta to scores field
                 scores_a = self.meta.pop('score_a', {})
                 scores_b = self.meta.pop('score_b', {})
                 self.scores = [scores_a, scores_b]
+            
+            # 2. Handle "winner" -> numeric scores conversion
+            # Check if we need to derive scores from a winner field
+            # Winner can be in self.scores['winner'] or self.meta['winner']
+            winner = None
+            if isinstance(self.scores, dict) and 'winner' in self.scores:
+                winner = self.scores.get('winner')
+            elif 'winner' in self.meta:
+                winner = self.meta.get('winner')
+                
+            # If we have a winner but no explicit per-model scores list, generate it
+            # Also handle case where scores is a list of empty dicts [{}, {}] which can happen from_dataframe
+            is_effectively_empty = False
+            if not self.scores:
+                is_effectively_empty = True
+            elif isinstance(self.scores, list):
+                # Check if all elements are empty dicts or None
+                is_effectively_empty = all(not s for s in self.scores)
+            elif isinstance(self.scores, dict) and not self.scores:
+                 is_effectively_empty = True
+
+            if winner is not None and is_effectively_empty:
+                # Calculate scores (+1 winner, -1 loser, 0 tie)
+                s_a, s_b = {}, {}
+                
+                if winner == model_a:
+                    s_a['winner'] = 1.0
+                    s_b['winner'] = -1.0
+                elif winner == model_b:
+                    s_a['winner'] = -1.0
+                    s_b['winner'] = 1.0
+                elif isinstance(winner, str) and 'tie' in winner.lower():
+                    s_a['winner'] = 0.0
+                    s_b['winner'] = 0.0
+                else:
+                     # Unknown winner string or format - leave empty
+                     pass
+                
+                if s_a or s_b:
+                    self.scores = [s_a, s_b]
+                    # Ensure winner is also in meta for reference
+                    self.meta['winner'] = winner
 
 @dataclass
 class Property:
@@ -291,6 +334,10 @@ class PropertyDataset:
                 
                 # Add winner to meta if present
                 winner = row.get('winner')
+                if winner is None and isinstance(row.get('score'), dict):
+                    # Fallback to looking in score dict
+                    winner = row.get('score').get('winner')
+
                 if winner is not None:
                     meta_with_winner['winner'] = winner
                 

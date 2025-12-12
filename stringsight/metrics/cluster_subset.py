@@ -176,7 +176,10 @@ def compute_subset_metrics(long_df: pd.DataFrame, total_conversations_by_model: 
         size = len(sub)
         proportion = float(size) / float(global_total) if global_total > 0 else 0.0
         quality = _avg_scores(sub)
-        quality_delta = {k: quality.get(k, 0.0) - global_quality.get(k, 0.0) for k in quality.keys()}
+        quality_raw_delta = {k: quality.get(k, 0.0) - global_quality.get(k, 0.0) for k in quality.keys()}
+        # Quality delta is just the raw difference (no proportion weighting)
+        quality_delta = quality_raw_delta
+        
         out["cluster_scores"][cluster_name] = {
             "size": int(size),
             "proportion": proportion,

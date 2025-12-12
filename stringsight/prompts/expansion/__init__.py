@@ -2,6 +2,8 @@
 Prompt expansion module.
 
 Contains functionality for expanding task descriptions using example traces.
+
+THIS IS NOT DONE YET, SORRY FOR THE INCONVENIENCE
 """
 
 from .base import PromptExpander
