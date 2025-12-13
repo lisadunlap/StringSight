@@ -26,7 +26,7 @@ This module produces 3 separate JSON files with the following structure:
          "quality_delta": {              # Raw difference: (Cluster Score - Model Average)
            "metric_name": float          # e.g., "helpfulness": +0.15 (this cluster is 0.15 higher than model's average)
          },
-         "proportion_delta": float,      # Salience: how much this model over/under-represents vs average across all models
+         "proportion_delta": float,      # Salience: how much this model over/under-represents vs average of OTHER models
          "metadata": {},                 # Cluster metadata (e.g., group information from stratified clustering)
          "examples": [                   # Sample conversation IDs and metadata for this model-cluster
            [conversation_id, conversation_metadata, property_metadata], ...
@@ -103,9 +103,9 @@ KEY CONCEPTS
 - **proportion**: What fraction of the parent set (model/all) falls into this subset
 - **quality**: Raw quality scores (e.g., helpfulness, accuracy ratings)
 - **quality_delta**: Raw difference in scores = (Score - Baseline). Shows how much better/worse this cluster/model is compared to baseline.
-- **proportion_delta** (salience): How much a model over/under-represents in a cluster
-  - Positive = model appears more than average in this cluster
-  - Negative = model appears less than average in this cluster
+- **proportion_delta** (salience): How much a model over/under-represents in a cluster compared to OTHER models
+  - Positive = model appears more than other models on average in this cluster
+  - Negative = model appears less than other models on average in this cluster
 - **Bootstrap CIs**: Confidence intervals computed by resampling conversations
   - When bootstrap is enabled, the main metric values are set to bootstrap means
 
@@ -508,7 +508,7 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         }
 
     def _compute_salience(self, model_cluster_scores: Dict[str, Dict[str, Dict[str, Any]]]) -> Dict[str, Dict[str, Dict[str, Any]]]:
-        """Compute salience (proportion deviation from average) for each model-cluster combination."""
+        """Compute salience (proportion deviation from average of OTHER models) for each model-cluster combination."""
         df = pd.DataFrame(model_cluster_scores).reset_index().rename({"index": "cluster"}, axis=1)
         
         # Step 1: Extract proportion values
@@ -518,13 +518,18 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         for model in model_names:
             df[f'{model}_proportion'] = df[model].apply(lambda x: x.get('proportion', 0) if isinstance(x, dict) else 0)
 
-        # Step 2: Compute average proportion per cluster
-        proportion_cols = [f'{model}_proportion' for model in model_names]
-        df['avg_proportion'] = df[proportion_cols].mean(axis=1)
-
-        # Step 3: Compute deviation from average
+        # Step 2 & 3: Compute deviation from average of OTHER models (excluding self)
         for model in model_names:
-            df[f'{model}_deviation'] = df[f'{model}_proportion'] - df['avg_proportion']
+            # Get all other models' proportion columns
+            other_model_cols = [f'{m}_proportion' for m in model_names if m != model]
+            if other_model_cols:
+                # Average proportion across all OTHER models
+                df[f'{model}_avg_others'] = df[other_model_cols].mean(axis=1)
+            else:
+                # If only one model, deviation is 0
+                df[f'{model}_avg_others'] = 0
+            # Deviation = this model's proportion - average of others
+            df[f'{model}_deviation'] = df[f'{model}_proportion'] - df[f'{model}_avg_others']
 
         # Step 4: Add deviation into model_cluster_scores
         for i, row in df.iterrows():

@@ -8,10 +8,9 @@ import uuid
 
 from stringsight.database import get_db
 from stringsight.models.job import Job
-from stringsight.schemas import ExtractJobStartRequest, PipelineJobRequest, ClusterJobRequest, DemoEmailRequest
+from stringsight.schemas import ExtractJobStartRequest, PipelineJobRequest, ClusterJobRequest
 from stringsight.workers.tasks import run_extract_job_inprocess, run_pipeline_job_inprocess, _run_cluster_job_async
 from stringsight.storage.adapter import get_storage_adapter
-from stringsight.email_service import send_results_email
 from stringsight.utils.paths import _get_results_dir
 import logging
 
@@ -113,39 +112,6 @@ def start_cluster_job(
     background_tasks.add_task(_run_cluster_job_async, str(job_id), req_data)
     
     return {"job_id": str(job_id), "status": "queued", "job_type": "cluster"}
-
-@router.post("/email-demo")
-def email_demo_results(
-    req: DemoEmailRequest,
-    background_tasks: BackgroundTasks
-):
-    """Send demo results via email."""
-    # Determine demo directory
-    demo_dir_name = "taubench_airline_data_sbs" if req.method == "side_by_side" else "taubench_airline_data"
-    results_base = _get_results_dir()
-    demo_dir = results_base / demo_dir_name
-    
-    if not demo_dir.exists():
-        raise HTTPException(status_code=404, detail=f"Demo results not found at {demo_dir}")
-        
-    def _send_email_task():
-        try:
-            logger.info(f"Sending demo results email to {req.email}")
-            result = send_results_email(
-                recipient_email=req.email,
-                results_dir=str(demo_dir),
-                experiment_name=f"Demo Data ({req.method})"
-            )
-            if result.get('success'):
-                logger.info(f"✅ Demo email sent successfully: {result.get('message')}")
-            else:
-                logger.warning(f"⚠️ Demo email sending failed: {result.get('message')}")
-        except Exception as e:
-            logger.error(f"Failed to send demo email: {e}")
-
-    background_tasks.add_task(_send_email_task)
-    
-    return {"status": "queued", "message": "Email sending queued"}
 
 @router.get("/{job_id}")
 def get_job_status(

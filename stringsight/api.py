@@ -36,7 +36,6 @@ from stringsight import public as public_api
 from stringsight.clusterers import get_clusterer
 from stringsight.metrics.cluster_subset import enrich_clusters_with_metrics, compute_total_conversations_by_model
 from stringsight.logging_config import get_logger
-from stringsight.email_service import send_results_email
 from stringsight.schemas import ExtractBatchRequest, ExtractJobStartRequest
 import threading, uuid
 from dataclasses import dataclass, field
@@ -214,11 +213,6 @@ class AutoDetectRequest(BaseModel):
     rows: List[Dict[str, Any]]  # Sample of data for detection
 
 
-class EmailResultsRequest(BaseModel):
-    """Request to email clustering results to a user."""
-    email: str
-    results_dir: str
-    experiment_name: str
 
 
 # -----------------------------
@@ -562,7 +556,6 @@ class ClusterRunRequest(BaseModel):
     output_dir: Optional[str] = None
     score_columns: Optional[List[str]] = None  # NEW: List of score column names to convert to dict format
     method: Optional[str] = "single_model"  # NEW: Method for score column conversion
-    email: Optional[str] = None  # NEW: Email for notifications
 
 
 @app.post("/cluster/run")
@@ -604,11 +597,6 @@ async def cluster_run(
     except Exception:
         pass
     
-    # Inject email from current_user if not provided
-    if not req.email and current_user and current_user.email:
-        req.email = current_user.email
-        logger.info(f"Injecting email {req.email} for cluster run")
-
     try:
         # NEW: Preprocess operationalRows to handle score_columns conversion
         # This ensures scores are in the expected nested dict format before creating ConversationRecords
@@ -1536,29 +1524,6 @@ async def cluster_run(
     except Exception as e:
         logger.warning(f"Failed to save metrics JSONL files: {e}")
 
-    # Send email if requested
-    if req.email and results_dir:
-        def _send_email_task():
-            try:
-                logger.info(f"Sending clustering results email to {req.email}")
-                # Determine experiment name
-                exp_name = results_dir_name or "Clustering Results"
-                
-                result = send_results_email(
-                    recipient_email=req.email,
-                    results_dir=str(results_dir),
-                    experiment_name=exp_name
-                )
-                if result.get('success'):
-                    logger.info(f"✅ Clustering email sent successfully: {result.get('message')}")
-                else:
-                    logger.warning(f"⚠️ Clustering email sending failed: {result.get('message')}")
-            except Exception as e:
-                logger.error(f"Failed to send clustering email: {e}")
-
-        background_tasks.add_task(_send_email_task)
-        logger.info(f"📧 Queued email notification for {req.email}")
-
     return {
         "clusters": enriched,
         "total_conversations_by_model": total_conversations,
@@ -2058,32 +2023,6 @@ def stream_conversations(
             "X-Chunk-Size": str(limit)
         }
     )
-
-
-@app.post("/results/email")
-def email_results(req: EmailResultsRequest) -> Dict[str, Any]:
-    """Email clustering results to a user.
-
-    Sends a zip file of the results directory to the specified email address.
-    Requires EMAIL_SMTP_SERVER, EMAIL_SENDER, and EMAIL_PASSWORD environment variables.
-
-    Args:
-        req: EmailResultsRequest with email, results_dir, and experiment_name
-
-    Returns:
-        Dict with 'success' boolean and 'message' string
-    """
-    results_dir = _resolve_within_base(req.results_dir)
-    if not results_dir.is_dir():
-        raise HTTPException(status_code=400, detail=f"Not a directory: {results_dir}")
-
-    result = send_results_email(
-        recipient_email=req.email,
-        results_dir=str(results_dir),
-        experiment_name=req.experiment_name
-    )
-
-    return result
 
 
 # -----------------------------
@@ -3493,27 +3432,6 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
                 "model_scores": model_scores_array,
             }
         }
-
-        # Send email if requested
-        if req.email and results_dir_full_path:
-            def _send_email_task():
-                try:
-                    from stringsight.email_service import send_results_email
-                    result = send_results_email(
-                        recipient_email=req.email,
-                        results_dir=results_dir_full_path,
-                        experiment_name=f"Clustering_{results_dir_name}"
-                    )
-                    if result.get("success"):
-                        logger.info(f"📧 Email sent to {req.email}")
-                    else:
-                        logger.error(f"Failed to send email: {result.get('message')}")
-                except Exception as e:
-                    logger.error(f"Failed to send clustering email: {e}")
-
-            import threading
-            threading.Thread(target=_send_email_task, daemon=True).start()
-            logger.info(f"📧 Queued email notification for {req.email}")
 
         # Mark job as completed
         with _CLUSTER_JOBS_LOCK:

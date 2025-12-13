@@ -13,7 +13,6 @@ from stringsight.utils.paths import _get_results_dir
 from stringsight.storage.adapter import get_storage_adapter
 from stringsight.schemas import ExtractJobStartRequest, PipelineJobRequest
 from stringsight.formatters import detect_method
-from stringsight.email_service import send_results_email
 
 # Import core logic
 from stringsight.core.data_objects import PropertyDataset
@@ -139,15 +138,7 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
         job.progress = 1.0
         job.result_path = req.output_dir if req.output_dir else f"extract_{job_id}_{timestamp}"
         db.commit()
-        
-        # Send email if requested (Async)
-        if req.email:
-            send_email_task.delay(
-                email=req.email,
-                output_dir=output_dir,
-                job_name=f"Extraction Job {job_id}"
-            )
-        
+
     except Exception as e:
         logger.error(f"Error in extract job {job_id}: {e}", exc_info=True)
         try:
@@ -258,14 +249,7 @@ def _run_pipeline_job(job_id: str, req_data: Dict[str, Any]) -> None:
         job.progress = 1.0
         job.result_path = req.output_dir if req.output_dir else f"pipeline_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         db.commit()
-        
-        if req.email:
-            send_email_task.delay(
-                email=req.email,
-                output_dir=output_dir,
-                job_name=f"Pipeline Job {job_id}"
-            )
-        
+
     except Exception as e:
         logger.error(f"Error in pipeline job {job_id}: {e}", exc_info=True)
         try:
@@ -289,23 +273,6 @@ def run_pipeline_job(self, job_id: str, req_data: Dict[str, Any]):
 def run_pipeline_job_inprocess(job_id: str, req_data: Dict[str, Any]) -> None:
     """In-process runner for pipeline jobs (no Celery/Redis required)."""
     _run_pipeline_job(job_id, req_data)
-
-@celery_app.task(bind=True, name="stringsight.workers.tasks.send_email_task")
-def send_email_task(self, email: str, output_dir: str, job_name: str):
-    """Async task to send email so it doesn't block the main job."""
-    try:
-        logger.info(f"Sending results email to {email}")
-        result = send_results_email(
-            recipient_email=email,
-            results_dir=output_dir,
-            experiment_name=job_name
-        )
-        if result.get('success'):
-            logger.info(f"✅ Email sent successfully: {result.get('message')}")
-        else:
-            logger.warning(f"⚠️ Email sending failed: {result.get('message')}")
-    except Exception as e:
-        logger.error(f"Failed to send email for {job_name}: {e}")
 
 @celery_app.task(bind=True, name="stringsight.workers.tasks.run_cluster_job")
 def run_cluster_job(self, job_id: str, req_data: Dict[str, Any]):
@@ -619,15 +586,7 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
         relative_path = req.output_dir if req.output_dir else f"{base_filename}_{timestamp}"
         job.result_path = relative_path
         db.commit()
-        
-        # Send email if requested (Async)
-        if req.email:
-            send_email_task.delay(
-                email=req.email,
-                output_dir=str(results_dir),
-                job_name=f"Cluster Job {job_id}"
-            )
-        
+
         logger.info(f"Cluster job {job_id} completed successfully")
         
     except Exception as e:
