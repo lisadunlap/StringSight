@@ -42,12 +42,6 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = "INFO"
     json_logs: bool = True
-    
-    # Email Configuration
-    EMAIL_SMTP_SERVER: Optional[str] = None
-    EMAIL_SMTP_PORT: int = 587
-    EMAIL_SENDER: Optional[str] = None
-    EMAIL_PASSWORD: Optional[str] = None
 
     class Config:
         env_file = ".env"

@@ -1,6 +1,8 @@
 # Welcome to StringSight
 
-**Extract, cluster, and analyze behavioral properties from Large Language Models**
+**Extract, cluster, and analyze behavioral properties from model traces**
+
+![StringSight Overview](assets/stringsight_teaser.png)
 
 StringSight helps you understand how different generative models behave by automatically extracting behavioral properties from their responses, grouping similar behaviors together, and quantifying how important these behaviors are.
 
@@ -13,9 +15,9 @@ StringSight is a comprehensive analysis framework for evaluating and comparing L
 2. **Clusters similar behaviors** - Groups related properties together to identify common patterns (e.g., "Reasoning Transparency", "Communication Style")
 
 3. **Computes cluster statistics** - Compute statistics on these clusters to understand:
-   - Which behaviors are most prominent?
-   - Which behaviors are seen in some models more than others?
-   - Which behaviors are correlated with any metrics that are provided?
+    - Which behaviors are most prominent?
+    - Which behaviors are seen in some models more than others?
+    - Which behaviors are correlated with any metrics that are provided?
 
 4. **Provides insights** - Explains *why* your model is failing, compare the behaviors of different models/methods, and find instances of reward hacking. 
 
@@ -111,18 +113,30 @@ Data Input → Property Extraction → Clustering → Metrics & Analysis
 ## Installation
 
 ```bash
-# Create conda environment
-conda create -n stringsight python=3.11
-conda activate stringsight
-
 # Install StringSight
-pip install -e ".[full]"
+pip install stringsight
 
-# Set API key
+# Set API keys
 export OPENAI_API_KEY="your-api-key-here"
+export ANTHROPIC_API_KEY="your-anthropic-key"  # optional
+export GOOGLE_API_KEY="your-google-key"        # optional
+
+# Launch web interface
+stringsight launch
 ```
 
 See the [Installation Guide](getting-started/installation.md) for detailed setup instructions.
+
+### Deployment Options
+
+**Local (Simple):**
+- `stringsight launch` - Run in foreground
+- `stringsight launch --daemon` - Run in background (persistent)
+
+**Docker (Production):**
+- `docker compose up -d` - Full stack with PostgreSQL, Redis, MinIO, and Celery workers
+
+See the [Deployment Guide](deployment/production.md) for production setup.
 
 ## Next Steps
 

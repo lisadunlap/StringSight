@@ -631,70 +631,27 @@ def parallel_embeddings(
 # -----------------------------
 # Provider/model normalization
 # -----------------------------
-_OPENAI_EMBED_SYNONYMS = {
-    "text-embedding-3-large": "openai/text-embedding-3-large",
-    "text-embedding-3-large": "openai/text-embedding-3-large",
-    "text-embedding-ada-002": "openai/text-embedding-ada-002",
-    "openai/text-embedding-3-large": "openai/text-embedding-3-large",
-    "openai/text-embedding-3-large": "openai/text-embedding-3-large",
-    "openai/text-embedding-ada-002": "openai/text-embedding-ada-002",
-    "e3-large": "openai/text-embedding-3-large",
-    "e3-small": "openai/text-embedding-3-large",
-}
-
-# Known valid OpenAI embedding models
-_VALID_OPENAI_MODELS = {
-    "text-embedding-3-large",
-    "text-embedding-3-large", 
-    "text-embedding-ada-002",
-    "openai/text-embedding-3-large",
-    "openai/text-embedding-3-large",
-    "openai/text-embedding-ada-002",
-    "e3-large",
-    "e3-small"
-}
-
 def _normalize_embedding_model_name(model: str) -> str:
-    """Return a LiteLLM-compatible provider-prefixed embedding model name.
+    """Return a LiteLLM-compatible embedding model name.
 
-    Validates that OpenAI models are known/valid and throws clear errors for invalid names.
-    Keeps non-OpenAI identifiers as-is (e.g., sentence-transformers, bge-*).
-    
-    Raises:
-        ValueError: If an invalid OpenAI model name is provided
+    Simply passes through the model name to litellm, which handles all provider
+    routing and validation. This allows any embedding model supported by litellm
+    to be used without hardcoding model names.
+
+    For OpenAI models, litellm accepts both:
+    - 'text-embedding-3-small' (litellm will auto-detect as OpenAI)
+    - 'openai/text-embedding-3-small' (explicit provider prefix)
+
+    For other providers, use the litellm provider prefix format:
+    - 'bedrock/amazon.titan-embed-text-v1'
+    - 'azure/text-embedding-ada-002'
+    - 'cohere/embed-english-v3.0'
+    - etc.
     """
     if not model:
-        return "openai/text-embedding-3-large"
-    m = str(model).strip()
-    
-    # Handle the common case where someone just specifies "openai"
-    if m.lower() == "openai":
-        raise ValueError(
-            f"Invalid embedding model '{model}'. Please specify a complete model name like:\n"
-            f"  - 'text-embedding-3-large' (recommended)\n"
-            f"  - 'text-embedding-3-large'\n" 
-            f"  - 'text-embedding-ada-002'\n"
-            f"  - or any sentence-transformers model name"
-        )
-    
-    # Check if it looks like an OpenAI model but is invalid
-    if (m.startswith("openai/") or m.startswith("text-embedding-") or 
-        m.startswith("e3-") or "embedding" in m.lower()):
-        if m not in _VALID_OPENAI_MODELS:
-            valid_models = sorted([name for name in _VALID_OPENAI_MODELS if not name.startswith("openai/")])
-            raise ValueError(
-                f"Invalid OpenAI embedding model '{model}'. Valid options are:\n" +
-                "\n".join(f"  - '{name}'" for name in valid_models)
-            )
-    
-    # If caller already provided a provider prefix, keep unless we know a canonical mapping
-    if m in _OPENAI_EMBED_SYNONYMS:
-        return _OPENAI_EMBED_SYNONYMS[m]
-    # Heuristic: bare OpenAI E3 names without provider
-    if m.startswith("text-embedding-3-") or m in ("e3-large", "e3-small"):
-        return _OPENAI_EMBED_SYNONYMS.get(m, f"openai/{m}")
-    # Otherwise pass through unchanged (e.g., sentence-transformers models)
-    return m
+        return "text-embedding-3-large"
+
+    return str(model).strip()
 
 
 def single_completion(

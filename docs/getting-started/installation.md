@@ -43,18 +43,7 @@ pip install "stringsight[full]"
 pip install "stringsight[wandb]"  # or: pip install wandb
 ```
 
-### 3. (Optional) Download Demo Data
-
-If you want to use the demo features in the web UI:
-
-```bash
-# Download demo data (requires local repo or GitHub access)
-stringsight download-demo-data
-```
-
-**Note:** Demo data (~130MB) is not included in the pip package to keep it under PyPI's size limit. The demo data is only needed if you want to use the "Load Demo Data" feature in the UI.
-
-### 4. Set API Key(s)
+### 3. Set API Key(s)
 
 ```bash
 # Add to your shell profile (.bashrc, .zshrc, etc.)
@@ -63,9 +52,9 @@ export OPENAI_API_KEY="your-api-key-here"
 # ... any other provider keys
 ```
 
-**Local Models**: StringSight uses LiteLLM, so you can use vLLM, Ollama, or any OpenAI-compatible server. See the [LiteLLM docs](https://docs.litellm.ai/docs/providers) for provider-specific setup. 
+**Local Models**: StringSight uses LiteLLM, so you can use vLLM, Ollama, or any OpenAI-compatible server. See the [LiteLLM docs](https://docs.litellm.ai/docs/providers) for provider-specific setup.
 
-### 5. Verify Installation
+### 4. Verify Installation
 
 ```bash
 # Test core package
@@ -205,70 +194,7 @@ clustered_df, model_stats = explain(df, output_dir="test_results")
 
 ## Troubleshooting
 
-### PyTorch/CUDA Issues
-```bash
-# Install PyTorch with CUDA support
-conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
-```
-
-### Node.js Version Issues
-```bash
-# Install/upgrade Node.js 20+
-conda install -c conda-forge nodejs=20
-
-# Or use nvm
-nvm install 20 && nvm use 20
-```
-
-### FastAPI/Uvicorn Errors
-```bash
-# Reinstall with explicit versions
-pip install "fastapi>=0.100.0" "uvicorn[standard]>=0.20.0"
-```
-
-### OpenAI API Key Issues
-```bash
-# Verify key is set
-echo $OPENAI_API_KEY
-
-# Test API connection
-python -c "import openai; print('✅ OpenAI client loaded')"
-```
-
-### Frontend Won't Start
-```bash
-cd frontend/
-rm -rf node_modules package-lock.json
-npm install
-npm run dev
-```
-
-### Port Already in Use
-```bash
-# Kill process on port 8000
-lsof -ti:8000 | xargs kill -9
-
-# Or use different port
-python -m uvicorn stringsight.api:app --reload --port 8001
-```
-
-### Clean Reinstall
-
-If you encounter dependency conflicts:
-
-```bash
-# Remove old environment
-conda deactivate
-conda remove -n stringsight --all
-
-# Create fresh environment
-conda create -n stringsight python=3.11
-conda activate stringsight
-
-# Reinstall
-cd stringsight
-pip install -e ".[full]"
-```
+If you encounter any issues during installation, see the [Troubleshooting Guide](../troubleshooting.md) for common problems and solutions.
 
 ## Environment Variables
 

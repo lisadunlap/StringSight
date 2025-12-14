@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="stringsight_github.png" alt="StringSight logo" width="600">
+  <img src="assets/stringsight_github.png" alt="StringSight logo" width="600">
 </p>
 
 <h1 align="center">StringSight</h1>
@@ -30,6 +30,10 @@
   <strong>Annoyed at having to look through your long model conversations or agentic traces? Fear not, StringSight has come to ease your woes. Understand and compare model behavior by automatically extracting behavioral properties from their responses, grouping similar behaviors together, and quantifying how important these behaviors are.</strong>
 </p>
 
+## Demo
+
+https://github.com/user-attachments/assets/demo.mp4
+
 ## Installation & Quick Start
 
 ```bash
@@ -44,8 +48,11 @@ export GOOGLE_API_KEY="your-google-key"        # optional
 # Launch the web interface
 stringsight launch
 
-# Or run in background
+# Or run in background (survives terminal disconnects)
 stringsight launch --daemon
+
+# Check status
+stringsight status
 
 # View logs
 stringsight logs
@@ -57,6 +64,21 @@ stringsight stop
 The UI will be available at [http://localhost:5180](http://localhost:5180).
 
 For tutorials and examples, see [starter_notebook.ipynb](starter_notebook.ipynb) or [Google Colab](https://colab.research.google.com/drive/1XBQqDqTK6-9wopqRB51j8cPfnTS5Wjqh?usp=drive_link).
+
+### Deployment Options
+
+**Local Development:**
+```bash
+stringsight launch              # Foreground mode (stops when terminal closes)
+stringsight launch --daemon     # Background mode (persistent)
+```
+
+**Docker (for production or multi-user setups):**
+```bash
+docker compose up -d
+```
+
+The Docker setup includes PostgreSQL, Redis, MinIO storage, and Celery workers for handling long-running jobs.
 
 ## Usage
 
@@ -188,7 +210,6 @@ See the [documentation](https://lisadunlap.github.io/StringSight/) for:
 - Multimodal conversations (text + images)
 - Prompt expansion
 - Caching configuration
-- Email notifications
 - CLI usage
 
 ## Documentation

@@ -16,7 +16,6 @@ class ExtractBatchRequest(BaseModel):
     output_dir: Optional[str] = None
     return_debug: Optional[bool] = False
     sample_size: Optional[int] = None
-    email: Optional[str] = None
 
 class ExtractJobStartRequest(ExtractBatchRequest):
     pass
@@ -54,10 +53,9 @@ class PipelineJobRequest(BaseModel):
     groupby_column: Optional[str] = "behavior_type"
     assign_outliers: Optional[bool] = False
     score_columns: Optional[List[str]] = None
-    
+
     # Output
     output_dir: Optional[str] = None
-    email: Optional[str] = None
 
 class ClusterParams(BaseModel):
     minClusterSize: Optional[int] = 5
@@ -73,8 +71,7 @@ class ClusterJobRequest(BaseModel):
     params: ClusterParams
     method: Optional[Literal["single_model", "side_by_side"]] = "single_model"
     score_columns: Optional[List[str]] = None
-    
+
     # Output
     output_dir: Optional[str] = None
-    email: Optional[str] = None
 

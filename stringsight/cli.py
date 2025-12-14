@@ -326,82 +326,6 @@ def status():
         print("✗ Server is not running")
         return 1
 
-def download_demo_data():
-    """Download demo data files for the UI."""
-    import stringsight
-    
-    # Find the frontend_dist directory
-    package_dir = Path(stringsight.__file__).parent
-    dist_path = package_dir / "frontend_dist"
-    
-    if not dist_path.exists():
-        print("Error: frontend_dist directory not found.")
-        print("Please ensure StringSight is properly installed.")
-        sys.exit(1)
-    
-    print("Downloading demo data...")
-    print(f"Target directory: {dist_path}")
-    
-    # Demo data files needed
-    demo_files = [
-        "taubench_airline.jsonl",
-        "taubench_airline_sbs.jsonl",
-    ]
-    
-    demo_folders = [
-        "taubench_airline_data",
-        "taubench_airline_data_sbs",
-    ]
-    
-    # Base URL for demo data (you can host this on GitHub releases or S3)
-    # For now, we'll check if it exists locally first, then provide instructions
-    base_url = "https://github.com/lisadunlap/stringsight/releases/download/demo-data"
-    
-    # Check if we're in a development environment with local demo data
-    cli_dir = Path(__file__).parent.parent
-    local_frontend = cli_dir / "frontend" / "public"
-    
-    if local_frontend.exists():
-        print("Found local demo data, copying...")
-        # Copy from local frontend/public if it exists
-        for file in demo_files:
-            src = local_frontend / file
-            if src.exists():
-                dst = dist_path / file
-                shutil.copy2(src, dst)
-                print(f"  ✓ Copied {file}")
-            else:
-                print(f"  ✗ {file} not found locally")
-        
-        for folder in demo_folders:
-            src = local_frontend / folder
-            if src.exists():
-                dst = dist_path / folder
-                if dst.exists():
-                    shutil.rmtree(dst)
-                shutil.copytree(src, dst)
-                print(f"  ✓ Copied {folder}/")
-            else:
-                print(f"  ✗ {folder}/ not found locally")
-    else:
-        print("\nDemo data not found locally.")
-        print("To download demo data, you have two options:")
-        print("\n1. Download from GitHub releases:")
-        print(f"   Visit: https://github.com/lisadunlap/stringsight/releases")
-        print("   Download the demo-data archive and extract to:")
-        print(f"   {dist_path}")
-        print("\n2. Copy from source (if you have the repo):")
-        print("   Copy files from frontend/public/ to:")
-        print(f"   {dist_path}")
-        print("\nRequired files:")
-        for f in demo_files + demo_folders:
-            print(f"   - {f}")
-        sys.exit(1)
-    
-    print("\n✓ Demo data installed successfully!")
-    print("You can now use 'Load Demo Data' in the UI.")
-
-
 def logs(follow: bool = False, lines: int = 50):
     """View server logs."""
     log_file = get_log_file()
@@ -506,12 +430,6 @@ def main():
         help="Number of lines to show (default: 50)"
     )
 
-    # Download demo data command
-    demo_parser = subparsers.add_parser(
-        "download-demo-data",
-        help="Download demo data files for the UI"
-    )
-
     args = parser.parse_args()
 
     if args.command == "launch":
@@ -528,8 +446,6 @@ def main():
         sys.exit(status())
     elif args.command == "logs":
         logs(follow=args.follow, lines=args.lines)
-    elif args.command == "download-demo-data":
-        download_demo_data()
     else:
         parser.print_help()
 

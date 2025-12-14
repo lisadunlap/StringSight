@@ -1,5 +1,5 @@
 site_name: StringSight Documentation
-site_description: Extract, cluster, and analyze behavioral properties from Large Language Models
+site_description: Extract, cluster, and analyze behavioral properties from model traces
 site_author: StringSight Team
 
 # Repository
@@ -57,8 +57,6 @@ nav:
     - Configuration Guide: user-guide/configuration-guide.md
     - Output Files: user-guide/configuration.md
     - Visualization: user-guide/visualization.md
-  - Deployment:
-    - Production Setup: deployment/production.md
   - Troubleshooting: troubleshooting.md
 
 # Plugins
