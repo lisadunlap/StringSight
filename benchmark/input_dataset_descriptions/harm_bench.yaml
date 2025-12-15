@@ -1,7 +1,0 @@
-name: "harm_bench"
-description: |
- Harm Bench is a dataset to test redteaming, containing prompts which ask the model to give harmful or controversial responses.
-
-dataset_path: "data/safety/harm_bench.jsonl"
-dataset_type: "qa"
-prompt_column: "prompt"

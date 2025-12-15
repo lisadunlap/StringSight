@@ -1,4 +1,0 @@
-python benchmark/create_benchmark.py     --dataset-desc benchmark/input_dataset_descriptions/aci_bench.yaml --behavior-model gemini/gemini-2.5-pro --response-model gemini/gemini-2.5-flash --sample-size 100
-python benchmark/create_benchmark.py     --dataset-desc benchmark/input_dataset_descriptions/omni_math.yaml --behavior-model gemini/gemini-2.5-pro --response-model gemini/gemini-2.5-flash --sample-size 100
-python benchmark/create_benchmark.py     --dataset-desc benchmark/input_dataset_descriptions/harm_bench.yaml --behavior-model gemini/gemini-2.5-pro --response-model gemini/gemini-2.5-flash --sample-size 100
-python benchmark/create_benchmark.py     --dataset-desc benchmark/input_dataset_descriptions/medication_qa.yaml --behavior-model gemini/gemini-2.5-pro --response-model gemini/gemini-2.5-flash --sample-size 100

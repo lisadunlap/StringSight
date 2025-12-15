@@ -1,10 +1,14 @@
 # Data directories - keep in main, exclude from prod
 data/
 results/
-benchmark/results/
-benchmark/evaluation_results/
+benchmark/
 helm/
 tests/outputs/
+
+# Vercel deployment
+vercel.json
+.vercelignore
+api/
 
 stringsight/stringsight/frontend_dist/
 

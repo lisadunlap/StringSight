@@ -1,7 +1,0 @@
-name: "instructeval"
-description: |
-  InstructEval is a general domain benchmark for evaluating instruction-following capabilities of language models.
-
-dataset_path: "data/helm_capabilities/instructeval.jsonl"
-dataset_type: "qa"
-prompt_column: "prompt"

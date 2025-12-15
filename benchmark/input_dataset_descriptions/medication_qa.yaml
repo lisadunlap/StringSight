@@ -1,7 +1,0 @@
-name: "medication_qa"
-description: |
- Medi QA consistens of consumer medication questions, and the task is to answer consumer medication-related questions.
-
-dataset_path: "data/medhelm/medication_qa.jsonl"
-dataset_type: "qa"
-prompt_column: "prompt"
