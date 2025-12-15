@@ -32,7 +32,9 @@
 
 ## Demo
 
-https://github.com/user-attachments/assets/demo.mp4
+<video src="https://github.com/lisadunlap/StringSight/raw/main/assets/demo.mp4" controls></video>
+
+_If the video doesn't play above, [click here to download](assets/demo.mp4)_
 
 ## Installation & Quick Start
 
