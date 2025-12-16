@@ -14,7 +14,6 @@ def get_clusterer(
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
     assign_outliers: bool = False,
     include_embeddings: bool = False,
-    use_gpu: bool | None = None,
     cluster_positive: bool = True,
     **kwargs
 ) -> PipelineStage:
@@ -27,7 +26,7 @@ def get_clusterer(
         embedding_model: Embedding model to use
         assign_outliers: Whether to assign outliers to nearest clusters
         include_embeddings: Whether to include embeddings in output
-        use_gpu: Enable GPU acceleration for embeddings, UMAP, and HDBSCAN.
+        use_gpu: Enable GPU acceleration for embeddings and HDBSCAN.
                 None (default) = auto-detect based on CUDA availability.
         cluster_positive: If False and groupby_column is "behavior_type", skip clustering positive behaviors.
                          Defaults to True.
@@ -44,7 +43,6 @@ def get_clusterer(
             embedding_model=embedding_model,
             assign_outliers=assign_outliers,
             include_embeddings=include_embeddings,
-            use_gpu=use_gpu,
             cluster_positive=cluster_positive,
             **kwargs
         )

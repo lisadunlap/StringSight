@@ -92,7 +92,6 @@ class ClusterConfig:
             context=getattr(args, "context", None),
             precomputed_embeddings=getattr(args, "precomputed_embeddings", None),
             disable_dim_reduction=getattr(args, "disable_dim_reduction", False),
-            assign_outliers=getattr(args, "assign_outliers", False),
             input_model_name=getattr(args, "input_model_name", None),
             min_samples=getattr(args, "min_samples", None),
             cluster_selection_epsilon=getattr(args, "cluster_selection_epsilon", 0.0),

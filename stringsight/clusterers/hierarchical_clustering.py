@@ -100,9 +100,8 @@ def prepare_embeddings(unique_values: List[Any], config: ClusterConfig) -> np.nd
         if config.verbose:
             logger.info(f"Embeddings shape: {embeddings.shape}")
     else:
-        # Use caching if enabled
-        use_gpu = getattr(config, 'use_gpu', False)
-        embeddings, _ = _setup_embeddings(unique_strings, config.embedding_model, config.verbose, use_gpu)
+       
+        embeddings, _ = _setup_embeddings(unique_strings, config.embedding_model, config.verbose)
         embeddings = np.array(embeddings)
     
     # Normalize embeddings
@@ -125,7 +124,7 @@ def prepare_embeddings(unique_values: List[Any], config: ClusterConfig) -> np.nd
                 # For very small datasets, skip dimension reduction entirely
                 method = "none"
             elif n_points > 5000 or n_dims > 200:
-                # For large datasets, use PCA (portable, avoids compiled UMAP/numba/llvmlite stack)
+                # For large datasets, use PCA (portable and fast; avoids optional compiled stacks)
                 method = "pca"
             else:
                 # For medium datasets, skip dimension reduction
@@ -276,7 +275,7 @@ def format_clustering_results(df: pd.DataFrame, column_name: str,
 async def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> pd.DataFrame:
     """
     Fast HDBSCAN clustering for medium to large datasets.
-    Supports optional LLM-based outlier reassignment if config.assign_outliers is True.
+    Supports LLM-based outlier reassignment.
     """
     # Handle backward compatibility by creating config from kwargs
     if config is None:
@@ -331,106 +330,43 @@ async def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> 
         cluster_labels = np.full(n_points, -1, dtype=int)
         clusterer = None
     else:
-        use_gpu = getattr(config, 'use_gpu', False)
+        clusterer = hdbscan.HDBSCAN(
+            min_cluster_size=effective_min_cluster_size,
+            min_samples=config.min_samples if config.min_samples else 1,
+            metric='euclidean',  # Euclidean is fine since embeddings are normalized
+            cluster_selection_method='eom',
+            prediction_data=True,
+            algorithm='best',
+            core_dist_n_jobs=-1,
+            cluster_selection_epsilon=config.cluster_selection_epsilon
+        )
+        # Run CPU-intensive HDBSCAN in thread pool to avoid blocking event loop
+        if config.verbose:
+            logger.info(f"HDBSCAN clustering (CPU) - {len(embeddings)} items...")
         
-        # Try GPU first if requested, fallback to CPU if cuML not available
-        if use_gpu:
+        def _run_hdbscan():
             try:
-                from cuml.cluster import HDBSCAN as cumlHDBSCAN
-                import cupy as cp
-                if config.verbose:
-                    logger.info("Using cuML HDBSCAN on GPU")
-                
-                # Convert to CuPy array for GPU computation
-                embeddings_gpu = cp.asarray(embeddings)
-                clusterer = cumlHDBSCAN(
-                    min_cluster_size=effective_min_cluster_size,
-                    min_samples=config.min_samples if config.min_samples else 1,
-                    metric='euclidean',  # Euclidean is fine since embeddings are normalized
-                    cluster_selection_method='eom',
-                    cluster_selection_epsilon=config.cluster_selection_epsilon
-                )
-                with tqdm(total=1, desc=f"HDBSCAN clustering (GPU) - {len(embeddings)} items", disable=not config.verbose) as pbar:
-                    try:
-                        cluster_labels_gpu = clusterer.fit_predict(embeddings_gpu)
-                        pbar.update(1)
-                        # Convert back to numpy
-                        cluster_labels = cp.asnumpy(cluster_labels_gpu).astype(int)
-                    except ValueError as e:
-                        if "Min cluster size must be greater than one" in str(e):
-                            if config.verbose:
-                                logger.warning(
-                                    f"HDBSCAN error: {e}. Dataset too small for clustering. "
-                                    f"Assigning all items to outliers (-1)."
-                                )
-                            cluster_labels = np.full(n_points, -1, dtype=int)
-                            clusterer = None
-                        else:
-                            raise
-            except ImportError as e:
-                clusterer = hdbscan.HDBSCAN(
-                    min_cluster_size=effective_min_cluster_size,
-                    min_samples=config.min_samples if config.min_samples else 1,
-                    metric='euclidean',  # Euclidean is fine since embeddings are normalized
-                    cluster_selection_method='eom',
-                    prediction_data=True,
-                    algorithm='best',
-                    core_dist_n_jobs=-1,
-                    cluster_selection_epsilon=config.cluster_selection_epsilon
-                )
-                with tqdm(total=1, desc=f"HDBSCAN clustering (CPU) - {len(embeddings)} items", disable=not config.verbose) as pbar:
-                    try:
-                        cluster_labels = clusterer.fit_predict(embeddings)
-                        pbar.update(1)
-                    except ValueError as e:
-                        if "Min cluster size must be greater than one" in str(e):
-                            if config.verbose:
-                                logger.warning(
-                                    f"HDBSCAN error: {e}. Dataset too small for clustering. "
-                                    f"Assigning all items to outliers (-1)."
-                                )
-                            cluster_labels = np.full(n_points, -1, dtype=int)
-                            clusterer = None
-                        else:
-                            raise
-        else:
-            clusterer = hdbscan.HDBSCAN(
-                min_cluster_size=effective_min_cluster_size,
-                min_samples=config.min_samples if config.min_samples else 1,
-                metric='euclidean',  # Euclidean is fine since embeddings are normalized
-                cluster_selection_method='eom',
-                prediction_data=True,
-                algorithm='best',
-                core_dist_n_jobs=-1,
-                cluster_selection_epsilon=config.cluster_selection_epsilon
-            )
-            # Run CPU-intensive HDBSCAN in thread pool to avoid blocking event loop
+                return clusterer.fit_predict(embeddings), False
+            except ValueError as e:
+                if "Min cluster size must be greater than one" in str(e):
+                    # Return all outliers if clustering fails, along with error flag
+                    return np.full(n_points, -1, dtype=int), True
+                else:
+                    raise
+        
+        cluster_labels, error_occurred = await asyncio.to_thread(_run_hdbscan)
+        
+        # If an error occurred, set clusterer to None
+        if error_occurred:
             if config.verbose:
-                logger.info(f"HDBSCAN clustering (CPU) - {len(embeddings)} items...")
-            
-            def _run_hdbscan():
-                try:
-                    return clusterer.fit_predict(embeddings), False
-                except ValueError as e:
-                    if "Min cluster size must be greater than one" in str(e):
-                        # Return all outliers if clustering fails, along with error flag
-                        return np.full(n_points, -1, dtype=int), True
-                    else:
-                        raise
-            
-            cluster_labels, error_occurred = await asyncio.to_thread(_run_hdbscan)
-            
-            # If an error occurred, set clusterer to None
-            if error_occurred:
-                if config.verbose:
-                    logger.warning(
-                        f"HDBSCAN error: Min cluster size must be greater than one. "
-                        f"Dataset too small for clustering. Assigning all items to outliers (-1)."
-                    )
-                clusterer = None
-            
-            if config.verbose:
-                logger.info("HDBSCAN clustering complete")
+                logger.warning(
+                    f"HDBSCAN error: Min cluster size must be greater than one. "
+                    f"Dataset too small for clustering. Assigning all items to outliers (-1)."
+                )
+            clusterer = None
+        
+        if config.verbose:
+            logger.info("HDBSCAN clustering complete")
 
     if config.verbose:
         n_initial_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
@@ -448,14 +384,14 @@ async def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> 
     # -------------------------------------------------------------
     # Step 3a: Optionally cluster outliers using LLM
     # -------------------------------------------------------------
-    if config.assign_outliers and config.verbose:
+    if config.verbose:
         logger.info("Clustering outliers using LLM...")
 
     # Get outlier items
     outlier_items = [unique_values[i] for i, label in enumerate(cluster_labels) if label < 0]
 
     # Skip LLM-based outlier clustering if fewer than min_cluster_size * 2 outliers (not worth the overhead)
-    if config.assign_outliers and len(outlier_items) >= effective_min_cluster_size * 2:
+    if len(outlier_items) >= effective_min_cluster_size * 2:
         # Generate outlier cluster summaries
         outlier_cluster_names = generate_coarse_labels(
             outlier_items,
@@ -466,9 +402,10 @@ async def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> 
         )
         
         # Assign outlier items to outlier clusters
+        outlier_items = outlier_items + [unique_values[i] for i, label in enumerate(cluster_labels) if label < 0]
         outlier_assignments = await assign_fine_to_coarse(
             outlier_items,
-            outlier_cluster_names,
+            outlier_cluster_names + list(cluster_label_map.values()),
             model=config.cluster_assignment_model,
             strategy="llm",
             verbose=config.verbose,

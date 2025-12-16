@@ -193,7 +193,7 @@ def _get_openai_embeddings(texts: List[str], *, model: str = "openai/text-embedd
 # Generic embedding helper
 # -----------------------------------------------------------------------------
 
-def _get_embeddings(texts: List[str], embedding_model: str, verbose: bool = False, use_gpu: bool = False) -> List[List[float]]:
+def _get_embeddings(texts: List[str], embedding_model: str, verbose: bool = False, use_gpu: Optional[bool] = None) -> List[List[float]]:
     """Return embeddings for *texts* using either OpenAI or a SentenceTransformer.
     
     Args:

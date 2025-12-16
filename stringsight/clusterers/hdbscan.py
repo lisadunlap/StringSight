@@ -45,13 +45,11 @@ class HDBSCANClusterer(BaseClusterer):
         self,
         min_cluster_size: int | None = None,
         embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
-        assign_outliers: bool = False,
         include_embeddings: bool = False,
         use_wandb: bool = False,
         wandb_project: Optional[str] = None,
         output_dir: Optional[str] = None,
-        # Additional explicit configuration parameters
-        use_gpu: Optional[bool] = None,  # None = auto-detect
+        # Additional explicit configuration parameters\
         min_samples: Optional[int] = None,
         cluster_selection_epsilon: float = 0.0,
         disable_dim_reduction: bool = False,
@@ -71,11 +69,6 @@ class HDBSCANClusterer(BaseClusterer):
     ):
         """Initialize the HDBSCAN clusterer with explicit, overridable parameters.
         
-        Args:
-            use_gpu: Enable GPU acceleration for embeddings and HDBSCAN.
-                    None (default) = auto-detect based on CUDA availability.
-                    True = force GPU (requires cuML and CuPy, falls back to CPU if not available).
-                    False = force CPU.
         """
         super().__init__(
             output_dir=output_dir,
@@ -94,13 +87,10 @@ class HDBSCANClusterer(BaseClusterer):
             context=context,
             precomputed_embeddings=precomputed_embeddings,
             disable_dim_reduction=disable_dim_reduction,
-            assign_outliers=assign_outliers,
             input_model_name=input_model_name,
             min_samples=min_samples,
             cluster_selection_epsilon=cluster_selection_epsilon,
             cache_embeddings=cache_embeddings,
-            # GPU acceleration
-            use_gpu=use_gpu,
             # models
             embedding_model=embedding_model,
             summary_model=summary_model,
@@ -129,6 +119,12 @@ class HDBSCANClusterer(BaseClusterer):
         """
 
         df = data.to_dataframe(type="properties")
+
+        # `to_dataframe(type="properties")` may include conversation rows without any extracted
+        # properties (i.e., missing/NaN `column_name`). Those rows cannot be clustered and can
+        # also coerce cluster id dtypes to float downstream, which breaks group metadata mapping.
+        if column_name in df.columns:
+            df = df[df[column_name].notna()].copy()
         
         if getattr(self, "verbose", False):
             logger.debug(f"DataFrame shape after to_dataframe: {df.shape}")
@@ -212,9 +208,6 @@ class HDBSCANClusterer(BaseClusterer):
                 with tqdm(total=total_groups, desc=f"Clustering {total_groups} groups in parallel", disable=not getattr(self, "verbose", False)) as pbar:
                     for task in asyncio.as_completed(tasks):
                         group, part = await task
-                        # Add meta column with group information as a dictionary
-                        # Use list comprehension to create independent dict objects for each row
-                        part["meta"] = [{"group": group} for _ in range(len(part))]
                         clustered_parts.append(part)
                         pbar.update(1)
                         completed_groups += 1
@@ -239,9 +232,6 @@ class HDBSCANClusterer(BaseClusterer):
                         column_name=column_name,
                         config=self.config,
                     )
-                    # Add meta column with group information as a dictionary
-                    # Use list comprehension to create independent dict objects for each row
-                    part["meta"] = [{"group": group} for _ in range(len(part))]
                     clustered_parts.append(part)
                     if progress_callback:
                         try:
@@ -358,25 +348,33 @@ class HDBSCANClusterer(BaseClusterer):
         group_col = getattr(self.config, "groupby_column", None)
         if group_col is not None and group_col in df.columns:
             id_col = f"{column_name}_cluster_id"
+
+            # Pandas may upcast cluster ids to floats if there are any NaNs in the column.
+            # Normalize ids to integers before converting to string keys (Cluster.id is a str).
+            id_group_df = df.loc[df[id_col].notna(), [id_col, group_col]].dropna().copy()
+            if not id_group_df.empty:
+                # If ids are floats like 0.0, cast back to int safely.
+                id_group_df[id_col] = id_group_df[id_col].astype(float).astype(int)
+
             id_to_group = (
-                df.loc[df[id_col].notna(), [id_col, group_col]]
-                .dropna()
-                .groupby(id_col)[group_col]
+                id_group_df.groupby(id_col)[group_col]
                 .agg(lambda s: s.iloc[0])
                 .to_dict()
             )
-            # Convert keys to strings to match Cluster.id type
-            id_to_group = {str(k): v for k, v in id_to_group.items()}
+            id_to_group = {str(int(k)): v for k, v in id_to_group.items()}
             
             for c in clusters:
                 cid = getattr(c, "id", None)
                 if cid in id_to_group:
                     c.meta = dict(c.meta or {})
-                    c.meta["group"] = id_to_group[cid]
+                    group_val = id_to_group[cid]
+                    # Frontend expects `metadata.group` for chart categorization.
+                    c.meta["group"] = group_val
+                    # Also store under the actual grouping column name (e.g. "behavior_type")
+                    # for explicitness and easier debugging.
+                    c.meta[group_col] = group_val
 
         return clusters
-
-
 class LLMOnlyClusterer(HDBSCANClusterer):
     """
     HDBSCAN clustering stage.
@@ -388,3 +386,5 @@ class LLMOnlyClusterer(HDBSCANClusterer):
     def run(self, data: PropertyDataset, column_name: str = "property_description", progress_callback=None) -> PropertyDataset:
         """Cluster properties using HDBSCAN (delegates to base)."""
         return super().run(data, column_name, progress_callback=progress_callback)
+
+
