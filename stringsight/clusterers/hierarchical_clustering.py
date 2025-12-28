@@ -202,7 +202,26 @@ def generate_cluster_summaries(cluster_values: Dict[int, List], config: ClusterC
     # Build result map
     for cluster_id, summary in zip(cluster_ids, summaries):
         # Clean up summary (same logic as _get_llm_cluster_summary)
-        content = summary.strip()
+        #
+        # NOTE: `parallel_completions()` can return `None` for failed/empty LLM calls
+        # while preserving index alignment. We must guard here to avoid crashing the
+        # entire clustering stage if a single completion fails.
+        if summary is None or not isinstance(summary, str):
+            content = f"Unlabeled {cluster_type} {cluster_id}"
+            if config.verbose:
+                logger.warning(
+                    f"⚠️ Missing/invalid LLM summary for {cluster_type} {cluster_id}; "
+                    f"using fallback label: {content}"
+                )
+        else:
+            content = summary.strip()
+            if not content:
+                content = f"Unlabeled {cluster_type} {cluster_id}"
+                if config.verbose:
+                    logger.warning(
+                        f"⚠️ Empty LLM summary for {cluster_type} {cluster_id}; "
+                        f"using fallback label: {content}"
+                    )
         if content.startswith(("'", '"')):
             content = content[1:]
         if content.endswith(("'", '"')):

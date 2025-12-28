@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stringsight"
-version = "0.3.5"
+version = "0.3.6"
 authors = [
     {name = "Lisa Dunlap", email = "lisabdunlap@berkeley.edu"},
 ]
@@ -36,7 +36,8 @@ dependencies = [
     "openai>=1.0.0",
     "plotly>=5.15.0",
     "fastapi>=0.100.0",
-    "uvicorn[standard]>=0.20.0",
+    "uvicorn>=0.20.0",
+    "h11>=0.14.0",
     "python-multipart>=0.0.6",
     "omegaconf>=2.3.0",
     "lmdb>=1.4.1",

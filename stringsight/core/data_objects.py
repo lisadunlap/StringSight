@@ -29,13 +29,9 @@ def simple_to_oai_format(prompt: str, response: str) -> list:
         List of dictionaries in OAI conversation format
     """
     return [
-        # {
-        #     "role": "user",
-        #     "content": prompt
-        # },
         {
-            "role": "assistant", 
-            "content": response
+            "role": "user", 
+            "content": "Output Trace:\n" + response
         }
     ]
 

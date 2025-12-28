@@ -27,7 +27,7 @@ clustering_systems_prompt = f"""You are an expert machine learning engineer task
 
 For instance "Speaking Tone and Emoji Usage" is a category, but "uses an enthusiastic tone" is a specific behavior. Descriptions like "Provides detailed math responses" are not informative because they could apply to many clusters. Instead, describe the behavior in a way that is specific and informative to this cluster, even if it doesn't apply to all properties.
 
-Avoid filler words like "detailed", "comprehensive" or "step-by-step" unless explicitly mentioned in the properties. Focus on the main behavior of the cluster.
+Avoid filler words like "detailed", "comprehensive" or "step-by-step" unless explicitly mentioned in the properties. Focus on the main behavior of the cluster. Also avoid generic behaviors like "the model hallucinated" or "the model generated incorrect information"; instead describe the specific behavior in more detail (e.g. "the model hallucinated a tool call to book a flight, resulting in a failed booking").
 
 Consider whether a user could easily understand the model's behavior and come up with an example scenario described by this behavior. If given a model response, could a user determine whether the model is exhibiting this behavior?
 
@@ -35,7 +35,7 @@ Output the cluster behavior description and nothing else. You MUST provide a 2-5
 
 deduplication_clustering_systems_prompt = """You are a machine learning expert evaluating LLM output behaviors. Given a list of behaviors seen in LLM outputs across a dataset, merge those that are redundant or very similar, keeping the most informative and specific version. Think about if a user would gain any new information from seeing both behaviors.
 
-Each behavior should be 1-2 clear and concise sentences. Avoid vague, broad, or meta-properties—focus on specific behaviors. Only use terms like "detailed", "comprehensive", or "step-by-step" if they are central to the behavior. Refrain from having high word overlap between your final properties, as this typically indicates that these are filler words (e.g. "clear", "comprehensive", "consistenly" etc). Again, your final list should not have multiple properties that start with the same few words. You MUST provide a 2-5 word summary of the property in bold before the property. Format: **[Summary]**: [Description]. This is a strict requirement.
+Each behavior should be 1-2 clear and concise sentences. Avoid vague, broad, or meta-properties—focus on specific behaviors. Only use terms like "detailed", "comprehensive", or "step-by-step" if they are central to the behavior. Refrain from having high word overlap between your final properties, as this typically indicates that these are filler words (e.g. "clear", "comprehensive", "consistenly" etc). Avoid generic behaviors like "the model hallucinated" or "the model generated incorrect information"; instead describe the specific behavior in more detail (e.g. "the model hallucinated a tool call to book a flight, resulting in a failed booking"). Again, your final list should not have multiple properties that start with the same few words. You MUST provide a 2-5 word summary of the property in bold before the property. Format: **[Summary]**: [Description]. This is a strict requirement.
             
 Make sure to include the minimal set of words that can be used to understand the property. Users at a glance should be able to understand the property and whether it's positive, negative, or neutral given the summary.
 

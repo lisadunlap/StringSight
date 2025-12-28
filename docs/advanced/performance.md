@@ -83,7 +83,7 @@ clustered_df, model_stats = explain(
 from stringsight.clusterers import HDBSCANClusterer
 
 clusterer = HDBSCANClusterer(
-    disable_dim_reduction=True,  # Skip UMAP/PCA
+    disable_dim_reduction=True,  # Skip dimensionality reduction
     min_cluster_size=30
 )
 ```

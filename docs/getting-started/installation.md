@@ -210,7 +210,7 @@ StringSight uses the following environment variables:
 ### Core Dependencies
 - `pandas`, `numpy` - Data processing
 - `scikit-learn` - Machine learning utilities
-- `hdbscan`, `umap-learn` - Clustering algorithms
+- `hdbscan` - Clustering algorithm
 - `openai`, `litellm` - LLM API clients
 - `sentence-transformers` - Local embedding models
 

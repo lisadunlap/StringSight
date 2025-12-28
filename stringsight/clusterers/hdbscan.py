@@ -142,7 +142,7 @@ class HDBSCANClusterer(BaseClusterer):
             logger.error(f"Column '{column_name}' not found in DataFrame!")
 
         group_col = getattr(self.config, "groupby_column", None)
-        cluster_positive = getattr(self.config, "cluster_positive", False)
+        cluster_positive = getattr(self.config, "cluster_positive", True)
 
         # Filter out positive behaviors if cluster_positive is False and groupby_column is behavior_type
         positive_mask = None

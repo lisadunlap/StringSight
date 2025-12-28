@@ -87,7 +87,7 @@ explain(df, embedding_model="all-MiniLM-L6-v2")
 # Assign all properties to clusters
 explain(df, assign_outliers=True)
 
-# Keep outliers separate (default)
+# Keep outliers separate
 explain(df, assign_outliers=False)
 ```
 
@@ -207,18 +207,14 @@ explain(
 
 ### Dimensionality Reduction
 
-Control UMAP/PCA before clustering:
+Control PCA (or no dimensionality reduction) before clustering:
 
 ```python
 from stringsight.clusterers import HDBSCANClusterer
 
 clusterer = HDBSCANClusterer(
     disable_dim_reduction=True,              # Skip dimensionality reduction
-    # OR configure it:
-    dim_reduction_method="umap",             # "umap", "pca", "adaptive", "none"
-    umap_n_components=100,                   # UMAP dimensions
-    umap_n_neighbors=30,                     # UMAP neighbors
-    umap_min_dist=0.1                        # UMAP min distance
+    dim_reduction_method="pca",              # "pca", "adaptive", "none"
 )
 ```
 

@@ -45,7 +45,7 @@ class ClusterConfig:
     assign_outliers: bool = True
     input_model_name: Optional[str] = None
     min_samples: Optional[int] = None
-    cluster_selection_epsilon: float = 0.05  # Small epsilon to merge very similar clusters
+    cluster_selection_epsilon: float = 0.0  
     cache_embeddings: bool = True
     groupby_column: Optional[str] = None # if not None, the data will be grouped by this column before clustering
     parallel_clustering: bool = False  # if True, parallelize clustering when groupby_column is set
