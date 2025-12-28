@@ -31,7 +31,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/stringsight_teaser.png" alt="StringSight Teaser" width="800">
+  <img src="assets/ui_screenshot.png" alt="StringSight Teaser" width="800">
 </p>
 
 ## Installation & Quick Start
