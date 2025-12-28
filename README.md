@@ -31,9 +31,7 @@
 </p>
 
 <p align="center">
-  <a href="https://imgur.com/VLUjqHx">
-    <img src="https://i.imgur.com/VLUjqHx.gif" alt="StringSight Demo Video" width="800">
-  </a>
+  <img src="assets/stringsight_teaser.png" alt="StringSight Teaser" width="800">
 </p>
 
 ## Installation & Quick Start
