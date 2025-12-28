@@ -30,6 +30,12 @@
   <strong>Annoyed at having to look through your long model conversations or agentic traces? Fear not, StringSight has come to ease your woes. Understand and compare model behavior by automatically extracting behavioral properties from their responses, grouping similar behaviors together, and quantifying how important these behaviors are.</strong>
 </p>
 
+<p align="center">
+  <a href="https://imgur.com/VLUjqHx">
+    <img src="https://i.imgur.com/VLUjqHx.gif" alt="StringSight Demo Video" width="800">
+  </a>
+</p>
+
 ## Installation & Quick Start
 
 ```bash
@@ -42,7 +48,7 @@ export ANTHROPIC_API_KEY="your-anthropic-key"  # optional
 export GOOGLE_API_KEY="your-google-key"        # optional
 
 # Launch the web interface
-stringsight launch
+stringsight launch 
 
 # Or run in background (survives terminal disconnects)
 stringsight launch --daemon
@@ -60,6 +66,27 @@ stringsight stop
 The UI will be available at [http://localhost:5180](http://localhost:5180).
 
 For tutorials and examples, see [starter_notebook.ipynb](starter_notebook.ipynb) or [Google Colab](https://colab.research.google.com/drive/1XBQqDqTK6-9wopqRB51j8cPfnTS5Wjqh?usp=drive_link).
+
+### Install from source
+
+Use this if you want the latest code, plan to modify StringSight, or want an editable install.
+
+```bash
+# Clone (includes submodules, e.g. the frontend)
+git clone --recurse-submodules https://github.com/lisadunlap/stringsight.git
+cd stringsight
+
+# If you already cloned without submodules:
+# git submodule update --init --recursive
+
+# Create and activate a virtual environment (example: venv)
+python -m venv .venv
+source .venv/bin/activate
+
+# Install in editable mode
+pip install -U pip
+pip install -e .
+```
 
 ### Deployment Options
 

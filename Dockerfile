@@ -16,10 +16,6 @@ COPY requirements.txt ./requirements.txt
 # Use --no-deps flag with careful dependency management
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-# Install bertopic WITHOUT dependencies to avoid pulling in sentence-transformers -> torch -> nvidia
-# We already installed all other bertopic deps (hdbscan, umap-learn, pandas, numpy, etc) in requirements.txt
-RUN pip install --no-cache-dir --prefix=/install --no-deps bertopic>=0.17.3
-
 # Final stage - smaller image
 FROM python:3.11-slim
 
