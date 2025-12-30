@@ -30,9 +30,7 @@
   <strong>Annoyed at having to look through your long model conversations or agentic traces? Fear not, StringSight has come to ease your woes. Understand and compare model behavior by automatically extracting behavioral properties from their responses, grouping similar behaviors together, and quantifying how important these behaviors are.</strong>
 </p>
 
-<p align="center">
-  <img src="assets/ui_screenshot.png" alt="StringSight Teaser" width="800">
-</p>
+https://github.com/user-attachments/assets/200d3312-0805-43f4-8ce9-401544f03db2
 
 ## Installation & Quick Start
 
