@@ -66,7 +66,7 @@ class ClusterJobRequest(BaseModel):
     # Data
     properties: List[Dict[str, Any]]
     operationalRows: List[Dict[str, Any]]
-    
+
     # Clustering params
     params: ClusterParams
     method: Optional[Literal["single_model", "side_by_side"]] = "single_model"
@@ -74,4 +74,37 @@ class ClusterJobRequest(BaseModel):
 
     # Output
     output_dir: Optional[str] = None
+
+class LabelRequest(BaseModel):
+    """Request for fixed-taxonomy labeling pipeline."""
+    rows: List[Dict[str, Any]]
+    taxonomy: Dict[str, str]  # Label name -> description
+
+    # Column mapping
+    prompt_column: Optional[str] = "prompt"
+    model_column: Optional[str] = "model"
+    model_response_column: Optional[str] = "model_response"
+    question_id_column: Optional[str] = None
+
+    # LLM config (defaults optimized for labeling)
+    model_name: Optional[str] = "gpt-4.1"
+    temperature: Optional[float] = 0.0
+    top_p: Optional[float] = 1.0
+    max_tokens: Optional[int] = 2048
+    max_workers: Optional[int] = 64
+
+    # Data preparation
+    sample_size: Optional[int] = None
+    score_columns: Optional[List[str]] = None
+
+    # Metrics config
+    metrics_kwargs: Optional[Dict[str, Any]] = None
+
+    # Logging & output
+    use_wandb: Optional[bool] = False
+    wandb_project: Optional[str] = None
+    verbose: Optional[bool] = False
+    output_dir: Optional[str] = None
+    extraction_cache_dir: Optional[str] = None
+    metrics_cache_dir: Optional[str] = None
 

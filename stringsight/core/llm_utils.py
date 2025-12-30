@@ -160,7 +160,7 @@ class LLMUtils:
         show_progress: bool = True,
         progress_desc: str = "LLM calls",
         progress_callback: Optional[Callable[[int, int], None]] = None
-    ) -> List[str]:
+    ) -> List[Optional[str]]:
         """
         Execute LLM completions in parallel with order preservation.
         
@@ -183,10 +183,10 @@ class LLMUtils:
             return []
             
         # Pre-allocate results to preserve order
-        results: List[str] = [""] * len(messages)
+        results: List[Optional[str]] = [""] * len(messages)
         
         # Weave removed: directly define function
-        def _single_completion(idx: int, message: Union[str, List[Dict[str, Any]]]) -> Tuple[int, str]:
+        def _single_completion(idx: int, message: Union[str, List[Dict[str, Any]]]) -> Tuple[int, Optional[str]]:
             """Process a single completion with retries."""
             for attempt in range(config.max_retries):
                 try:
@@ -525,7 +525,7 @@ class LLMUtils:
         message: Union[str, List[Dict[str, Any]]],
         config: LLMConfig,
         system_prompt: Optional[str] = None
-    ) -> str:
+    ) -> Optional[str]:
         """
         Single completion call with caching (convenience method).
         
@@ -572,7 +572,7 @@ def parallel_completions(
     progress_desc: str = "LLM calls",
     progress_callback: Optional[Callable[[int, int], None]] = None,
     **kwargs
-) -> List[str]:
+) -> List[Optional[str]]:
     """Convenience function for parallel completions with default settings."""
     # Separate function-specific parameters from config parameters
     config_kwargs = {k: v for k, v in kwargs.items()
@@ -592,7 +592,7 @@ async def parallel_completions_async(
     progress_desc: str = "LLM calls",
     progress_callback: Optional[Callable[[int, int], None]] = None,
     **kwargs
-) -> List[str]:
+) -> List[Optional[str]]:
     """Async wrapper for parallel completions with default settings."""
     # Run the synchronous function in an executor to avoid blocking
     loop = asyncio.get_event_loop()
@@ -659,7 +659,7 @@ def single_completion(
     model: str = "gpt-4.1-mini", 
     system_prompt: Optional[str] = None,
     **kwargs
-) -> str:
+) -> Optional[str]:
     """Convenience function for single completion with caching."""
     # Separate function-specific parameters from config parameters (no function-specific params for single)
     config_kwargs = {k: v for k, v in kwargs.items() 

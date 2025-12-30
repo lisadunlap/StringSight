@@ -36,7 +36,7 @@ from stringsight import public as public_api
 from stringsight.clusterers import get_clusterer
 from stringsight.metrics.cluster_subset import enrich_clusters_with_metrics, compute_total_conversations_by_model
 from stringsight.logging_config import get_logger
-from stringsight.schemas import ExtractBatchRequest, ExtractJobStartRequest
+from stringsight.schemas import ExtractBatchRequest, ExtractJobStartRequest, LabelRequest
 import threading, uuid
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -1634,6 +1634,205 @@ def cluster_metrics(req: ClusterMetricsRequest) -> Dict[str, Any]:
         "clusters": enriched,
         "total_conversations_by_model": total_conversations,
         "total_unique_conversations": total_unique_conversations
+    }
+
+
+@app.post("/label/run")
+async def label_run(req: LabelRequest) -> Dict[str, Any]:
+    """Run fixed-taxonomy labeling pipeline.
+
+    This endpoint runs the label() function which:
+    1. Uses FixedAxesLabeler to assign conversation responses to predefined taxonomy labels
+    2. Skips clustering (each taxonomy label becomes its own cluster via DummyClusterer)
+    3. Computes metrics per label and model
+
+    Only supports single_model format data.
+
+    Returns:
+        Dictionary with:
+        - properties: List of property dicts with assigned labels
+        - clusters: List of cluster dicts (one per taxonomy label)
+        - metrics: Dict with model_cluster_scores, cluster_scores, model_scores DataFrames
+        - total_conversations_by_model: Count of conversations per model
+        - total_unique_conversations: Total unique conversations
+    """
+    t0 = time.perf_counter()
+
+    # Validate taxonomy
+    if not req.taxonomy or len(req.taxonomy) == 0:
+        raise HTTPException(status_code=400, detail="Taxonomy must contain at least one label")
+
+    # Build DataFrame from rows
+    df = pd.DataFrame(req.rows)
+
+    # Normalize column names to match what label() expects
+    # The frontend may send 'responses' instead of 'model_response', 'scores' instead of 'score', etc.
+    column_mapping = {
+        'responses': 'model_response',  # Frontend sends 'responses', backend expects 'model_response'
+        'scores': 'score',  # Frontend sends 'scores', backend expects 'score'
+    }
+
+    for frontend_col, backend_col in column_mapping.items():
+        if frontend_col in df.columns and backend_col not in df.columns:
+            df = df.rename(columns={frontend_col: backend_col})
+            logger.info(f"Renamed column '{frontend_col}' -> '{backend_col}' for label() compatibility")
+
+    # Apply sample_size if specified
+    if req.sample_size and req.sample_size < len(df):
+        df = df.sample(n=req.sample_size, random_state=42)
+        logger.info(f"Sampled {req.sample_size} rows from {len(req.rows)} total rows for labeling")
+
+    # Validate that we have single_model format data
+    method = detect_method(list(df.columns))
+    if method == "side_by_side":
+        raise HTTPException(
+            status_code=400,
+            detail="label() only supports single_model format data. Found side_by_side format."
+        )
+
+    # The label() function will handle column mapping internally via validate_and_prepare_dataframe
+    # We just need to ensure we have the basic structure
+    # Check that we have at least prompt and model columns (response column will be auto-detected)
+    if "prompt" not in df.columns:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "Missing required 'prompt' column",
+                "available": list(df.columns),
+            }
+        )
+
+    # Check for model column (could be 'model' or user-specified)
+    model_col = req.model_column or "model"
+    if model_col not in df.columns:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": f"Missing required model column: '{model_col}'",
+                "available": list(df.columns),
+                "hint": "Specify 'model_column' in the request if your model column has a different name"
+            }
+        )
+
+    # Auto-detect response column if not specified
+    # Common aliases: model_response, responses, response, output, completion, text
+    response_col = req.model_response_column
+    if not response_col or response_col == "model_response":
+        # Try to auto-detect common aliases
+        response_aliases = ["model_response", "responses", "response", "output", "completion", "text"]
+        found_col = None
+        for alias in response_aliases:
+            if alias in df.columns:
+                found_col = alias
+                break
+
+        if found_col:
+            response_col = found_col
+            if found_col != "model_response":
+                logger.info(f"Auto-detected response column: '{found_col}' (will be mapped to 'model_response')")
+        else:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "Could not find response column",
+                    "available": list(df.columns),
+                    "tried_aliases": response_aliases,
+                    "hint": "Specify 'model_response_column' in the request to indicate which column contains model responses"
+                }
+            )
+
+    try:
+        # Call the label() function from public API
+        clustered_df, model_stats = await asyncio.to_thread(
+            public_api.label,
+            df,
+            taxonomy=req.taxonomy,
+            sample_size=None,  # Already sampled above
+            score_columns=req.score_columns,
+            prompt_column=req.prompt_column or "prompt",
+            model_column=model_col,
+            model_response_column=response_col,  # Use auto-detected column
+            question_id_column=req.question_id_column,
+            model_name=req.model_name or "gpt-4.1",
+            temperature=req.temperature if req.temperature is not None else 0.0,
+            top_p=req.top_p if req.top_p is not None else 1.0,
+            max_tokens=req.max_tokens or 2048,
+            max_workers=req.max_workers or 64,
+            metrics_kwargs=req.metrics_kwargs,
+            use_wandb=req.use_wandb or False,
+            wandb_project=req.wandb_project,
+            verbose=req.verbose or False,
+            output_dir=req.output_dir,
+            extraction_cache_dir=req.extraction_cache_dir,
+            metrics_cache_dir=req.metrics_cache_dir,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("Unexpected error during label() pipeline")
+        raise HTTPException(status_code=500, detail=f"Labeling failed: {e}")
+
+    dt = time.perf_counter() - t0
+    logger.info(f"label() completed in {dt:.2f}s; rows_out={len(clustered_df)}; taxonomy_labels={len(req.taxonomy)}")
+
+    # Extract properties from clustered_df
+    properties = []
+    for _, row in clustered_df.iterrows():
+        prop = {
+            "question_id": str(row.get("question_id", "")),
+            "property_description": row.get("property_description"),
+            "reason": row.get("reason"),
+            "evidence": row.get("evidence"),
+            "model": row.get("model"),
+        }
+
+        # Add cluster assignment if present
+        if "property_description_cluster_id" in row:
+            prop["property_description_cluster_id"] = row["property_description_cluster_id"]
+        if "property_description_cluster" in row:
+            prop["property_description_cluster"] = row["property_description_cluster"]
+
+        properties.append(prop)
+
+    # Extract clusters - each taxonomy label is a cluster
+    clusters = []
+    cluster_id = 0
+    for label_name, label_desc in req.taxonomy.items():
+        # Count how many properties were assigned to this label
+        label_count = sum(1 for p in properties if p.get("property_description") == label_name)
+
+        cluster = {
+            "cluster_id": cluster_id,
+            "cluster_label": label_name,
+            "cluster_description": label_desc,
+            "size": label_count,
+            "properties": [p for p in properties if p.get("property_description") == label_name]
+        }
+        clusters.append(cluster)
+        cluster_id += 1
+
+    # Calculate conversation counts
+    total_conversations_by_model = {}
+    for _, row in clustered_df.iterrows():
+        model = row.get("model", "unknown")
+        total_conversations_by_model[model] = total_conversations_by_model.get(model, 0) + 1
+
+    total_unique_conversations = len(clustered_df["question_id"].unique()) if "question_id" in clustered_df.columns else len(clustered_df)
+
+    # Format metrics if present
+    metrics_output = None
+    if model_stats:
+        metrics_output = {
+            k: v.to_dict(orient="records") if isinstance(v, pd.DataFrame) else v
+            for k, v in model_stats.items()
+        }
+
+    return {
+        "properties": properties,
+        "clusters": clusters,
+        "metrics": metrics_output,
+        "total_conversations_by_model": total_conversations_by_model,
+        "total_unique_conversations": total_unique_conversations,
     }
 
 

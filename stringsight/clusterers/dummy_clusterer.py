@@ -58,13 +58,13 @@ class DummyClusterer(BaseClusterer):
             include_embeddings=include_embeddings,
         )
 
-    async def run(self, data: PropertyDataset, column_name: str = "property_description", progress_callback=None) -> PropertyDataset:
-        """Execute clustering using `property_description` as the key for fixed-axes.
+    async def run(self, data: PropertyDataset, column_name: str = "category", progress_callback=None) -> PropertyDataset:
+        """Execute clustering using `category` as the key for fixed-axes.
 
         We intentionally ignore the incoming `column_name` and cluster by
-        the `property_description` field emitted by the fixed-axes extractor.
+        the `category` field emitted by the fixed-axes extractor.
         """
-        return await super().run(data, column_name="property_description", progress_callback=progress_callback)
+        return await super().run(data, column_name="category", progress_callback=progress_callback)
 
     def cluster(self, data: PropertyDataset, column_name: str) -> pd.DataFrame:
         """Map properties to a fixed taxonomy and return a standardized DataFrame."""
@@ -74,10 +74,16 @@ class DummyClusterer(BaseClusterer):
             if desc not in self.allowed_labels:
                 setattr(prop, column_name, self.unknown_label)
 
-        # 2) Build a properties DataFrame
-        df = data.to_dataframe(type="properties")
+        # 2) Build a properties DataFrame directly from properties (not merged with conversations)
+        df = pd.DataFrame([p.to_dict() for p in data.properties])
         if df.empty:
             return df
+
+        # Ensure question_id and id are strings
+        if "question_id" in df.columns:
+            df["question_id"] = df["question_id"].astype(str)
+        if "id" in df.columns:
+            df["id"] = df["id"].astype(str)
 
         # 3) Compute deterministic ordering: allowed labels first, then 'Other' if not included
         ordered_labels = list(self.allowed_labels)
@@ -99,10 +105,10 @@ class DummyClusterer(BaseClusterer):
     def _build_clusters_from_df(self, df: pd.DataFrame, column_name: str):
         """Construct clusters while preserving human-readable descriptions.
 
-        Although we cluster by `category`, we keep the cluster's
-        `property_descriptions` populated from the `property_description`
-        column when available so downstream merges and displays remain
-        intuitive.
+        Although we cluster by `category`, we always populate the cluster's
+        `property_descriptions` from the `property_description` column
+        (not from `category`) so downstream merges and displays remain
+        intuitive and show the actual property descriptions.
         """
         label_col = f"{column_name}_cluster_label"
         id_col = f"{column_name}_cluster_id"
@@ -114,10 +120,14 @@ class DummyClusterer(BaseClusterer):
 
             property_ids = cid_group["id"].tolist() if "id" in cid_group.columns else []
             question_ids = cid_group["question_id"].tolist() if "question_id" in cid_group.columns else []
+
+            # Always use property_description column for the descriptions, not the category
             if "property_description" in cid_group.columns:
                 property_descriptions = cid_group["property_description"].tolist()
             else:
-                property_descriptions = cid_group[column_name].tolist()
+                # If property_description is missing, fall back to empty strings to maintain consistency
+                property_descriptions = [""] * len(cid_group)
+                self.log(f"Warning: property_description column not found for cluster {label}")
 
             clusters.append(
                 Cluster(

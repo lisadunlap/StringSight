@@ -166,7 +166,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 import pandas as pd
 
 import importlib.util
@@ -194,6 +194,7 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         output_dir: str | Path | None = None,
         compute_bootstrap: bool = True,
         bootstrap_samples: int = 100,
+        bootstrap_seed: int | None = None,
         log_to_wandb: bool = True,
         generate_plots: bool = True,
         storage: Optional[StorageAdapter] = None,
@@ -203,6 +204,7 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         self.output_dir = Path(output_dir) if output_dir else None
         self.compute_bootstrap = compute_bootstrap
         self.bootstrap_samples = bootstrap_samples
+        self.bootstrap_seed = bootstrap_seed
         self.log_to_wandb = log_to_wandb
         self.generate_plots = generate_plots
         self.storage = storage or get_storage_adapter()
@@ -243,7 +245,13 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         if self.compute_bootstrap and self.bootstrap_samples > 0:
             self.log(f"Adding bootstrap confidence intervals with {self.bootstrap_samples} samples...")
             model_cluster_scores, cluster_scores, model_scores = self._add_bootstrap_analysis(
-                df, model_cluster_scores, cluster_scores, model_scores, progress_callback=progress_callback
+                df,
+                model_cluster_scores,
+                cluster_scores,
+                model_scores,
+                cluster_names=cluster_names,
+                model_names=list(model_names),
+                progress_callback=progress_callback,
             )
 
         # Save results
@@ -459,18 +467,15 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
 
         model_df = df[df["model"].isin(models)]
 
-        # 🛑 If the sample contains no rows for these models, signal the caller to skip this bootstrap sample
+        # If the subset contains no rows for these models, return empty metrics
+        # (this can happen during bootstrap resampling; callers should not skip the draw).
         if model_df.empty:
-            raise AssertionError("Bootstrap sample contains no examples for the requested model(s)")
+            metric_keys = self._infer_metric_keys(df)
+            return self.empty_metrics(metric_keys)
 
         cluster_model_df = model_df[model_df["cluster"].isin(clusters)]
 
-        # Collect all possible metrics from all rows, not just the first one
-        all_metrics = set()
-        for scores in model_df["scores"]:
-            if isinstance(scores, dict):
-                all_metrics.update(scores.keys())
-        metrics = list(all_metrics)
+        metrics = self._infer_metric_keys(model_df)
 
         if len(cluster_model_df) == 0:
             return self.empty_metrics(metrics)
@@ -506,6 +511,115 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
                 cluster_model_df["property_metadata"]
             )),
         }
+
+    def _infer_metric_keys(self, df: pd.DataFrame) -> List[str]:
+        """Infer score metric keys from a dataframe.
+
+        Expected input:
+            - `df` contains a `scores` column whose entries are dicts mapping metric names (str)
+              to numeric values (int/float). Missing metrics are permitted.
+
+        Returns:
+            - List of metric keys (strings). Order is deterministic (sorted).
+        """
+        if df is None or df.empty or "scores" not in df.columns:
+            return []
+        keys = set()
+        for scores in df["scores"]:
+            if isinstance(scores, dict):
+                keys.update(scores.keys())
+        return sorted(keys)
+
+    def _bootstrap_salience_from_proportions(
+        self, proportions: "Any", *, n_models: int
+    ) -> "Any":
+        """Compute per-model proportion deltas (salience) from proportions.
+
+        This is the bootstrap analogue of `_compute_salience()`, but operates on a dense
+        array instead of nested dicts.
+
+        Args:
+            proportions: Array of shape (n_models, n_clusters) with proportions in [0, 1].
+            n_models: Number of models (first dimension).
+
+        Returns:
+            Array of shape (n_models, n_clusters) with `proportion_delta`.
+        """
+        import numpy as np
+
+        if n_models <= 1:
+            return np.zeros_like(proportions, dtype=float)
+
+        totals = np.sum(proportions, axis=0, keepdims=True)
+        avg_others = (totals - proportions) / float(n_models - 1)
+        return proportions - avg_others
+
+    @staticmethod
+    def _compute_weighted_means_1d(
+        *,
+        group_idx: "Any",
+        n_groups: int,
+        weights: "Any",
+        values: "Any",
+    ) -> "Any":
+        """Compute weighted means per group with NaN-safe handling.
+
+        Args:
+            group_idx: int array of shape (n_rows,) mapping each row to a group in [0, n_groups).
+            n_groups: number of groups.
+            weights: float array of shape (n_rows,) (non-negative weights).
+            values: float array of shape (n_rows, n_metrics) with NaN for missing values.
+
+        Returns:
+            means: float array of shape (n_groups, n_metrics). If a group has no valid entries
+                   for a metric (denominator 0), the mean is 0.0 (matching `empty_metrics` behavior).
+        """
+        import numpy as np
+
+        n_rows, n_metrics = values.shape
+        if n_rows == 0:
+            return np.zeros((n_groups, n_metrics), dtype=float)
+
+        means = np.zeros((n_groups, n_metrics), dtype=float)
+        for j in range(n_metrics):
+            col = values[:, j]
+            valid = ~np.isnan(col)
+            if not np.any(valid):
+                continue
+            num = np.bincount(
+                group_idx[valid],
+                weights=(weights[valid] * col[valid]),
+                minlength=n_groups,
+            )
+            den = np.bincount(group_idx[valid], weights=weights[valid], minlength=n_groups)
+            means[:, j] = np.divide(num, den, out=np.zeros_like(num, dtype=float), where=den > 0)
+        return means
+
+    @staticmethod
+    def _compute_weighted_means_2d(
+        *,
+        row_idx: "Any",
+        col_idx: "Any",
+        n_rows: int,
+        n_cols: int,
+        weights: "Any",
+        values: "Any",
+    ) -> "Any":
+        """Compute weighted means for a 2D grouping (row_idx, col_idx) with NaN-safe handling."""
+        import numpy as np
+
+        if len(values) == 0:
+            return np.zeros((n_rows, n_cols, values.shape[1]), dtype=float)
+
+        flat = row_idx * n_cols + col_idx
+        n_groups = n_rows * n_cols
+        means_flat = FunctionalMetrics._compute_weighted_means_1d(
+            group_idx=flat,
+            n_groups=n_groups,
+            weights=weights,
+            values=values,
+        )
+        return means_flat.reshape((n_rows, n_cols, values.shape[1]))
 
     def _compute_salience(self, model_cluster_scores: Dict[str, Dict[str, Dict[str, Any]]]) -> Dict[str, Dict[str, Dict[str, Any]]]:
         """Compute salience (proportion deviation from average of OTHER models) for each model-cluster combination."""
@@ -565,73 +679,429 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
             for model in model_names
         }
 
-    def _add_bootstrap_analysis(self, df: pd.DataFrame, model_cluster_scores, cluster_scores, model_scores, progress_callback=None):
-        """Add bootstrap confidence intervals and statistical significance testing."""
+    def _bootstrap_scores_to_matrix(
+        self,
+        *,
+        scores_series: pd.Series,
+        metric_to_idx: Dict[str, int],
+        n_metrics: int,
+    ) -> "Any":
+        """Convert a `scores` series into a dense matrix.
+
+        Expected input format:
+            - `scores_series` entries are `dict[str, number]` or non-dict / empty.
+            - `metric_to_idx` maps metric keys to column indices.
+
+        Output:
+            - `np.ndarray` of shape (n_rows, n_metrics) with float values.
+            - Missing metrics are encoded as NaN (so denominators ignore them).
+        """
         import numpy as np
-        
+
+        mat = np.full((len(scores_series), n_metrics), np.nan, dtype=float)
+        for i, s in enumerate(scores_series):
+            if not isinstance(s, dict):
+                continue
+            for k, v in s.items():
+                j = metric_to_idx.get(k)
+                if j is None:
+                    continue
+                if isinstance(v, (int, float)):
+                    mat[i, j] = float(v)
+        return mat
+
+    def _bootstrap_prepare(
+        self,
+        *,
+        df: pd.DataFrame,
+        cluster_names: List[str],
+        model_names: List[str],
+    ) -> Dict[str, Any]:
+        """Prepare stable indices and dense score matrices for fast bootstrap.
+
+        Returns a dict with:
+            - model_names, cluster_names, metric_keys, and mapping dicts
+            - conversation index and per-row conversation/model/cluster indices
+            - deduplicated frames and dense score matrices
+        """
+        import numpy as np
+
+        model_names = list(model_names)
+        cluster_names = list(cluster_names)
+        n_models = len(model_names)
+        n_clusters = len(cluster_names)
+
+        metric_keys = self._infer_metric_keys(df)
+        metric_to_idx = {k: i for i, k in enumerate(metric_keys)}
+        model_to_idx = {m: i for i, m in enumerate(model_names)}
+        cluster_to_idx = {c: i for i, c in enumerate(cluster_names)}
+
+        # De-duplicate at the same levels the metric computations implicitly use.
+        # - Denominators and model/global scores: unique per (conversation_id, model)
+        # - Cluster numerators: unique per (conversation_id, model, cluster)
+        df_cm = df.drop_duplicates(subset=["conversation_id", "model"]).copy()
+        df_cmc = df.drop_duplicates(subset=["conversation_id", "model", "cluster"]).copy()
+
+        conv_index = pd.Index(df["conversation_id"].unique())
+        n_conv = len(conv_index)
+
+        # Precompute row -> conversation/model/cluster indices
+        cm_conv_idx = conv_index.get_indexer(df_cm["conversation_id"])
+        cm_model_idx = np.array([model_to_idx.get(m, -1) for m in df_cm["model"]], dtype=int)
+
+        cmc_conv_idx = conv_index.get_indexer(df_cmc["conversation_id"])
+        cmc_model_idx = np.array([model_to_idx.get(m, -1) for m in df_cmc["model"]], dtype=int)
+        cmc_cluster_idx = np.array([cluster_to_idx.get(c, -1) for c in df_cmc["cluster"]], dtype=int)
+
+        # Filter unknown model/cluster rows (should not happen, but keep arrays aligned)
+        cm_keep = cm_model_idx >= 0
+        df_cm = df_cm.loc[cm_keep].reset_index(drop=True)
+        cm_conv_idx = cm_conv_idx[cm_keep]
+        cm_model_idx = cm_model_idx[cm_keep]
+
+        cmc_keep = (cmc_model_idx >= 0) & (cmc_cluster_idx >= 0)
+        df_cmc = df_cmc.loc[cmc_keep].reset_index(drop=True)
+        cmc_conv_idx = cmc_conv_idx[cmc_keep]
+        cmc_model_idx = cmc_model_idx[cmc_keep]
+        cmc_cluster_idx = cmc_cluster_idx[cmc_keep]
+
+        n_metrics = len(metric_keys)
+        cm_scores = self._bootstrap_scores_to_matrix(
+            scores_series=df_cm["scores"],
+            metric_to_idx=metric_to_idx,
+            n_metrics=n_metrics,
+        )
+        cmc_scores = self._bootstrap_scores_to_matrix(
+            scores_series=df_cmc["scores"],
+            metric_to_idx=metric_to_idx,
+            n_metrics=n_metrics,
+        )
+
+        return {
+            "model_names": model_names,
+            "cluster_names": cluster_names,
+            "metric_keys": metric_keys,
+            "metric_to_idx": metric_to_idx,
+            "model_to_idx": model_to_idx,
+            "cluster_to_idx": cluster_to_idx,
+            "n_models": n_models,
+            "n_clusters": n_clusters,
+            "n_metrics": n_metrics,
+            "conv_index": conv_index,
+            "n_conv": n_conv,
+            "cm_conv_idx": cm_conv_idx,
+            "cm_model_idx": cm_model_idx,
+            "cmc_conv_idx": cmc_conv_idx,
+            "cmc_model_idx": cmc_model_idx,
+            "cmc_cluster_idx": cmc_cluster_idx,
+            "cm_scores": cm_scores,
+            "cmc_scores": cmc_scores,
+        }
+
+    @staticmethod
+    def _bootstrap_allocate_arrays(*, S: int, n_models: int, n_clusters: int, n_metrics: int) -> Dict[str, "Any"]:
+        """Allocate bootstrap result arrays."""
+        import numpy as np
+
+        return {
+            "mc_prop": np.zeros((S, n_models, n_clusters), dtype=float),
+            "mc_prop_delta": np.zeros((S, n_models, n_clusters), dtype=float),
+            "mc_quality": np.zeros((S, n_models, n_clusters, n_metrics), dtype=float),
+            "mc_quality_delta": np.zeros((S, n_models, n_clusters, n_metrics), dtype=float),
+            "c_prop": np.zeros((S, n_clusters), dtype=float),
+            "c_quality": np.zeros((S, n_clusters, n_metrics), dtype=float),
+            "c_quality_delta": np.zeros((S, n_clusters, n_metrics), dtype=float),
+            "m_prop": np.zeros((S, n_models), dtype=float),
+            "m_quality": np.zeros((S, n_models, n_metrics), dtype=float),
+            "m_quality_delta": np.zeros((S, n_models, n_metrics), dtype=float),
+        }
+
+    def _bootstrap_compute_one_replicate(
+        self,
+        *,
+        prep: Dict[str, Any],
+        arrays: Dict[str, Any],
+        i: int,
+        conv_weights: "Any",
+    ) -> None:
+        """Compute all bootstrap metrics for a single replicate and store into `arrays`."""
+        import numpy as np
+
+        n_models = prep["n_models"]
+        n_clusters = prep["n_clusters"]
+        n_metrics = prep["n_metrics"]
+
+        # Row weights (by conversation)
+        w_cm = conv_weights[prep["cm_conv_idx"]]
+        w_cmc = conv_weights[prep["cmc_conv_idx"]]
+
+        cm_model_idx = prep["cm_model_idx"]
+        cmc_model_idx = prep["cmc_model_idx"]
+        cmc_cluster_idx = prep["cmc_cluster_idx"]
+
+        # ---- Denominators: by model, and global ----
+        model_sizes = np.bincount(cm_model_idx, weights=w_cm, minlength=n_models)
+        global_size = float(np.sum(w_cm))
+
+        # Weighted mean scores per model and global
+        model_means = self._compute_weighted_means_1d(
+            group_idx=cm_model_idx,
+            n_groups=n_models,
+            weights=w_cm,
+            values=prep["cm_scores"],
+        )
+        global_means = self._compute_weighted_means_1d(
+            group_idx=np.zeros(len(prep["cm_scores"]), dtype=int),
+            n_groups=1,
+            weights=w_cm,
+            values=prep["cm_scores"],
+        )[0]
+
+        # ---- Cluster-level numerators (across all models) ----
+        cluster_sizes = np.bincount(cmc_cluster_idx, weights=w_cmc, minlength=n_clusters)
+        cluster_means = self._compute_weighted_means_1d(
+            group_idx=cmc_cluster_idx,
+            n_groups=n_clusters,
+            weights=w_cmc,
+            values=prep["cmc_scores"],
+        )
+
+        # ---- Model-cluster numerators ----
+        flat_mc = cmc_model_idx * n_clusters + cmc_cluster_idx
+        mc_sizes_flat = np.bincount(flat_mc, weights=w_cmc, minlength=n_models * n_clusters)
+        mc_sizes = mc_sizes_flat.reshape((n_models, n_clusters))
+        mc_means = self._compute_weighted_means_2d(
+            row_idx=cmc_model_idx,
+            col_idx=cmc_cluster_idx,
+            n_rows=n_models,
+            n_cols=n_clusters,
+            weights=w_cmc,
+            values=prep["cmc_scores"],
+        )
+
+        # ---- Proportions ----
+        with np.errstate(divide="ignore", invalid="ignore"):
+            proportions = np.divide(
+                mc_sizes,
+                model_sizes.reshape((n_models, 1)),
+                out=np.zeros_like(mc_sizes, dtype=float),
+                where=model_sizes.reshape((n_models, 1)) > 0,
+            )
+        prop_delta = self._bootstrap_salience_from_proportions(proportions, n_models=n_models)
+
+        arrays["mc_prop"][i] = proportions
+        arrays["mc_prop_delta"][i] = prop_delta
+        arrays["c_prop"][i] = (cluster_sizes / global_size) if global_size > 0 else np.zeros(n_clusters, dtype=float)
+        arrays["m_prop"][i] = np.where(model_sizes > 0, 1.0, 0.0)
+
+        # ---- Quality + deltas ----
+        arrays["mc_quality"][i] = mc_means
+        arrays["c_quality"][i] = cluster_means
+        arrays["m_quality"][i] = model_means
+
+        baseline_model = model_means[:, None, :]  # (n_models, 1, n_metrics)
+        arrays["mc_quality_delta"][i] = np.where(baseline_model != 0.0, mc_means - baseline_model, 0.0)
+        arrays["c_quality_delta"][i] = np.where(global_means[None, :] != 0.0, cluster_means - global_means[None, :], 0.0)
+
+        # model_scores in current implementation are cluster==all clusters, so delta is 0 vs itself
+        arrays["m_quality_delta"][i] = np.zeros((n_models, n_metrics), dtype=float)
+
+    def _bootstrap_attach_results(
+        self,
+        *,
+        prep: Dict[str, Any],
+        arrays: Dict[str, Any],
+        model_cluster_scores: Dict[str, Dict[str, Dict[str, Any]]],
+        cluster_scores: Dict[str, Dict[str, Any]],
+        model_scores: Dict[str, Dict[str, Any]],
+    ) -> None:
+        """Attach CI dicts + significance flags and replace point-estimates with bootstrap means."""
+        import numpy as np
+
+        metric_keys = prep["metric_keys"]
+        model_names = prep["model_names"]
+        cluster_names = prep["cluster_names"]
+
+        def _ci_dict(arr: "Any") -> Dict[str, float]:
+            return {
+                "lower": float(np.percentile(arr, 2.5)),
+                "upper": float(np.percentile(arr, 97.5)),
+                "mean": float(np.mean(arr)),
+            }
+
+        # Model-cluster
+        for mi, model in enumerate(model_names):
+            for ci, cluster in enumerate(cluster_names):
+                mc = model_cluster_scores[model][cluster]
+
+                ci_prop = _ci_dict(arrays["mc_prop"][:, mi, ci])
+                mc["proportion_ci"] = ci_prop
+                mc["proportion"] = ci_prop["mean"]
+
+                ci_pd = _ci_dict(arrays["mc_prop_delta"][:, mi, ci])
+                mc["proportion_delta_ci"] = ci_pd
+                mc["proportion_delta"] = ci_pd["mean"]
+                mc["proportion_delta_significant"] = self._is_significant(ci_pd["lower"], ci_pd["upper"], 0)
+
+                q_ci: Dict[str, Dict[str, float]] = {}
+                qd_ci: Dict[str, Dict[str, float]] = {}
+                qd_sig: Dict[str, bool] = {}
+                for mj, metric in enumerate(metric_keys):
+                    ci_q = _ci_dict(arrays["mc_quality"][:, mi, ci, mj])
+                    q_ci[metric] = ci_q
+                    mc["quality"][metric] = ci_q["mean"]
+
+                    ci_qd = _ci_dict(arrays["mc_quality_delta"][:, mi, ci, mj])
+                    qd_ci[metric] = ci_qd
+                    mc["quality_delta"][metric] = ci_qd["mean"]
+                    qd_sig[metric] = self._is_significant(ci_qd["lower"], ci_qd["upper"], 0)
+
+                if q_ci:
+                    mc["quality_ci"] = q_ci
+                if qd_ci:
+                    mc["quality_delta_ci"] = qd_ci
+                mc["quality_delta_significant"] = qd_sig
+
+        # Cluster scores
+        for ci, cluster in enumerate(cluster_names):
+            cs = cluster_scores[cluster]
+
+            ci_prop = _ci_dict(arrays["c_prop"][:, ci])
+            cs["proportion_ci"] = ci_prop
+            cs["proportion"] = ci_prop["mean"]
+
+            q_ci: Dict[str, Dict[str, float]] = {}
+            qd_ci: Dict[str, Dict[str, float]] = {}
+            qd_sig: Dict[str, bool] = {}
+            for mj, metric in enumerate(metric_keys):
+                ci_q = _ci_dict(arrays["c_quality"][:, ci, mj])
+                q_ci[metric] = ci_q
+                cs["quality"][metric] = ci_q["mean"]
+
+                ci_qd = _ci_dict(arrays["c_quality_delta"][:, ci, mj])
+                qd_ci[metric] = ci_qd
+                cs["quality_delta"][metric] = ci_qd["mean"]
+                qd_sig[metric] = self._is_significant(ci_qd["lower"], ci_qd["upper"], 0)
+
+            if q_ci:
+                cs["quality_ci"] = q_ci
+            if qd_ci:
+                cs["quality_delta_ci"] = qd_ci
+            cs["quality_delta_significant"] = qd_sig
+
+        # Model scores
+        for mi, model in enumerate(model_names):
+            ms = model_scores[model]
+
+            ci_prop = _ci_dict(arrays["m_prop"][:, mi])
+            ms["proportion_ci"] = ci_prop
+            ms["proportion"] = ci_prop["mean"]
+
+            q_ci: Dict[str, Dict[str, float]] = {}
+            qd_ci: Dict[str, Dict[str, float]] = {}
+            qd_sig: Dict[str, bool] = {}
+            for mj, metric in enumerate(metric_keys):
+                ci_q = _ci_dict(arrays["m_quality"][:, mi, mj])
+                q_ci[metric] = ci_q
+                ms["quality"][metric] = ci_q["mean"]
+
+                ci_qd = _ci_dict(arrays["m_quality_delta"][:, mi, mj])
+                qd_ci[metric] = ci_qd
+                ms["quality_delta"][metric] = ci_qd["mean"]
+                qd_sig[metric] = self._is_significant(ci_qd["lower"], ci_qd["upper"], 0)
+
+            if q_ci:
+                ms["quality_ci"] = q_ci
+            if qd_ci:
+                ms["quality_delta_ci"] = qd_ci
+            ms["quality_delta_significant"] = qd_sig
+
+    def _add_bootstrap_analysis(
+        self,
+        df: pd.DataFrame,
+        model_cluster_scores: Dict[str, Dict[str, Dict[str, Any]]],
+        cluster_scores: Dict[str, Dict[str, Any]],
+        model_scores: Dict[str, Dict[str, Any]],
+        *,
+        cluster_names: List[str],
+        model_names: List[str],
+        progress_callback=None,
+    ) -> Tuple[Dict[str, Dict[str, Dict[str, Any]]], Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]:
+        """Add bootstrap confidence intervals and significance testing.
+
+        This implementation is a **true with-replacement bootstrap** over `conversation_id`s.
+        To make it fast, it uses per-conversation **weights** (draw counts) instead of
+        materializing a duplicated DataFrame for each replicate.
+
+        Inputs:
+            df:
+                Long dataframe with columns:
+                - conversation_id: hashable conversation id
+                - model: model name (str)
+                - cluster: cluster label (str)
+                - scores: dict[str, number] of metric values (may be missing keys)
+            cluster_names, model_names:
+                The cluster/model order to use for bootstrap arrays and output attachment.
+
+        Behavior:
+            - Always uses exactly `bootstrap_samples` replicates (no skipping).
+            - Empty subsets (e.g., a model gets 0 draws) yield empty metrics (zeros), matching
+              `empty_metrics()` behavior.
+            - Point estimates are set to bootstrap means (same behavior as prior implementation).
+        """
+        import numpy as np
+
         self.log(f"Computing bootstrap confidence intervals with {self.bootstrap_samples} samples...")
-        
-        # Extract cluster names and models from original data
-        cluster_names = df["cluster"].unique()
-        model_names = df["model"].unique()
-        
-        # Collect all bootstrap samples
-        bootstrap_samples = []
-        
-        for i in range(self.bootstrap_samples):
+
+        # ---- Setup deterministic RNG (optional) ----
+        rng = np.random.default_rng(self.bootstrap_seed)
+
+        prep = self._bootstrap_prepare(df=df, cluster_names=cluster_names, model_names=model_names)
+        if prep["n_conv"] == 0:
+            return model_cluster_scores, cluster_scores, model_scores
+
+        S = int(self.bootstrap_samples)
+        arrays = self._bootstrap_allocate_arrays(
+            S=S, n_models=prep["n_models"], n_clusters=prep["n_clusters"], n_metrics=prep["n_metrics"]
+        )
+
+        # Bootstrap sampling distribution over conversation ids (uniform)
+        p = np.full(prep["n_conv"], 1.0 / float(prep["n_conv"]), dtype=float)
+
+        for i in range(S):
             if i % 20 == 0:
-                self.log(f"Bootstrap progress: {i}/{self.bootstrap_samples} ({i/self.bootstrap_samples*100:.1f}%)")
-            
+                self.log(f"Bootstrap progress: {i}/{S} ({i/S*100:.1f}%)")
             if progress_callback and i % 5 == 0:
                 try:
-                    progress_callback(i / self.bootstrap_samples)
+                    progress_callback(i / S)
                 except Exception:
                     pass
-            
-            # Resample conversations with replacement
-            sample_df = self._resample_conversations(df)
-            
-            try:
-                # Recompute all metrics for this sample
-                sample_model_cluster = self._compute_model_cluster_scores(
-                    sample_df,
-                    cluster_names,
-                    model_names,
-                    include_metadata=False,
-                )
-                # IMPORTANT: Recompute salience for this bootstrap sample
-                sample_model_cluster = self._compute_salience(sample_model_cluster)
-                
-                sample_cluster = self._compute_cluster_scores(
-                    sample_df,
-                    cluster_names,
-                    model_names,
-                    include_metadata=False,
-                )
-                sample_model = self._compute_model_scores(
-                    sample_df,
-                    cluster_names,
-                    model_names,
-                    include_metadata=False,
-                )
-                
-                bootstrap_samples.append({
-                    'model_cluster': sample_model_cluster,
-                    'cluster': sample_cluster,
-                    'model': sample_model
-                })
-            except AssertionError:
-                # Skip this iteration if it creates empty cluster-model combinations
-                continue
-        
-        # Calculate confidence intervals and add to original metrics
-        self._add_confidence_intervals(model_cluster_scores, cluster_scores, model_scores, bootstrap_samples)
-        
-        self.log(f"✅ Bootstrap analysis completed with {len(bootstrap_samples)} samples")
+
+            # True with-replacement bootstrap counts for each conversation_id
+            conv_weights = rng.multinomial(prep["n_conv"], p).astype(float)
+            self._bootstrap_compute_one_replicate(prep=prep, arrays=arrays, i=i, conv_weights=conv_weights)
+
+        self._bootstrap_attach_results(
+            prep=prep,
+            arrays=arrays,
+            model_cluster_scores=model_cluster_scores,
+            cluster_scores=cluster_scores,
+            model_scores=model_scores,
+        )
+
+        self.log(f"✅ Bootstrap analysis completed with {S} samples")
         return model_cluster_scores, cluster_scores, model_scores
     
     def _resample_conversations(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Resample conversations with replacement for bootstrap."""
+        """Resample conversations with replacement for bootstrap (materializing duplicates).
+
+        Notes:
+            This is a **true with-replacement** resample over `conversation_id`. Duplicate draws
+            are preserved by concatenating conversation slices multiple times.
+
+            The main implementation uses a faster weight-based approach; this helper remains
+            useful for debugging and small equivalence checks.
+        """
         import numpy as np
         
         # Get unique conversation IDs
@@ -644,10 +1114,24 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
             replace=True
         )
         
-        # Filter dataframe to include only sampled conversations
-        sample_df = df[df["conversation_id"].isin(sample_conversations)].copy()
-        
-        return sample_df
+        # Preserve multiplicity: each drawn conversation appears as many times as it was drawn.
+        counts: Dict[Any, int] = {}
+        for cid in sample_conversations:
+            counts[cid] = counts.get(cid, 0) + 1
+
+        parts = []
+        for cid, k in counts.items():
+            if k <= 0:
+                continue
+            block = df[df["conversation_id"] == cid]
+            if block.empty:
+                continue
+            parts.extend([block] * k)
+
+        if not parts:
+            return df.iloc[0:0].copy()
+
+        return pd.concat(parts, ignore_index=True).copy()
     
     def _compute_ci(self, values, lower_percentile=2.5, upper_percentile=97.5):
         """Compute confidence interval for a list of values."""

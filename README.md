@@ -31,7 +31,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/ui_screenshot.png" alt="StringSight Teaser" width="800">
+  https://github.com/lisadunlap/StringSight/raw/main/assets/demo.mp4
 </p>
 
 ## Installation & Quick Start
