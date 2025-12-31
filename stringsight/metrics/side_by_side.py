@@ -339,9 +339,9 @@ class SideBySideMetrics(FunctionalMetrics):
         if len(cluster_model_df) == 0:
             return self.empty_metrics(metric_keys)
 
-        # Compute sizes and raw quality scores
-        model_size, model_scores = self.compute_size_and_score(model_df)
-        cluster_model_size, cluster_model_scores = self.compute_size_and_score(cluster_model_df)
+        # Compute sizes and raw quality scores (pass metrics to ensure consistency)
+        model_size, model_scores = self.compute_size_and_score(model_df, metrics=metric_keys)
+        cluster_model_size, cluster_model_scores = self.compute_size_and_score(cluster_model_df, metrics=metric_keys)
 
         # Align keys without asserting strict equality
         all_keys = set(metric_keys) | set(model_scores.keys()) | set(cluster_model_scores.keys())

@@ -437,20 +437,28 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         return size, quality_scores
 
     def empty_metrics(self, metrics: List[str]) -> Dict[str, Any]:
-        """Return empty metrics for clusters with no examples."""
+        """Return empty metrics for clusters with no examples.
+
+        Uses NaN for quality values to distinguish 'no data' from 'real zero mean'.
+        """
+        import numpy as np
         return {
             "size": 0,
             "proportion": 0,
-            "quality": {metric: 0 for metric in metrics},
-            "quality_delta": {metric: 0 for metric in metrics},
+            "quality": {metric: float('nan') for metric in metrics},
+            "quality_delta": {metric: float('nan') for metric in metrics},
             "metadata": {},
             "examples": [],
         }
 
     def compute_relative_quality(self, quality_cluster: Dict[str, float], quality_model: Dict[str, float]) -> Dict[str, float]:
-        """Compute relative quality scores (cluster vs model baseline)."""
+        """Compute relative quality scores (cluster vs model baseline).
+
+        Returns delta as cluster - baseline. If baseline is NaN (missing data), delta is NaN.
+        If baseline is 0.0 (real mean), delta is computed normally (e.g., 5.0 - 0.0 = 5.0).
+        """
         return {
-            metric: (quality_cluster[metric] - quality_model[metric]) if quality_model.get(metric, 0) != 0 else 0
+            metric: quality_cluster[metric] - quality_model[metric]
             for metric in quality_cluster.keys()
         }
 
@@ -572,15 +580,15 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
 
         Returns:
             means: float array of shape (n_groups, n_metrics). If a group has no valid entries
-                   for a metric (denominator 0), the mean is 0.0 (matching `empty_metrics` behavior).
+                   for a metric (denominator 0), the mean is NaN (distinguishing missing from real zero).
         """
         import numpy as np
 
         n_rows, n_metrics = values.shape
         if n_rows == 0:
-            return np.zeros((n_groups, n_metrics), dtype=float)
+            return np.full((n_groups, n_metrics), np.nan, dtype=float)
 
-        means = np.zeros((n_groups, n_metrics), dtype=float)
+        means = np.full((n_groups, n_metrics), np.nan, dtype=float)
         for j in range(n_metrics):
             col = values[:, j]
             valid = ~np.isnan(col)
@@ -592,7 +600,7 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
                 minlength=n_groups,
             )
             den = np.bincount(group_idx[valid], weights=weights[valid], minlength=n_groups)
-            means[:, j] = np.divide(num, den, out=np.zeros_like(num, dtype=float), where=den > 0)
+            means[:, j] = np.divide(num, den, out=np.full_like(num, np.nan, dtype=float), where=den > 0)
         return means
 
     @staticmethod
@@ -899,12 +907,15 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         arrays["c_quality"][i] = cluster_means
         arrays["m_quality"][i] = model_means
 
+        # Compute deltas: cluster/model - baseline
+        # If baseline is NaN (missing data), delta is NaN
+        # If baseline is 0.0 (real mean), delta is computed normally
         baseline_model = model_means[:, None, :]  # (n_models, 1, n_metrics)
-        arrays["mc_quality_delta"][i] = np.where(baseline_model != 0.0, mc_means - baseline_model, 0.0)
-        arrays["c_quality_delta"][i] = np.where(global_means[None, :] != 0.0, cluster_means - global_means[None, :], 0.0)
+        arrays["mc_quality_delta"][i] = mc_means - baseline_model
+        arrays["c_quality_delta"][i] = cluster_means - global_means[None, :]
 
-        # model_scores in current implementation are cluster==all clusters, so delta is 0 vs itself
-        arrays["m_quality_delta"][i] = np.zeros((n_models, n_metrics), dtype=float)
+        # Model delta: compare each model to cross-model average (global_means)
+        arrays["m_quality_delta"][i] = model_means - global_means[None, :]
 
     def _bootstrap_attach_results(
         self,
@@ -1091,261 +1102,13 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
 
         self.log(f"✅ Bootstrap analysis completed with {S} samples")
         return model_cluster_scores, cluster_scores, model_scores
-    
-    def _resample_conversations(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Resample conversations with replacement for bootstrap (materializing duplicates).
 
-        Notes:
-            This is a **true with-replacement** resample over `conversation_id`. Duplicate draws
-            are preserved by concatenating conversation slices multiple times.
-
-            The main implementation uses a faster weight-based approach; this helper remains
-            useful for debugging and small equivalence checks.
-        """
-        import numpy as np
-        
-        # Get unique conversation IDs
-        unique_conversations = df["conversation_id"].unique()
-        
-        # Sample with replacement
-        sample_conversations = np.random.choice(
-            unique_conversations, 
-            size=len(unique_conversations), 
-            replace=True
-        )
-        
-        # Preserve multiplicity: each drawn conversation appears as many times as it was drawn.
-        counts: Dict[Any, int] = {}
-        for cid in sample_conversations:
-            counts[cid] = counts.get(cid, 0) + 1
-
-        parts = []
-        for cid, k in counts.items():
-            if k <= 0:
-                continue
-            block = df[df["conversation_id"] == cid]
-            if block.empty:
-                continue
-            parts.extend([block] * k)
-
-        if not parts:
-            return df.iloc[0:0].copy()
-
-        return pd.concat(parts, ignore_index=True).copy()
-    
-    def _compute_ci(self, values, lower_percentile=2.5, upper_percentile=97.5):
-        """Compute confidence interval for a list of values."""
-        import numpy as np
-        
-        if not values:
-            return None
-            
-        return {
-            'lower': float(np.percentile(values, lower_percentile)),
-            'upper': float(np.percentile(values, upper_percentile)),
-            'mean': float(np.mean(values))
-        }
-    
     def _is_significant(self, lower, upper, contains=0):
-        """Check for significant difference. 
+        """Check for significant difference.
         If the interval range contains 0, the difference is not significant.
         If the interval range does not contain 0, the difference is significant.
         """
         return not (lower <= contains <= upper)
-
-    def _add_confidence_intervals(self, model_cluster_scores, cluster_scores, model_scores, bootstrap_samples):
-        """Add bootstrap confidence intervals to all score dictionaries."""
-        
-        # Add CIs to model_cluster_scores
-        for model in model_cluster_scores:
-            for cluster in model_cluster_scores[model]:
-                proportions = []
-                proportion_deltas = []  # NEW
-                quality_scores = {key: [] for key in model_cluster_scores[model][cluster].get('quality', {})}
-                quality_deltas = {key: [] for key in model_cluster_scores[model][cluster].get('quality_delta', {})}  # NEW
-                
-                for sample in bootstrap_samples:
-                    if model in sample['model_cluster'] and cluster in sample['model_cluster'][model]:
-                        sample_metrics = sample['model_cluster'][model][cluster]
-                        proportions.append(sample_metrics.get('proportion', 0))
-                        proportion_deltas.append(sample_metrics.get('proportion_delta', 0))  # NEW
-                        
-                        for key in quality_scores:
-                            if key in sample_metrics.get('quality', {}):
-                                quality_scores[key].append(sample_metrics['quality'][key])
-                        
-                        for key in quality_deltas:  # NEW
-                            if key in sample_metrics.get('quality_delta', {}):
-                                quality_deltas[key].append(sample_metrics['quality_delta'][key])
-                
-                # Add proportion CI
-                proportion_ci = self._compute_ci(proportions)
-                if proportion_ci:
-                    model_cluster_scores[model][cluster]['proportion_ci'] = proportion_ci
-                    # Use bootstrap mean as the point estimate
-                    model_cluster_scores[model][cluster]['proportion'] = proportion_ci['mean']
-                
-                # Add proportion_delta CI (salience)  # NEW
-                proportion_delta_ci = self._compute_ci(proportion_deltas)
-                if proportion_delta_ci:
-                    model_cluster_scores[model][cluster]['proportion_delta_ci'] = proportion_delta_ci
-                    # Use bootstrap mean as the point estimate
-                    model_cluster_scores[model][cluster]['proportion_delta'] = proportion_delta_ci['mean']
-                    # Add significance testing for proportion_delta
-                    model_cluster_scores[model][cluster]['proportion_delta_significant'] = self._is_significant(
-                        proportion_delta_ci['lower'], proportion_delta_ci['upper'], 0
-                    )
-                else:
-                    # If no CI could be computed (0 samples), significance is False
-                    model_cluster_scores[model][cluster]['proportion_delta_significant'] = False
-                
-                # Add quality score CIs
-                quality_ci = {}
-                for key, values in quality_scores.items():
-                    ci = self._compute_ci(values)
-                    if ci:
-                        quality_ci[key] = ci
-                        # Use bootstrap mean as the point estimate
-                        model_cluster_scores[model][cluster]['quality'][key] = ci['mean']
-                
-                if quality_ci:
-                    model_cluster_scores[model][cluster]['quality_ci'] = quality_ci
-                
-                # Add quality_delta CIs  # NEW
-                quality_delta_ci = {}
-                quality_delta_significant = {}
-                for key, values in quality_deltas.items():
-                    ci = self._compute_ci(values)
-                    if ci:
-                        quality_delta_ci[key] = ci
-                        # Use bootstrap mean as the point estimate
-                        model_cluster_scores[model][cluster]['quality_delta'][key] = ci['mean']
-                        # Add significance testing for quality_delta
-                        quality_delta_significant[key] = self._is_significant(ci['lower'], ci['upper'], 0)
-                    else:
-                        # If no CI could be computed (0 samples), significance is False
-                        quality_delta_significant[key] = False
-                
-                if quality_delta_ci:
-                    model_cluster_scores[model][cluster]['quality_delta_ci'] = quality_delta_ci
-                # Always add significance, even if some CIs couldn't be computed
-                model_cluster_scores[model][cluster]['quality_delta_significant'] = quality_delta_significant
-        
-        # Add CIs to cluster_scores (across all models)
-        for cluster in cluster_scores:
-            proportions = []
-            quality_scores = {key: [] for key in cluster_scores[cluster].get('quality', {})}
-            quality_deltas = {key: [] for key in cluster_scores[cluster].get('quality_delta', {})}  # NEW
-            
-            for sample in bootstrap_samples:
-                if cluster in sample['cluster']:
-                    sample_metrics = sample['cluster'][cluster]
-                    proportions.append(sample_metrics.get('proportion', 0))
-                    
-                    for key in quality_scores:
-                        if key in sample_metrics.get('quality', {}):
-                            quality_scores[key].append(sample_metrics['quality'][key])
-                    
-                    for key in quality_deltas:  # NEW
-                        if key in sample_metrics.get('quality_delta', {}):
-                            quality_deltas[key].append(sample_metrics['quality_delta'][key])
-            
-            # Add proportion CI
-            proportion_ci = self._compute_ci(proportions)
-            if proportion_ci:
-                cluster_scores[cluster]['proportion_ci'] = proportion_ci
-                # Use bootstrap mean as the point estimate
-                cluster_scores[cluster]['proportion'] = proportion_ci['mean']
-            
-            # Add quality score CIs
-            quality_ci = {}
-            for key, values in quality_scores.items():
-                ci = self._compute_ci(values)
-                if ci:
-                    quality_ci[key] = ci
-                    # Use bootstrap mean as the point estimate
-                    cluster_scores[cluster]['quality'][key] = ci['mean']
-            
-            if quality_ci:
-                cluster_scores[cluster]['quality_ci'] = quality_ci
-            
-            # Add quality_delta CIs  # NEW
-            quality_delta_ci = {}
-            quality_delta_significant = {}
-            for key, values in quality_deltas.items():
-                ci = self._compute_ci(values)
-                if ci:
-                    quality_delta_ci[key] = ci
-                    # Use bootstrap mean as the point estimate
-                    cluster_scores[cluster]['quality_delta'][key] = ci['mean']
-                    # Add significance testing for quality_delta
-                    quality_delta_significant[key] = self._is_significant(ci['lower'], ci['upper'], 0)
-                else:
-                    # If no CI could be computed (0 samples), significance is False
-                    quality_delta_significant[key] = False
-            
-            if quality_delta_ci:
-                cluster_scores[cluster]['quality_delta_ci'] = quality_delta_ci
-            # Always add significance, even if some CIs couldn't be computed
-            cluster_scores[cluster]['quality_delta_significant'] = quality_delta_significant
-        
-        # Add CIs to model_scores (across all clusters)  
-        for model in model_scores:
-            proportions = []
-            quality_scores = {key: [] for key in model_scores[model].get('quality', {})}
-            quality_deltas = {key: [] for key in model_scores[model].get('quality_delta', {})}  # NEW
-            
-            for sample in bootstrap_samples:
-                if model in sample['model']:
-                    sample_metrics = sample['model'][model]
-                    proportions.append(sample_metrics.get('proportion', 0))
-                    
-                    for key in quality_scores:
-                        if key in sample_metrics.get('quality', {}):
-                            quality_scores[key].append(sample_metrics['quality'][key])
-                    
-                    for key in quality_deltas:  # NEW
-                        if key in sample_metrics.get('quality_delta', {}):
-                            quality_deltas[key].append(sample_metrics['quality_delta'][key])
-            
-            # Add CIs
-            proportion_ci = self._compute_ci(proportions)
-            if proportion_ci:
-                model_scores[model]['proportion_ci'] = proportion_ci
-                # Use bootstrap mean as the point estimate
-                model_scores[model]['proportion'] = proportion_ci['mean']
-            
-            # Add quality score CIs
-            quality_ci = {}
-            for key, values in quality_scores.items():
-                ci = self._compute_ci(values)
-                if ci:
-                    quality_ci[key] = ci
-                    # Use bootstrap mean as the point estimate
-                    model_scores[model]['quality'][key] = ci['mean']
-            
-            if quality_ci:
-                model_scores[model]['quality_ci'] = quality_ci
-            
-            # Add quality_delta CIs  # NEW
-            quality_delta_ci = {}
-            quality_delta_significant = {}
-            for key, values in quality_deltas.items():
-                ci = self._compute_ci(values)
-                if ci:
-                    quality_delta_ci[key] = ci
-                    # Use bootstrap mean as the point estimate
-                    model_scores[model]['quality_delta'][key] = ci['mean']
-                    # Add significance testing for quality_delta
-                    quality_delta_significant[key] = self._is_significant(ci['lower'], ci['upper'], 0)
-                else:
-                    # If no CI could be computed (0 samples), significance is False
-                    quality_delta_significant[key] = False
-            
-            if quality_delta_ci:
-                model_scores[model]['quality_delta_ci'] = quality_delta_ci
-            # Always add significance, even if some CIs couldn't be computed
-            model_scores[model]['quality_delta_significant'] = quality_delta_significant 
 
     def process_wandb_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """Process dataframe for wandb logging by handling NA values and converting complex types to strings."""

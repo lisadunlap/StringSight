@@ -1,29 +1,25 @@
 #!/usr/bin/env python3
 """
-Run metrics twice (with and without bootstrap_keep_full_records) and compare outputs.
+Compare optimized weight-based bootstrap vs naive materialized true-bootstrap.
 
-Usage example:
-  python scripts/test_bootstrap_equivalence.py \
-    --method single_model \
-    --input_file data/demo_data/taubench_airline.jsonl \
-    --output_dir results/taubench_airline_demo \
-    --system_prompt agent_system_prompt \
-    --bootstrap_samples 200
+This script exists to validate that the optimized bootstrap implementation produces
+the same numeric outputs as a naive *true with-replacement* bootstrap that explicitly
+duplicates conversations according to the bootstrap draw.
 
-This script:
-  - Runs metrics-only twice against the same dataset/results directory
-  - First with --bootstrap_keep_full_records (legacy heavy path)
-  - Then without (optimized lean path)
-  - Times both runs and compares the resulting JSON outputs
+The comparison is tolerance-based because reduction order can differ.
 """
 
 import argparse
 import json
-import os
 import sys
 import time
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
+
+from stringsight.core.data_objects import PropertyDataset
+from stringsight.metrics import get_metrics
 from stringsight.public import compute_metrics_only
 
 
@@ -123,60 +119,308 @@ def compare_dicts(d1, d2, keys_to_compare=None, path_prefix=""):
     return diffs
 
 
+def _load_dataset_from_results_dir(results_dir: Path) -> PropertyDataset:
+    """Load a PropertyDataset from a pipeline results directory (or file)."""
+    if results_dir.is_dir():
+        possible_files = [
+            results_dir / "full_dataset.json",
+            results_dir / "full_dataset.parquet",
+            results_dir / "clustered_results.parquet",
+            results_dir / "dataset.json",
+            results_dir / "dataset.parquet",
+        ]
+        for file_path in possible_files:
+            if file_path.exists():
+                return PropertyDataset.load(str(file_path))
+        raise FileNotFoundError(f"No recognizable dataset file found in {results_dir}")
+    if results_dir.is_file():
+        return PropertyDataset.load(str(results_dir))
+    raise FileNotFoundError(f"Input path does not exist: {results_dir}")
+
+
+def _naive_resample_conversations(df: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:
+    """Materialize a true with-replacement bootstrap sample (preserving duplicates).
+
+    Important:
+        This uses the *same multinomial draw-count representation* as the optimized
+        weight-based bootstrap (per-conversation draw counts).
+
+        That makes this script a strict equivalence test: given the same seed and
+        number of replicates, both code paths will use the same bootstrap draw
+        counts, so any remaining differences should be due to implementation bugs
+        (or tiny floating point reduction-order differences), not Monte Carlo noise
+        from sampling different bootstrap replicates.
+    """
+    conv_ids = df["conversation_id"].unique()
+    n_conv = len(conv_ids)
+    if n_conv == 0:
+        return df.iloc[0:0].copy()
+
+    # True with-replacement bootstrap counts for each conversation_id
+    p = np.full(n_conv, 1.0 / float(n_conv), dtype=float)
+    counts = rng.multinomial(n_conv, p)
+
+    parts = []
+    for cid, k in zip(conv_ids, counts):
+        if k <= 0:
+            continue
+        block = df[df["conversation_id"] == cid]
+        if block.empty:
+            continue
+        parts.extend([block] * int(k))
+
+    if not parts:
+        return df.iloc[0:0].copy()
+    return pd.concat(parts, ignore_index=True).copy()
+
+
+def _compute_ci(values, lower_percentile=2.5, upper_percentile=97.5):
+    """Compute confidence interval for a list of values."""
+    if not values:
+        return None
+    return {
+        'lower': float(np.percentile(values, lower_percentile)),
+        'upper': float(np.percentile(values, upper_percentile)),
+        'mean': float(np.mean(values))
+    }
+
+
+def _attach_bootstrap_cis(stage, model_cluster_scores, cluster_scores, model_scores, bootstrap_samples):
+    """Attach CI-bearing fields to metrics dicts (mirrors FunctionalMetrics behavior)."""
+    # model_cluster_scores
+    for model in model_cluster_scores:
+        for cluster in model_cluster_scores[model]:
+            proportions = []
+            proportion_deltas = []
+            quality_scores = {k: [] for k in model_cluster_scores[model][cluster].get("quality", {})}
+            quality_deltas = {k: [] for k in model_cluster_scores[model][cluster].get("quality_delta", {})}
+
+            for sample in bootstrap_samples:
+                if model in sample["model_cluster"] and cluster in sample["model_cluster"][model]:
+                    sm = sample["model_cluster"][model][cluster]
+                    proportions.append(sm.get("proportion", 0))
+                    proportion_deltas.append(sm.get("proportion_delta", 0))
+                    for k in quality_scores:
+                        if k in sm.get("quality", {}):
+                            quality_scores[k].append(sm["quality"][k])
+                    for k in quality_deltas:
+                        if k in sm.get("quality_delta", {}):
+                            quality_deltas[k].append(sm["quality_delta"][k])
+
+            proportion_ci = _compute_ci(proportions)
+            if proportion_ci:
+                model_cluster_scores[model][cluster]["proportion_ci"] = proportion_ci
+                model_cluster_scores[model][cluster]["proportion"] = proportion_ci["mean"]
+
+            proportion_delta_ci = _compute_ci(proportion_deltas)
+            if proportion_delta_ci:
+                model_cluster_scores[model][cluster]["proportion_delta_ci"] = proportion_delta_ci
+                model_cluster_scores[model][cluster]["proportion_delta"] = proportion_delta_ci["mean"]
+                model_cluster_scores[model][cluster]["proportion_delta_significant"] = stage._is_significant(
+                    proportion_delta_ci["lower"], proportion_delta_ci["upper"], 0
+                )
+            else:
+                model_cluster_scores[model][cluster]["proportion_delta_significant"] = False
+
+            quality_ci = {}
+            for k, vals in quality_scores.items():
+                ci = _compute_ci(vals)
+                if ci:
+                    quality_ci[k] = ci
+                    model_cluster_scores[model][cluster]["quality"][k] = ci["mean"]
+            if quality_ci:
+                model_cluster_scores[model][cluster]["quality_ci"] = quality_ci
+
+            quality_delta_ci = {}
+            quality_delta_significant = {}
+            for k, vals in quality_deltas.items():
+                ci = _compute_ci(vals)
+                if ci:
+                    quality_delta_ci[k] = ci
+                    model_cluster_scores[model][cluster]["quality_delta"][k] = ci["mean"]
+                    quality_delta_significant[k] = stage._is_significant(ci["lower"], ci["upper"], 0)
+                else:
+                    quality_delta_significant[k] = False
+            if quality_delta_ci:
+                model_cluster_scores[model][cluster]["quality_delta_ci"] = quality_delta_ci
+            model_cluster_scores[model][cluster]["quality_delta_significant"] = quality_delta_significant
+
+    # cluster_scores
+    for cluster in cluster_scores:
+        proportions = []
+        quality_scores = {k: [] for k in cluster_scores[cluster].get("quality", {})}
+        quality_deltas = {k: [] for k in cluster_scores[cluster].get("quality_delta", {})}
+
+        for sample in bootstrap_samples:
+            if cluster in sample["cluster"]:
+                sm = sample["cluster"][cluster]
+                proportions.append(sm.get("proportion", 0))
+                for k in quality_scores:
+                    if k in sm.get("quality", {}):
+                        quality_scores[k].append(sm["quality"][k])
+                for k in quality_deltas:
+                    if k in sm.get("quality_delta", {}):
+                        quality_deltas[k].append(sm["quality_delta"][k])
+
+        proportion_ci = _compute_ci(proportions)
+        if proportion_ci:
+            cluster_scores[cluster]["proportion_ci"] = proportion_ci
+            cluster_scores[cluster]["proportion"] = proportion_ci["mean"]
+
+        quality_ci = {}
+        for k, vals in quality_scores.items():
+            ci = _compute_ci(vals)
+            if ci:
+                quality_ci[k] = ci
+                cluster_scores[cluster]["quality"][k] = ci["mean"]
+        if quality_ci:
+            cluster_scores[cluster]["quality_ci"] = quality_ci
+
+        quality_delta_ci = {}
+        quality_delta_significant = {}
+        for k, vals in quality_deltas.items():
+            ci = _compute_ci(vals)
+            if ci:
+                quality_delta_ci[k] = ci
+                cluster_scores[cluster]["quality_delta"][k] = ci["mean"]
+                quality_delta_significant[k] = stage._is_significant(ci["lower"], ci["upper"], 0)
+            else:
+                quality_delta_significant[k] = False
+        if quality_delta_ci:
+            cluster_scores[cluster]["quality_delta_ci"] = quality_delta_ci
+        cluster_scores[cluster]["quality_delta_significant"] = quality_delta_significant
+
+    # model_scores
+    for model in model_scores:
+        proportions = []
+        quality_scores = {k: [] for k in model_scores[model].get("quality", {})}
+        quality_deltas = {k: [] for k in model_scores[model].get("quality_delta", {})}
+
+        for sample in bootstrap_samples:
+            if model in sample["model"]:
+                sm = sample["model"][model]
+                proportions.append(sm.get("proportion", 0))
+                for k in quality_scores:
+                    if k in sm.get("quality", {}):
+                        quality_scores[k].append(sm["quality"][k])
+                for k in quality_deltas:
+                    if k in sm.get("quality_delta", {}):
+                        quality_deltas[k].append(sm["quality_delta"][k])
+
+        proportion_ci = _compute_ci(proportions)
+        if proportion_ci:
+            model_scores[model]["proportion_ci"] = proportion_ci
+            model_scores[model]["proportion"] = proportion_ci["mean"]
+
+        quality_ci = {}
+        for k, vals in quality_scores.items():
+            ci = _compute_ci(vals)
+            if ci:
+                quality_ci[k] = ci
+                model_scores[model]["quality"][k] = ci["mean"]
+        if quality_ci:
+            model_scores[model]["quality_ci"] = quality_ci
+
+        quality_delta_ci = {}
+        quality_delta_significant = {}
+        for k, vals in quality_deltas.items():
+            ci = _compute_ci(vals)
+            if ci:
+                quality_delta_ci[k] = ci
+                model_scores[model]["quality_delta"][k] = ci["mean"]
+                quality_delta_significant[k] = stage._is_significant(ci["lower"], ci["upper"], 0)
+            else:
+                quality_delta_significant[k] = False
+        if quality_delta_ci:
+            model_scores[model]["quality_delta_ci"] = quality_delta_ci
+        model_scores[model]["quality_delta_significant"] = quality_delta_significant
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Test bootstrap equivalence with and without full records")
+    parser = argparse.ArgumentParser(description="Test bootstrap equivalence: optimized vs naive true-bootstrap")
     parser.add_argument("--method", type=str, default="single_model")
     parser.add_argument("--input_file", type=str, required=True)
     parser.add_argument("--output_dir", type=str, required=True)
-    parser.add_argument("--system_prompt", type=str, default="single_model_system_prompt")
     parser.add_argument("--bootstrap_samples", type=int, default=100)
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--use_wandb", action="store_true")
     args = parser.parse_args()
 
     results_dir = Path(args.output_dir)
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    # Metrics-only expects an existing pipeline results directory or file path.
-    # We assume output_dir contains full_dataset.json from a prior run.
-    metrics_input_path = results_dir
+    metrics_input_path = Path(args.input_file)
 
-    # Run legacy-heavy path
-    import numpy as np
-    np.random.seed(42)
+    # ----------------------------
+    # 1) Optimized (library path)
+    # ----------------------------
     t0 = time.time()
-    _, model_stats_legacy = compute_metrics_only(
+    compute_metrics_only(
         input_path=str(metrics_input_path),
         method=args.method,
-        output_dir=str(results_dir / "equiv_legacy"),
+        output_dir=str(results_dir / "equiv_optimized"),
         metrics_kwargs={
             "compute_confidence_intervals": True,
             "bootstrap_samples": args.bootstrap_samples,
-            # Emulate legacy by forcing full-records via environment variable (no longer supported by flags)
+            "bootstrap_seed": args.seed,
+            "log_to_wandb": args.use_wandb,
+            "generate_plots": False,
         },
         use_wandb=args.use_wandb,
         verbose=False,
     )
     t1 = time.time()
 
-    # Run optimized-lean path
-    np.random.seed(42)
-    _, model_stats_lean = compute_metrics_only(
-        input_path=str(metrics_input_path),
+    # ----------------------------
+    # 2) Naive true-bootstrap
+    # ----------------------------
+    dataset = _load_dataset_from_results_dir(metrics_input_path)
+    stage = get_metrics(
         method=args.method,
-        output_dir=str(results_dir / "equiv_lean"),
-        metrics_kwargs={
-            "compute_confidence_intervals": True,
-            "bootstrap_samples": args.bootstrap_samples,
-            # Lean path is default now
-        },
-        use_wandb=args.use_wandb,
+        output_dir=str(results_dir / "equiv_naive"),
+        compute_bootstrap=False,
+        bootstrap_samples=args.bootstrap_samples,
+        bootstrap_seed=args.seed,
+        log_to_wandb=args.use_wandb,
+        generate_plots=False,
         verbose=False,
+        use_wandb=args.use_wandb,
     )
+
+    df = stage._prepare_data(dataset)
+    cluster_names = [c for c in df["cluster"].unique() if pd.notna(c)]
+    model_names = list(df["model"].unique())
+
+    base_model_cluster = stage._compute_model_cluster_scores(df, cluster_names, model_names, include_metadata=False)
+    base_model_cluster = stage._compute_salience(base_model_cluster)
+    base_cluster = stage._compute_cluster_scores(df, cluster_names, model_names, include_metadata=False)
+    base_model = stage._compute_model_scores(df, cluster_names, model_names, include_metadata=False)
+
+    rng = np.random.default_rng(args.seed)
+    bootstrap_samples = []
+    for _ in range(args.bootstrap_samples):
+        sample_df = _naive_resample_conversations(df, rng)
+        sample_mc = stage._compute_model_cluster_scores(sample_df, cluster_names, model_names, include_metadata=False)
+        sample_mc = stage._compute_salience(sample_mc)
+        sample_c = stage._compute_cluster_scores(sample_df, cluster_names, model_names, include_metadata=False)
+        sample_m = stage._compute_model_scores(sample_df, cluster_names, model_names, include_metadata=False)
+        bootstrap_samples.append({"model_cluster": sample_mc, "cluster": sample_c, "model": sample_m})
+
+    _attach_bootstrap_cis(stage, base_model_cluster, base_cluster, base_model, bootstrap_samples)
+
+    naive_dir = results_dir / "equiv_naive"
+    naive_dir.mkdir(parents=True, exist_ok=True)
+    with open(naive_dir / "model_cluster_scores.json", "w") as f:
+        json.dump(base_model_cluster, f)
+    with open(naive_dir / "cluster_scores.json", "w") as f:
+        json.dump(base_cluster, f)
+    with open(naive_dir / "model_scores.json", "w") as f:
+        json.dump(base_model, f)
     t2 = time.time()
 
     # Load key JSON outputs from both runs
-    legacy_dir = results_dir / "equiv_legacy"
-    lean_dir = results_dir / "equiv_lean"
+    opt_dir = results_dir / "equiv_optimized"
+    naive_dir = results_dir / "equiv_naive"
     files = [
         "model_cluster_scores.json",
         "cluster_scores.json",
@@ -184,25 +428,25 @@ def main():
     ]
 
     print("\n=== Timing ===")
-    print(f"Legacy (keep full records): {t1 - t0:.2f}s")
-    print(f"Lean (skip heavy fields):   {t2 - t1:.2f}s")
+    print(f"Optimized (weight-based): {t1 - t0:.2f}s")
+    print(f"Naive (materialized):     {t2 - t1:.2f}s")
 
     print("\n=== Comparing outputs (numeric fields) ===")
     any_diffs = False
     for fname in files:
-        legacy_path = legacy_dir / fname
-        lean_path = lean_dir / fname
-        legacy = load_json(legacy_path)
-        lean = load_json(lean_path)
+        opt_path = opt_dir / fname
+        naive_path = naive_dir / fname
+        opt = load_json(opt_path)
+        naive = load_json(naive_path)
 
         # Compare a few top-level structures shallowly; for nested dicts, focus on scalar fields
-        if isinstance(legacy, dict) and isinstance(lean, dict):
+        if isinstance(opt, dict) and isinstance(naive, dict):
             diffs = []
-            common_keys = sorted(set(legacy.keys()) & set(lean.keys()))
+            common_keys = sorted(set(opt.keys()) & set(naive.keys()))
             # Check a sample of up to 10 keys for brevity
             for k in common_keys[:10]:
-                v1 = legacy[k]
-                v2 = lean[k]
+                v1 = opt[k]
+                v2 = naive[k]
                 if isinstance(v1, dict) and isinstance(v2, dict):
                     diffs.extend(compare_dicts(v1, v2))
                 else:
@@ -220,8 +464,10 @@ def main():
                 print(f"  * {d}")
 
     if any_diffs:
-        print("\nNote: Differences may occur in non-essential fields (e.g., examples/metadata) or due to randomness.\n"
-              "We seeded NumPy for both runs; numeric metric fields should closely match.")
+        print(
+            "\nNote: Differences may occur in non-essential fields (e.g., examples/metadata).\n"
+            "Bootstrap is seeded; numeric metric fields should closely match within tolerance."
+        )
     else:
         print("\nAll checked files matched on compared numeric fields.")
 
