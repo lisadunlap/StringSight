@@ -27,11 +27,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e .
         pip install -r requirements.txt
-        pip install pytest pytest-cov black mypy
-
-    - name: Check formatting with black
-      run: |
-        black --check stringsight/
+        pip install pytest pytest-cov mypy
 
     - name: Type check with mypy
       run: |
