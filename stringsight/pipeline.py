@@ -45,7 +45,7 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
         # intermediate pipeline results after each stage.  This enables tooling
         # such as compute_metrics_only() to pick up from any point in the
         # pipeline without the caller having to remember to save explicitly.
-        self.output_dir = kwargs.get('output_dir')
+        self.output_dir: str | None = kwargs.get('output_dir')
         self.storage = storage or get_storage_adapter()
 
         # Now call parent __init__ methods safely
@@ -80,7 +80,7 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
         """Remove and return a stage at a specific position."""
         return self.stages.pop(index)
         
-    async def run(self, data: PropertyDataset, progress_callback=None) -> PropertyDataset:
+    async def run(self, data: PropertyDataset, progress_callback: Any = None) -> PropertyDataset:
         """
         Execute all stages in the pipeline.
         

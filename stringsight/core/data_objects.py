@@ -657,11 +657,12 @@ class PropertyDataset:
             "all_models": self.all_models,
         }
     
-    def get_valid_properties(self):
+    def get_valid_properties(self) -> List[Property]:
         """Get all properties where the property model is unknown, there is no property description, or the property description is empty."""
-        logger.debug(f"All models: {self.all_models}")
-        logger.debug(f"Properties: {self.properties[0].model}")
-        logger.debug(f"Property description: {self.properties[0].property_description}")
+        if self.properties:
+            logger.debug(f"All models: {self.all_models}")
+            logger.debug(f"Properties: {self.properties[0].model}")
+            logger.debug(f"Property description: {self.properties[0].property_description}")
         return [prop for prop in self.properties if prop.model in self.all_models and prop.property_description is not None and prop.property_description.strip() != ""]
 
     # ------------------------------------------------------------------

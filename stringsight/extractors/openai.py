@@ -76,7 +76,7 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         self.include_scores_in_prompt = include_scores_in_prompt
         # Note: Caching is handled by parallel_completions via UnifiedCache singleton
 
-    async def run(self, data: PropertyDataset, progress_callback=None) -> PropertyDataset:
+    async def run(self, data: PropertyDataset, progress_callback: Any = None) -> PropertyDataset:
         """Run OpenAI extraction for all conversations.
 
         Each conversation is formatted with ``prompt_builder`` and sent to the

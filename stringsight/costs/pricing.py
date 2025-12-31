@@ -186,7 +186,7 @@ def get_supported_providers() -> Dict[str, list]:
     Returns:
         Dictionary mapping provider names to lists of model names
     """
-    providers = {}
+    providers: dict[str, list[str]] = {}
     for model_name, pricing in PRICING_TABLE.items():
         provider = pricing.provider
         if provider not in providers:

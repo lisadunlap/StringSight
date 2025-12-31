@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 
 # ==================== Helper for Event Loop Management ====================
 
-def _run_pipeline_smart(pipeline, dataset, progress_callback=None):
+def _run_pipeline_smart(pipeline: Pipeline, dataset: PropertyDataset, progress_callback: Optional[Callable[[float], None]] = None) -> PropertyDataset:
     """Run pipeline, handling both sync and async contexts automatically."""
     try:
         # Check if we're already in an event loop
@@ -189,7 +189,7 @@ async def explain_async(
     max_tokens: int = 16000,
     max_workers: int = 64,
     include_scores_in_prompt: bool = False,
-    clusterer: Union[str, "PipelineStage"] = "hdbscan",
+    clusterer: Union[str, Any] = "hdbscan",
     min_cluster_size: int | None = 5,
     embedding_model: str = "text-embedding-3-large",
     prettify_labels: bool = False,
@@ -466,7 +466,7 @@ def explain(
     expansion_num_traces: int = 5,
     expansion_model: str = "gpt-4.1",
     # Clustering parameters  
-    clusterer: Union[str, "PipelineStage"] = "hdbscan",
+    clusterer: Union[str, Any] = "hdbscan",
     min_cluster_size: int | None = 5,
     embedding_model: str = "text-embedding-3-large",
     prettify_labels: bool = False,
@@ -897,15 +897,15 @@ def _check_contains_score(df: pd.DataFrame, method: str) -> bool:
 def _build_default_pipeline(
     method: str,
     system_prompt: str,
-    prompt_builder: Optional[Callable],
+    prompt_builder: Optional[Callable[[pd.Series], str]],
     model_name: str,
     temperature: float,
     top_p: float,
     max_tokens: int,
     max_workers: int,
     include_scores_in_prompt: bool,
-    clusterer: Union[str, "PipelineStage"],
-    min_cluster_size: int,
+    clusterer: Union[str, Any],
+    min_cluster_size: int | None,
     embedding_model: str,
     assign_outliers: bool,
     prettify_labels: bool,
@@ -1289,7 +1289,7 @@ def _save_final_summary(
 
 def _build_fixed_axes_pipeline(
     *,
-    extractor: "FixedAxesLabeler",
+    extractor: Any,
     taxonomy: Dict[str, str],
     model_name: str,
     temperature: float,

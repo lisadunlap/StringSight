@@ -82,7 +82,7 @@ class BaseClusterer(LoggingMixin, TimingMixin, WandbMixin, PipelineStage, ABC):
         self.config: Optional[ClusterConfig] = config
 
     @abstractmethod
-    def cluster(self, data: PropertyDataset, column_name: str, progress_callback=None) -> pd.DataFrame:
+    def cluster(self, data: PropertyDataset, column_name: str, progress_callback: Any = None) -> pd.DataFrame:
         """Produce a standardized clustered DataFrame from the dataset.
 
         Implementations may compute embeddings or use heuristic rules, but

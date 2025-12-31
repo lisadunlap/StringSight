@@ -99,15 +99,15 @@ class ErrorHandlingMixin:
 
 class WandbMixin:
     """Mixin for Weights & Biases logging."""
-    
-    def __init__(self, *, use_wandb: bool = True, wandb_project: str = None, **_):
+
+    def __init__(self, *, use_wandb: bool = True, wandb_project: str | None = None, **_: Any):
         self.use_wandb     = use_wandb
         self.wandb_project = wandb_project
         self._wandb_ok     = False
-        self._summary_metrics = {}  # Accumulate summary metrics
+        self._summary_metrics: Dict[str, Any] = {}  # Accumulate summary metrics
         super().__init__()
     
-    def init_wandb(self, project: str = None, run_name: str = None, **kwargs) -> None:
+    def init_wandb(self, project: str | None = None, run_name: str | None = None, **kwargs: Any) -> None:
         """Initialize wandb if enabled."""
         if not self.use_wandb:
             return
@@ -146,7 +146,7 @@ class WandbMixin:
             # If wandb initialization fails, continue without it
             self.use_wandb = False
     
-    def log_wandb(self, data: Dict[str, Any], step: int = None, is_summary: bool = False) -> None:
+    def log_wandb(self, data: Dict[str, Any], step: int | None = None, is_summary: bool = False) -> None:
         """
         Log data to wandb.
         
@@ -252,9 +252,9 @@ class WandbMixin:
 
 class TimingMixin:
     """Mixin for timing stage execution."""
-    
-    def __init__(self, **kwargs):
-        self._start = None
+
+    def __init__(self, **kwargs: Any):
+        self._start: float | None = None
         # Forward remaining kwargs to next mixin
         super().__init__(**kwargs)
     

@@ -1,8 +1,12 @@
 import uuid
+from typing import TYPE_CHECKING
 from sqlalchemy import Column, DateTime, Float, ForeignKey, String, Text, Uuid
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from stringsight.database import Base
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Mapped
 
 class Job(Base):
     __tablename__ = "jobs"

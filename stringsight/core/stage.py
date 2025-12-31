@@ -27,7 +27,7 @@ class PipelineStage(ABC):
         super().__init__()
     
     @abstractmethod
-    def run(self, data: PropertyDataset, progress_callback=None) -> PropertyDataset:
+    def run(self, data: PropertyDataset, progress_callback: Any = None) -> PropertyDataset:
         """
         Process the input data and return the modified data.
         
@@ -66,7 +66,7 @@ class PipelineStage(ABC):
         if not isinstance(data, PropertyDataset):
             raise ValueError(f"Output must be a PropertyDataset, got {type(data)}")
     
-    async def __call__(self, data: PropertyDataset, progress_callback=None) -> PropertyDataset:
+    async def __call__(self, data: PropertyDataset, progress_callback: Any = None) -> PropertyDataset:
         """
         Convenience method to run the stage.
         

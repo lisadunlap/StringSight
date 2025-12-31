@@ -1,8 +1,12 @@
 import uuid
+from typing import TYPE_CHECKING
 from sqlalchemy import Boolean, Column, DateTime, String, Uuid
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from stringsight.database import Base
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Mapped
 
 class User(Base):
     __tablename__ = "users"

@@ -68,17 +68,17 @@ class CostCalculator:
         max_tokens: int = 16000,
         avg_conversation_tokens: Optional[int] = None,
         system_prompt_tokens: Optional[int] = None
-    ) -> Dict[str, float]:
+    ) -> Dict[str, float | str]:
         """
         Estimate cost for property extraction stage.
-        
+
         Args:
             num_conversations: Number of conversations to process
-            model_name: LLM model for extraction  
+            model_name: LLM model for extraction
             max_tokens: Maximum tokens per response
             avg_conversation_tokens: Override default conversation length
             system_prompt_tokens: Override default system prompt length
-            
+
         Returns:
             Dictionary with cost breakdown
         """
@@ -223,21 +223,21 @@ class CostCalculator:
             total_cost=extraction_costs.get("total_cost", 0.0) + clustering_costs.get("total_cost", 0.0),
             
             # Tokens
-            extraction_input_tokens=extraction_costs.get("input_tokens", 0),
-            extraction_output_tokens=extraction_costs.get("output_tokens", 0),
-            embedding_tokens=clustering_costs.get("embedding_tokens", 0),
-            clustering_llm_input_tokens=clustering_costs.get("summary_input_tokens", 0),
-            clustering_llm_output_tokens=clustering_costs.get("summary_output_tokens", 0),
-            
+            extraction_input_tokens=int(extraction_costs.get("input_tokens", 0)),
+            extraction_output_tokens=int(extraction_costs.get("output_tokens", 0)),
+            embedding_tokens=int(clustering_costs.get("embedding_tokens", 0)),
+            clustering_llm_input_tokens=int(clustering_costs.get("summary_input_tokens", 0)),
+            clustering_llm_output_tokens=int(clustering_costs.get("summary_output_tokens", 0)),
+
             # Models
             extraction_model=extraction_model,
             embedding_model=embedding_model,
             summary_model=summary_model,
-            
+
             # Configuration
             num_conversations=num_conversations,
             estimated_properties=estimated_properties,
-            estimated_clusters=clustering_costs.get("estimated_clusters", 0)
+            estimated_clusters=int(clustering_costs.get("estimated_clusters", 0))
         )
         
         return estimate
