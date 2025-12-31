@@ -4,5 +4,6 @@ include requirements.txt
 include config.yaml
 recursive-include stringsight *.py
 recursive-include stringsight/frontend_dist *
+recursive-exclude stringsight/frontend_dist/taubench_airline_data *
 
 

@@ -108,3 +108,8 @@ class LabelRequest(BaseModel):
     extraction_cache_dir: Optional[str] = None
     metrics_cache_dir: Optional[str] = None
 
+
+class LabelPromptRequest(BaseModel):
+    """Request to get the system prompt for labeling with a given taxonomy."""
+    taxonomy: Dict[str, str]  # Label name -> description
+

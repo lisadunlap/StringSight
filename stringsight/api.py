@@ -34,9 +34,9 @@ from stringsight.formatters import (
 from stringsight.utils.df_utils import explode_score_columns
 from stringsight import public as public_api
 from stringsight.clusterers import get_clusterer
-from stringsight.metrics.cluster_subset import enrich_clusters_with_metrics, compute_total_conversations_by_model
+from stringsight.metrics.cluster_subset import enrich_clusters_with_metrics, compute_total_conversations_by_model, prepare_long_frame, compute_subset_metrics
 from stringsight.logging_config import get_logger
-from stringsight.schemas import ExtractBatchRequest, ExtractJobStartRequest, LabelRequest
+from stringsight.schemas import ExtractBatchRequest, ExtractJobStartRequest, LabelRequest, LabelPromptRequest
 import threading, uuid
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -187,10 +187,18 @@ class ResultsLoadRequest(BaseModel):
         max_conversations: Maximum number of conversations to load (default: all).
                           Use this to limit memory usage for large datasets.
         max_properties: Maximum number of properties to load (default: all).
+        conversations_page: Page number for conversations (1-indexed).
+        conversations_per_page: Number of conversations per page.
+        properties_page: Page number for properties (1-indexed).
+        properties_per_page: Number of properties per page.
     """
     path: str
     max_conversations: Optional[int] = None
     max_properties: Optional[int] = None
+    conversations_page: int = 1
+    conversations_per_page: int = 100
+    properties_page: int = 1
+    properties_per_page: int = 100
 
 
 class FlexibleColumnMapping(BaseModel):
@@ -581,19 +589,21 @@ async def cluster_run(
     # Force-drop any pre-initialized global LMDB caches so this request runs cacheless
     from stringsight.core import llm_utils as _llm_utils
     from stringsight.clusterers import clustering_utils as _cu
-    _orig_default_cache = getattr(_llm_utils, "_default_cache", None)
+    from stringsight.core.caching import UnifiedCache
+
+    _orig_default_cache: Optional[UnifiedCache] = getattr(_llm_utils, "_default_cache", None)
     _orig_default_llm_utils = getattr(_llm_utils, "_default_llm_utils", None)
     _orig_embed_cache = getattr(_cu, "_cache", None)
     try:
-        _llm_utils._default_cache = None
-        _llm_utils._default_llm_utils = None
+        if hasattr(_llm_utils, "_default_cache"):
+            _llm_utils._default_cache = None  # type: ignore
+        if hasattr(_llm_utils, "_default_llm_utils"):
+            _llm_utils._default_llm_utils = None  # type: ignore
     except Exception:
         pass
     try:
         if hasattr(_cu, "_cache"):
-            _cu._cache = None
-    except Exception:
-        pass
+            _cu._cache = None  # type: ignore
     except Exception:
         pass
     
@@ -677,7 +687,7 @@ async def cluster_run(
             operational_df = convert_score_columns_to_dict(
                 operational_df,
                 score_columns=score_columns_to_use,
-                method=req.method
+                method=req.method or "single_model"
             )
             
             # Convert back to dict list
@@ -821,15 +831,15 @@ async def cluster_run(
 
         if req.method == "side_by_side":
             logger.info("🔄 Reconstructing conversations for side-by-side metrics...")
-            
+
             # Group properties by base question_id to identify pairs
-            properties_by_qid = {}
+            properties_by_qid: Dict[str, List[Property]] = {}
             for p in properties:
                 if p.question_id not in properties_by_qid:
                     properties_by_qid[p.question_id] = []
                 properties_by_qid[p.question_id].append(p)
-            
-            sxs_conversations = []
+
+            sxs_conversations: List[ConversationRecord] = []
             
             # Pre-index operational rows for faster lookup
             import time
@@ -982,20 +992,22 @@ async def cluster_run(
         )
         
         # Run clustering
-        clustered_dataset = await clusterer.run(dataset, column_name="property_description")
+        clustered_dataset = await clusterer.run(dataset)
         
     finally:
         # Restore original cache/env settings (no-op for DiskCache)
         os.environ["STRINGSIGHT_DISABLE_CACHE"] = original_cache_setting
         # Restore global caches
         try:
-            _llm_utils._default_cache = _orig_default_cache
-            _llm_utils._default_llm_utils = _orig_default_llm_utils
+            if hasattr(_llm_utils, "_default_cache"):
+                _llm_utils._default_cache = _orig_default_cache  # type: ignore
+            if hasattr(_llm_utils, "_default_llm_utils"):
+                _llm_utils._default_llm_utils = _orig_default_llm_utils  # type: ignore
         except Exception:
             pass
         try:
             if hasattr(_cu, "_cache"):
-                _cu._cache = _orig_embed_cache
+                _cu._cache = _orig_embed_cache  # type: ignore
         except Exception:
             pass
 
@@ -1019,7 +1031,7 @@ async def cluster_run(
     # Choose metrics computer based on method
     if req.method == "side_by_side":
         logger.info("🚀 Using SideBySideMetrics for computation")
-        metrics_computer = SideBySideMetrics(
+        metrics_computer: SideBySideMetrics = SideBySideMetrics(
             output_dir=None,
             compute_bootstrap=True,  # Disable bootstrap for API speed
             log_to_wandb=False,
@@ -1027,12 +1039,13 @@ async def cluster_run(
         )
     else:
         logger.info("🚀 Using FunctionalMetrics for computation")
-        metrics_computer = FunctionalMetrics(
+        metrics_computer_temp = FunctionalMetrics(
             output_dir=None,
             compute_bootstrap=True,  # Disable bootstrap for API speed
             log_to_wandb=False,
             generate_plots=False
         )
+        metrics_computer = metrics_computer_temp
     
     # Debug: Check what's in clustered_dataset before metrics
     logger.info(f"🔍 Before FunctionalMetrics:")
@@ -1268,16 +1281,17 @@ async def cluster_run(
         # Convert PropertyDataset to DataFrame and then format conversations
         try:
             import pandas as pd
+            from typing import cast, Literal
             # Get the method from the dataset (check if it's side_by_side or single_model)
-            method = "side_by_side" if any(isinstance(conv.model, list) for conv in clustered_dataset.conversations) else "single_model"
-            conv_df = clustered_dataset.to_dataframe(type="base", method=method)
+            detected_method: Literal['single_model', 'side_by_side'] = "side_by_side" if any(isinstance(conv.model, list) for conv in clustered_dataset.conversations) else "single_model"
+            conv_df = clustered_dataset.to_dataframe(type="base", method=detected_method)
             # Format conversations using the formatter
-            formatted_conversations = format_conversations(conv_df, method)
+            formatted_conversations_list = format_conversations(conv_df, detected_method)
             # Save as JSONL
             conversation_path = results_dir / "conversation.jsonl"
             with open(conversation_path, 'w') as f:
-                for conv in formatted_conversations:
-                    f.write(json.dumps(conv, default=str) + '\n')
+                for conv_dict in formatted_conversations_list:
+                    f.write(json.dumps(conv_dict, default=str) + '\n')
             logger.info(f"✓ Saved conversations: {conversation_path}")
         except Exception as e:
             logger.warning(f"Failed to save conversation.jsonl: {e}")
@@ -1812,7 +1826,7 @@ async def label_run(req: LabelRequest) -> Dict[str, Any]:
         cluster_id += 1
 
     # Calculate conversation counts
-    total_conversations_by_model = {}
+    total_conversations_by_model: Dict[str, int] = {}
     for _, row in clustered_df.iterrows():
         model = row.get("model", "unknown")
         total_conversations_by_model[model] = total_conversations_by_model.get(model, 0) + 1
@@ -1980,6 +1994,7 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
     """
     # Try to resolve relative to results directory first (for job.result_path compatibility)
     path_obj = Path(req.path)
+    results_dir: Path
     if not path_obj.is_absolute():
         # Try relative to results directory first
         results_base = _get_results_dir()
@@ -2503,6 +2518,36 @@ def prompt_text(name: str, task_description: Optional[str] = None, method: Optio
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"name": name, "text": value}
+
+
+@app.post("/label/prompt")
+def label_prompt(req: LabelPromptRequest) -> Dict[str, Any]:
+    """Return the system prompt that will be used for fixed-taxonomy labeling.
+
+    This endpoint generates the same system prompt used by the label() function,
+    allowing users to preview the exact prompt before running labeling.
+
+    Args:
+        req: LabelPromptRequest containing taxonomy dictionary
+
+    Returns:
+        Dictionary with 'text' key containing the full system prompt
+    """
+    from stringsight.prompts.fixed_axes import fixed_axis_prompt
+
+    if not req.taxonomy or len(req.taxonomy) == 0:
+        raise HTTPException(status_code=400, detail="Taxonomy must contain at least one label")
+
+    fixed_axes = "\n".join(f"- **{name}**: {desc}" for name, desc in req.taxonomy.items())
+    fixed_axes_names = ", ".join(req.taxonomy.keys())
+
+    system_prompt = (
+        fixed_axis_prompt
+        .replace("{fixed_axes}", fixed_axes)
+        .replace("{fixed_axes_names}", fixed_axes_names)
+    )
+
+    return {"text": system_prompt}
 
 
 # -----------------------------
@@ -3148,17 +3193,21 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
         # Force-drop any pre-initialized global LMDB caches
         from stringsight.core import llm_utils as _llm_utils
         from stringsight.clusterers import clustering_utils as _cu
-        _orig_default_cache = getattr(_llm_utils, "_default_cache", None)
+        from stringsight.core.caching import UnifiedCache
+
+        _orig_default_cache: Optional[UnifiedCache] = getattr(_llm_utils, "_default_cache", None)
         _orig_default_llm_utils = getattr(_llm_utils, "_default_llm_utils", None)
         _orig_embed_cache = getattr(_cu, "_cache", None)
         try:
-            _llm_utils._default_cache = None
-            _llm_utils._default_llm_utils = None
+            if hasattr(_llm_utils, "_default_cache"):
+                _llm_utils._default_cache = None  # type: ignore
+            if hasattr(_llm_utils, "_default_llm_utils"):
+                _llm_utils._default_llm_utils = None  # type: ignore
         except Exception:
             pass
         try:
             if hasattr(_cu, "_cache"):
-                _cu._cache = None
+                _cu._cache = None  # type: ignore
         except Exception:
             pass
 
@@ -3221,7 +3270,7 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
             operational_df = convert_score_columns_to_dict(
                 operational_df,
                 score_columns=score_columns_to_use,
-                method=req.method
+                method=req.method or "single_model"
             )
             req.operationalRows = operational_df.to_dict('records')
             logger.info(f"✓ Score columns converted successfully")
@@ -3333,7 +3382,7 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
             logger.info("🔄 Reconstructing conversations for side-by-side metrics...")
 
             # Group properties by base question_id to identify pairs
-            properties_by_qid = {}
+            properties_by_qid: Dict[str, List[Property]] = {}
             for p in properties:
                 if p.question_id not in properties_by_qid:
                     properties_by_qid[p.question_id] = []
@@ -3454,7 +3503,7 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
         with _CLUSTER_JOBS_LOCK:
             job.progress = 0.4
 
-        clustered = await clusterer.run(dataset, column_name="property_description")
+        clustered = await clusterer.run(dataset)
 
         with _CLUSTER_JOBS_LOCK:
             job.progress = 0.7
@@ -3541,7 +3590,7 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
         # Choose metrics computer based on method
         if req.method == "side_by_side":
             logger.info("🚀 Using SideBySideMetrics for computation")
-            metrics_computer = SideBySideMetrics(
+            metrics_computer: SideBySideMetrics = SideBySideMetrics(
                 output_dir=None,
                 compute_bootstrap=True,
                 log_to_wandb=False,
@@ -3549,12 +3598,13 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
             )
         else:
             logger.info("🚀 Using FunctionalMetrics for computation")
-            metrics_computer = FunctionalMetrics(
+            metrics_computer_temp = FunctionalMetrics(
                 output_dir=None,
                 compute_bootstrap=True,
                 log_to_wandb=False,
                 generate_plots=False
             )
+            metrics_computer = metrics_computer_temp
 
         # Run metrics computation on the clustered dataset
         clustered = metrics_computer.run(clustered)
