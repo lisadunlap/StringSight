@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 from datetime import datetime
 from pathlib import Path
 import pandas as pd
@@ -47,7 +47,7 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
             logger.error(f"Job {job_id} not found in database")
             return
 
-        job.status = "running"
+        job.status = "running"  # type: ignore[assignment]
         db.commit()
 
         # Reconstruct request object
@@ -86,7 +86,7 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
                     with SessionLocal() as session:
                         current_job = session.query(Job).filter(Job.id == job_uuid).first()
                         if current_job:
-                            current_job.progress = completed / total_count if total_count > 0 else 0.0
+                            current_job.progress = completed / total_count if total_count > 0 else 0.0  # type: ignore[assignment]
                             session.commit()
                     last_update = now
                 except Exception as e:
@@ -134,9 +134,9 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
         # Update job with success
         # Refresh job object
         job = db.query(Job).filter(Job.id == job_uuid).first()
-        job.status = "completed"
-        job.progress = 1.0
-        job.result_path = req.output_dir if req.output_dir else f"extract_{job_id}_{timestamp}"
+        job.status = "completed"  # type: ignore[assignment]
+        job.progress = 1.0  # type: ignore[assignment]
+        job.result_path = req.output_dir if req.output_dir else f"extract_{job_id}_{timestamp}"  # type: ignore[assignment]
         db.commit()
 
     except Exception as e:
@@ -144,8 +144,8 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
         try:
             job = db.query(Job).filter(Job.id == job_uuid).first()
             if job:
-                job.status = "failed"
-                job.error_message = str(e)
+                job.status = "failed"  # type: ignore[assignment]
+                job.error_message = str(e)  # type: ignore[assignment]
                 db.commit()
         except Exception as db_e:
             logger.error(f"Failed to update job error state: {db_e}")
@@ -183,10 +183,10 @@ def _run_pipeline_job(job_id: str, req_data: Dict[str, Any]) -> None:
         if not job:
             logger.error(f"Job {job_id} not found")
             return
-        
-        job.status = "running"
+
+        job.status = "running"  # type: ignore[assignment]
         db.commit()
-        
+
         req = PipelineJobRequest(**req_data)
         df = pd.DataFrame(req.rows)
         
@@ -237,7 +237,7 @@ def _run_pipeline_job(job_id: str, req_data: Dict[str, Any]) -> None:
                 with SessionLocal() as session:
                     current_job = session.query(Job).filter(Job.id == job_uuid).first()
                     if current_job:
-                        current_job.progress = progress
+                        current_job.progress = progress  # type: ignore[assignment]
                         session.commit()
             except Exception as e:
                 logger.error(f"Failed to update progress: {e}")
@@ -245,9 +245,9 @@ def _run_pipeline_job(job_id: str, req_data: Dict[str, Any]) -> None:
         explain(df, **explain_kwargs, progress_callback=update_progress)
 
         job = db.query(Job).filter(Job.id == job_uuid).first()
-        job.status = "completed"
-        job.progress = 1.0
-        job.result_path = req.output_dir if req.output_dir else f"pipeline_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        job.status = "completed"  # type: ignore[assignment]
+        job.progress = 1.0  # type: ignore[assignment]
+        job.result_path = req.output_dir if req.output_dir else f"pipeline_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"  # type: ignore[assignment]
         db.commit()
 
     except Exception as e:
@@ -255,8 +255,8 @@ def _run_pipeline_job(job_id: str, req_data: Dict[str, Any]) -> None:
         try:
             job = db.query(Job).filter(Job.id == job_uuid).first()
             if job:
-                job.status = "failed"
-                job.error_message = str(e)
+                job.status = "failed"  # type: ignore[assignment]
+                job.error_message = str(e)  # type: ignore[assignment]
                 db.commit()
         except Exception as db_e:
             logger.error(f"Failed to update job error state: {db_e}")
@@ -303,9 +303,9 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
         if not job:
             logger.error(f"Job {job_id} not found")
             return
-        
-        job.status = "running"
-        job.progress = 0.0
+
+        job.status = "running"  # type: ignore[assignment]
+        job.progress = 0.0  # type: ignore[assignment]
         db.commit()
         
         # Reconstruct request
@@ -320,7 +320,7 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
                 with SessionLocal() as session:
                     current_job = session.query(Job).filter(Job.id == job_uuid).first()
                     if current_job:
-                        current_job.progress = progress
+                        current_job.progress = progress  # type: ignore[assignment]
                         session.commit()
             except Exception as e:
                 logger.error(f"Failed to update progress: {e}")
@@ -586,11 +586,11 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
         update_progress(1.0)
         job = db.query(Job).filter(Job.id == job_uuid).first()
         if job:
-            job.status = "completed"
-            job.progress = 1.0
+            job.status = "completed"  # type: ignore[assignment]
+            job.progress = 1.0  # type: ignore[assignment]
             # Store relative path from results directory for API compatibility
             relative_path = req.output_dir if req.output_dir else f"{base_filename}_{timestamp}"
-            job.result_path = relative_path
+            job.result_path = relative_path  # type: ignore[assignment]
             db.commit()
 
         logger.info(f"Cluster job {job_id} completed successfully")
@@ -600,8 +600,8 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
         try:
             job = db.query(Job).filter(Job.id == job_uuid).first()
             if job:
-                job.status = "failed"
-                job.error_message = str(e)
+                job.status = "failed"  # type: ignore[assignment]
+                job.error_message = str(e)  # type: ignore[assignment]
                 db.commit()
         except Exception as db_e:
             logger.error(f"Failed to update job error state: {db_e}")

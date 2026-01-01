@@ -4,7 +4,7 @@ Pipeline orchestration for StringSight.
 The Pipeline class manages the execution of multiple pipeline stages in sequence.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import time
 from .core.stage import PipelineStage
 from .core.data_objects import PropertyDataset
@@ -23,9 +23,9 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
     def __init__(
         self,
         name: str,
-        stages: List[PipelineStage] = None,
-        storage: Optional[StorageAdapter] = None,
-        **kwargs
+        stages: List[PipelineStage] | None = None,
+        storage: StorageAdapter | None = None,
+        **kwargs: Any
     ):
         """
         Initialize a new Pipeline.
@@ -381,21 +381,21 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
     def __getitem__(self, index: int) -> PipelineStage:
         return self.stages[index]
     
-    def __iter__(self):
+    def __iter__(self) -> Any:
         return iter(self.stages)
 
 
 class PipelineBuilder:
     """
     Builder pattern for constructing pipelines.
-    
+
     Makes it easy to construct pipelines with method chaining.
     """
-    
+
     def __init__(self, name: str = "Pipeline"):
         self.name = name
-        self.stages = []
-        self.config = {}
+        self.stages: List[PipelineStage] = []
+        self.config: Dict[str, Any] = {}
         
     def add_stage(self, stage: PipelineStage) -> "PipelineBuilder":
         """Add a stage to the pipeline."""
@@ -418,11 +418,11 @@ class PipelineBuilder:
         """Add a metrics computation stage."""
         return self.add_stage(metrics)
         
-    def configure(self, **kwargs) -> "PipelineBuilder":
+    def configure(self, **kwargs: Any) -> "PipelineBuilder":
         """Set configuration options for the pipeline."""
         self.config.update(kwargs)
         return self
         
     def build(self) -> Pipeline:
         """Build the pipeline."""
-        return Pipeline(self.name, self.stages, **self.config) 
+        return Pipeline(self.name, self.stages, **self.config)  # type: ignore[arg-type] 

@@ -954,24 +954,24 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
                 mc["proportion_delta"] = ci_pd["mean"]
                 mc["proportion_delta_significant"] = self._is_significant(ci_pd["lower"], ci_pd["upper"], 0)
 
-                q_ci: Dict[str, Dict[str, float]] = {}
-                qd_ci: Dict[str, Dict[str, float]] = {}
-                qd_sig: Dict[str, bool] = {}
+                mc_q_ci: Dict[str, Dict[str, float]] = {}
+                mc_qd_ci: Dict[str, Dict[str, float]] = {}
+                mc_qd_sig: Dict[str, bool] = {}
                 for mj, metric in enumerate(metric_keys):
                     ci_q = _ci_dict(arrays["mc_quality"][:, mi, ci, mj])
-                    q_ci[metric] = ci_q
+                    mc_q_ci[metric] = ci_q
                     mc["quality"][metric] = ci_q["mean"]
 
                     ci_qd = _ci_dict(arrays["mc_quality_delta"][:, mi, ci, mj])
-                    qd_ci[metric] = ci_qd
+                    mc_qd_ci[metric] = ci_qd
                     mc["quality_delta"][metric] = ci_qd["mean"]
-                    qd_sig[metric] = self._is_significant(ci_qd["lower"], ci_qd["upper"], 0)
+                    mc_qd_sig[metric] = self._is_significant(ci_qd["lower"], ci_qd["upper"], 0)
 
-                if q_ci:
-                    mc["quality_ci"] = q_ci
-                if qd_ci:
-                    mc["quality_delta_ci"] = qd_ci
-                mc["quality_delta_significant"] = qd_sig
+                if mc_q_ci:
+                    mc["quality_ci"] = mc_q_ci
+                if mc_qd_ci:
+                    mc["quality_delta_ci"] = mc_qd_ci
+                mc["quality_delta_significant"] = mc_qd_sig
 
         # Cluster scores
         for ci, cluster in enumerate(cluster_names):
@@ -981,24 +981,24 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
             cs["proportion_ci"] = ci_prop
             cs["proportion"] = ci_prop["mean"]
 
-            q_ci: Dict[str, Dict[str, float]] = {}
-            qd_ci: Dict[str, Dict[str, float]] = {}
-            qd_sig: Dict[str, bool] = {}
+            c_q_ci: Dict[str, Dict[str, float]] = {}
+            c_qd_ci: Dict[str, Dict[str, float]] = {}
+            c_qd_sig: Dict[str, bool] = {}
             for mj, metric in enumerate(metric_keys):
                 ci_q = _ci_dict(arrays["c_quality"][:, ci, mj])
-                q_ci[metric] = ci_q
+                c_q_ci[metric] = ci_q
                 cs["quality"][metric] = ci_q["mean"]
 
                 ci_qd = _ci_dict(arrays["c_quality_delta"][:, ci, mj])
-                qd_ci[metric] = ci_qd
+                c_qd_ci[metric] = ci_qd
                 cs["quality_delta"][metric] = ci_qd["mean"]
-                qd_sig[metric] = self._is_significant(ci_qd["lower"], ci_qd["upper"], 0)
+                c_qd_sig[metric] = self._is_significant(ci_qd["lower"], ci_qd["upper"], 0)
 
-            if q_ci:
-                cs["quality_ci"] = q_ci
-            if qd_ci:
-                cs["quality_delta_ci"] = qd_ci
-            cs["quality_delta_significant"] = qd_sig
+            if c_q_ci:
+                cs["quality_ci"] = c_q_ci
+            if c_qd_ci:
+                cs["quality_delta_ci"] = c_qd_ci
+            cs["quality_delta_significant"] = c_qd_sig
 
         # Model scores
         for mi, model in enumerate(model_names):
@@ -1008,24 +1008,24 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
             ms["proportion_ci"] = ci_prop
             ms["proportion"] = ci_prop["mean"]
 
-            q_ci: Dict[str, Dict[str, float]] = {}
-            qd_ci: Dict[str, Dict[str, float]] = {}
-            qd_sig: Dict[str, bool] = {}
+            m_q_ci: Dict[str, Dict[str, float]] = {}
+            m_qd_ci: Dict[str, Dict[str, float]] = {}
+            m_qd_sig: Dict[str, bool] = {}
             for mj, metric in enumerate(metric_keys):
                 ci_q = _ci_dict(arrays["m_quality"][:, mi, mj])
-                q_ci[metric] = ci_q
+                m_q_ci[metric] = ci_q
                 ms["quality"][metric] = ci_q["mean"]
 
                 ci_qd = _ci_dict(arrays["m_quality_delta"][:, mi, mj])
-                qd_ci[metric] = ci_qd
+                m_qd_ci[metric] = ci_qd
                 ms["quality_delta"][metric] = ci_qd["mean"]
-                qd_sig[metric] = self._is_significant(ci_qd["lower"], ci_qd["upper"], 0)
+                m_qd_sig[metric] = self._is_significant(ci_qd["lower"], ci_qd["upper"], 0)
 
-            if q_ci:
-                ms["quality_ci"] = q_ci
-            if qd_ci:
-                ms["quality_delta_ci"] = qd_ci
-            ms["quality_delta_significant"] = qd_sig
+            if m_q_ci:
+                ms["quality_ci"] = m_q_ci
+            if m_qd_ci:
+                ms["quality_delta_ci"] = m_qd_ci
+            ms["quality_delta_significant"] = m_qd_sig
 
     def _add_bootstrap_analysis(
         self,

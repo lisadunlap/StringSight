@@ -6,7 +6,7 @@ operations based on model usage and token counts.
 """
 
 import re
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, Tuple, List
 from dataclasses import dataclass, asdict
 
 from .pricing import get_model_pricing, estimate_tokens_cost
@@ -66,9 +66,9 @@ class CostCalculator:
         num_conversations: int,
         model_name: str = "gpt-4.1",
         max_tokens: int = 16000,
-        avg_conversation_tokens: Optional[int] = None,
-        system_prompt_tokens: Optional[int] = None
-    ) -> Dict[str, float | str]:
+        avg_conversation_tokens: int | None = None,
+        system_prompt_tokens: int | None = None
+    ) -> Dict[str, float | str | int]:
         """
         Estimate cost for property extraction stage.
 
@@ -114,9 +114,9 @@ class CostCalculator:
         self,
         num_properties: int,
         embedding_model: str = "openai",
-        summary_model: str = "gpt-4.1", 
-        avg_property_tokens: Optional[int] = None
-    ) -> Dict[str, float]:
+        summary_model: str = "gpt-4.1",
+        avg_property_tokens: int | None = None
+    ) -> Dict[str, float | int]:
         """
         Estimate cost for clustering stage.
         
@@ -177,8 +177,8 @@ class CostCalculator:
         embedding_model: str = "openai",
         summary_model: str = "gpt-4.1",
         # Optional overrides
-        avg_conversation_tokens: Optional[int] = None,
-        properties_per_conversation: Optional[float] = None
+        avg_conversation_tokens: int | None = None,
+        properties_per_conversation: float | None = None
     ) -> CostEstimate:
         """
         Estimate total cost for the entire pipeline.

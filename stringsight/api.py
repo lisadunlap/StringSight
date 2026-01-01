@@ -12,7 +12,7 @@ This module is isolated from the Gradio app. It can be run independently:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal
 import asyncio
 import io
 import os
@@ -64,7 +64,7 @@ def _get_file_hash(path: Path) -> str:
     key_str = f"{path}:{stat.st_mtime}:{stat.st_size}"
     return hashlib.md5(key_str.encode()).hexdigest()
 
-def _get_cached_jsonl(path: Path, nrows: Optional[int] = None) -> List[Dict[str, Any]]:
+def _get_cached_jsonl(path: Path, nrows: int | None = None) -> List[Dict[str, Any]]:
     """Read JSONL file with caching. Cache key includes file mtime to auto-invalidate on changes.
 
     Only caches full file reads (nrows=None) to avoid cache bloat. For partial reads,
@@ -144,7 +144,7 @@ def _read_json_safe(path: Path) -> Any:
         return json.load(f)
 
 
-def _read_jsonl_as_list(path: Path, nrows: Optional[int] = None) -> List[Dict[str, Any]]:
+def _read_jsonl_as_list(path: Path, nrows: int | None = None) -> List[Dict[str, Any]]:
     """Read a JSONL file into a list of dicts. Optional row cap."""
     import json
     rows: List[Dict[str, Any]] = []
@@ -160,7 +160,7 @@ def _read_jsonl_as_list(path: Path, nrows: Optional[int] = None) -> List[Dict[st
 
 class RowsPayload(BaseModel):
     rows: List[Dict[str, Any]]
-    method: Optional[Literal["single_model", "side_by_side"]] = None
+    method: Literal["single_model", "side_by_side"] | None = None
 
 
 class ReadRequest(BaseModel):
@@ -169,13 +169,13 @@ class ReadRequest(BaseModel):
     Use with caution – this assumes the server has access to the path.
     """
     path: str
-    method: Optional[Literal["single_model", "side_by_side"]] = None
-    limit: Optional[int] = None  # return all rows if None
+    method: Literal["single_model", "side_by_side"] | None = None
+    limit: int | None = None  # return all rows if None
 
 
 class ListRequest(BaseModel):
     path: str  # directory to list (server-side)
-    exts: Optional[List[str]] = None  # e.g., [".jsonl", ".json", ".csv"]
+    exts: List[str | None] = None  # e.g., [".jsonl", ".json", ".csv"]
 
 
 class ResultsLoadRequest(BaseModel):
@@ -193,8 +193,8 @@ class ResultsLoadRequest(BaseModel):
         properties_per_page: Number of properties per page.
     """
     path: str
-    max_conversations: Optional[int] = None
-    max_properties: Optional[int] = None
+    max_conversations: int | None = None
+    max_properties: int | None = None
     conversations_page: int = 1
     conversations_per_page: int = 100
     properties_page: int = 1
@@ -205,8 +205,8 @@ class FlexibleColumnMapping(BaseModel):
     """Column mapping specification for flexible data processing."""
     prompt_col: str
     response_cols: List[str]
-    model_cols: Optional[List[str]] = None
-    score_cols: Optional[List[str]] = None
+    model_cols: List[str | None] = None
+    score_cols: List[str | None] = None
     method: Literal["single_model", "side_by_side"] = "single_model"
 
 
@@ -229,18 +229,18 @@ class AutoDetectRequest(BaseModel):
 
 class ExtractSingleRequest(BaseModel):
     row: Dict[str, Any]
-    method: Optional[Literal["single_model", "side_by_side"]] = None
-    system_prompt: Optional[str] = None
-    task_description: Optional[str] = None
-    model_name: Optional[str] = "gpt-4.1"
-    temperature: Optional[float] = 0.7
-    top_p: Optional[float] = 0.95
-    max_tokens: Optional[int] = 16000
-    max_workers: Optional[int] = 128
-    include_scores_in_prompt: Optional[bool] = False
-    use_wandb: Optional[bool] = False
-    output_dir: Optional[str] = None
-    return_debug: Optional[bool] = False
+    method: Literal["single_model", "side_by_side"] | None = None
+    system_prompt: str | None = None
+    task_description: str | None = None
+    model_name: str | None = "gpt-4.1"
+    temperature: float | None = 0.7
+    top_p: float | None = 0.95
+    max_tokens: int | None = 16000
+    max_workers: int | None = 128
+    include_scores_in_prompt: bool | None = False
+    use_wandb: bool | None = False
+    output_dir: str | None = None
+    return_debug: bool | None = False
 
 
 # ExtractBatchRequest moved to schemas.py
@@ -261,7 +261,7 @@ class DFSelectRequest(DFRows):
 
 class DFGroupPreviewRequest(DFRows):
     by: str
-    numeric_cols: Optional[List[str]] = None
+    numeric_cols: List[str | None] = None
 
 
 class DFGroupRowsRequest(DFRows):
@@ -554,16 +554,16 @@ def debug_post(body: Dict[str, Any]) -> Dict[str, Any]:
 class ClusterRunParams(BaseModel):
     minClusterSize: int | None = None
     embeddingModel: str = "openai/text-embedding-3-large"
-    groupBy: Optional[str] = "none"  # none | category | behavior_type
+    groupBy: str | None = "none"  # none | category | behavior_type
 
 
 class ClusterRunRequest(BaseModel):
     operationalRows: List[Dict[str, Any]]
     properties: List[Dict[str, Any]]
     params: ClusterRunParams
-    output_dir: Optional[str] = None
-    score_columns: Optional[List[str]] = None  # NEW: List of score column names to convert to dict format
-    method: Optional[str] = "single_model"  # NEW: Method for score column conversion
+    output_dir: str | None = None
+    score_columns: List[str | None] = None  # NEW: List of score column names to convert to dict format
+    method: str | None = "single_model"  # NEW: Method for score column conversion
 
 
 @app.post("/cluster/run")
@@ -591,7 +591,7 @@ async def cluster_run(
     from stringsight.clusterers import clustering_utils as _cu
     from stringsight.core.caching import UnifiedCache
 
-    _orig_default_cache: Optional[UnifiedCache] = getattr(_llm_utils, "_default_cache", None)
+    _orig_default_cache: UnifiedCache | None = getattr(_llm_utils, "_default_cache", None)
     _orig_default_llm_utils = getattr(_llm_utils, "_default_llm_utils", None)
     _orig_embed_cache = getattr(_cu, "_cache", None)
     try:
@@ -1237,8 +1237,8 @@ async def cluster_run(
     total_unique_conversations = len(set(str(p.get("question_id", "")) for p in req.properties if p.get("question_id")))
     
     # Save full pipeline results to disk with timestamped directory
-    results_dir: Optional[Path] = None
-    results_dir_name: Optional[str] = None
+    results_dir: Path | None = None
+    results_dir_name: str | None = None
     try:
         import json
 
@@ -1555,9 +1555,9 @@ class ClusterMetricsRequest(BaseModel):
     clusters: List[Dict[str, Any]]
     properties: List[Dict[str, Any]]
     operationalRows: List[Dict[str, Any]]
-    included_property_ids: Optional[List[str]] = None
-    score_columns: Optional[List[str]] = None  # NEW: List of score column names to convert to dict format
-    method: Optional[str] = "single_model"  # NEW: Method for score column conversion
+    included_property_ids: List[str | None] = None
+    score_columns: List[str | None] = None  # NEW: List of score column names to convert to dict format
+    method: str | None = "single_model"  # NEW: Method for score column conversion
 
 
 @app.post("/cluster/metrics")
@@ -2011,9 +2011,9 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail=f"Not a directory: {results_dir}")
 
     # Load metrics (always cached for fast access)
-    model_cluster_scores: Optional[List[Dict[str, Any]]] = None
-    cluster_scores: Optional[List[Dict[str, Any]]] = None
-    model_scores: Optional[List[Dict[str, Any]]] = None
+    model_cluster_scores: List[Dict[str, Any | None]] = None
+    cluster_scores: List[Dict[str, Any | None]] = None
+    model_scores: List[Dict[str, Any | None]] = None
 
     # Use cached JSONL reading for metrics files
     p = results_dir / "model_cluster_scores_df.jsonl"
@@ -2505,7 +2505,7 @@ def list_prompts() -> Dict[str, Any]:
 
 
 @app.get("/prompt-text")
-def prompt_text(name: str, task_description: Optional[str] = None, method: Optional[str] = None) -> Dict[str, Any]:
+def prompt_text(name: str, task_description: str | None = None, method: str | None = None) -> Dict[str, Any]:
     """Return full text of a prompt by name or alias (default/agent), formatted.
 
     If 'name' is an alias, 'method' determines the template ('single_model' or 'side_by_side').
@@ -2566,11 +2566,11 @@ class TidyRow(BaseModel):
 
     Additional keys are allowed and passed through to the DataFrame.
     """
-    question_id: Optional[str] = None
+    question_id: str | None = None
     prompt: str
     model: str
     model_response: Any
-    score: Optional[Dict[str, float]] = None
+    score: Dict[str, float | None] = None
 
     class Config:
         extra = "allow"
@@ -2592,9 +2592,9 @@ class ExplainSideBySideTidyRequest(BaseModel):
     model_a: str
     model_b: str
     data: List[TidyRow]
-    score_columns: Optional[List[str]] = None
-    sample_size: Optional[int] = None
-    output_dir: Optional[str] = None
+    score_columns: List[str | None] = None
+    sample_size: int | None = None
+    output_dir: str | None = None
 
 
 @app.post("/api/explain/side-by-side")
@@ -2825,7 +2825,7 @@ class ExtractJob:
     progress: float = 0.0
     count_done: int = 0
     count_total: int = 0
-    error: Optional[str] = None
+    error: str | None = None
     properties: List[Dict[str, Any]] = field(default_factory=list)
     cancelled: bool = False  # Flag to signal cancellation
 
@@ -2839,9 +2839,9 @@ class ClusterJob:
     id: str
     state: str = "queued"  # queued | running | completed | error | cancelled
     progress: float = 0.0
-    error: Optional[str] = None
-    result: Optional[Dict[str, Any]] = None
-    result_path: Optional[str] = None
+    error: str | None = None
+    result: Dict[str, Any | None] = None
+    result_path: str | None = None
     cancelled: bool = False
 
 
@@ -3195,7 +3195,7 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
         from stringsight.clusterers import clustering_utils as _cu
         from stringsight.core.caching import UnifiedCache
 
-        _orig_default_cache: Optional[UnifiedCache] = getattr(_llm_utils, "_default_cache", None)
+        _orig_default_cache: UnifiedCache | None = getattr(_llm_utils, "_default_cache", None)
         _orig_default_llm_utils = getattr(_llm_utils, "_default_llm_utils", None)
         _orig_embed_cache = getattr(_cu, "_cache", None)
         try:

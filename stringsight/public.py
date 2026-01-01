@@ -4,7 +4,7 @@ Public API for StringSight.
 This module provides the main explain() function that users will interact with.
 """
 
-from typing import Dict, List, Any, Callable, Optional, Union, Tuple
+from typing import Dict, List, Any, Callable, Union, Tuple
 import asyncio
 import pandas as pd
 from .core.data_objects import PropertyDataset
@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 
 # ==================== Helper for Event Loop Management ====================
 
-def _run_pipeline_smart(pipeline: Pipeline, dataset: PropertyDataset, progress_callback: Optional[Callable[[float], None]] = None) -> PropertyDataset:
+def _run_pipeline_smart(pipeline: Pipeline, dataset: PropertyDataset, progress_callback: Callable[[float], None] | None = None) -> PropertyDataset:
     """Run pipeline, handling both sync and async contexts automatically."""
     try:
         # Check if we're already in an event loop
@@ -51,33 +51,33 @@ async def extract_properties_only_async(
     method: str = "single_model",
     system_prompt: str | None = None,
     task_description: str | None = None,
-    prompt_builder: Optional[Callable[[pd.Series], str]] = None,
+    prompt_builder: Callable[[pd.Series, str], str] | None = None,
     model_name: str = "gpt-4.1",
     temperature: float = 0.7,
     top_p: float = 0.95,
     max_tokens: int = 16000,
     max_workers: int = 64,
     include_scores_in_prompt: bool = False,
-    score_columns: Optional[List[str]] = None,
-    sample_size: Optional[int] = None,
-    model_a: Optional[str] = None,
-    model_b: Optional[str] = None,
+    score_columns: List[str] | None = None,
+    sample_size: int | None = None,
+    model_a: str | None = None,
+    model_b: str | None = None,
     prompt_column: str = "prompt",
-    model_column: Optional[str] = None,
-    model_response_column: Optional[str] = None,
-    question_id_column: Optional[str] = None,
-    model_a_column: Optional[str] = None,
-    model_b_column: Optional[str] = None,
-    model_a_response_column: Optional[str] = None,
-    model_b_response_column: Optional[str] = None,
-    output_dir: Optional[str] = None,
+    model_column: str | None = None,
+    model_response_column: str | None = None,
+    question_id_column: str | None = None,
+    model_a_column: str | None = None,
+    model_b_column: str | None = None,
+    model_a_response_column: str | None = None,
+    model_b_response_column: str | None = None,
+    output_dir: str | None = None,
     use_wandb: bool = False,
-    wandb_project: Optional[str] = None,
+    wandb_project: str | None = None,
     verbose: bool = False,
-    extraction_cache_dir: Optional[str] = None,
+    extraction_cache_dir: str | None = None,
     return_debug: bool = False,
-    **kwargs
-) -> Union[PropertyDataset, Tuple[PropertyDataset, List[Dict[str, Any]]]]:
+    **kwargs: Any
+) -> PropertyDataset | Tuple[PropertyDataset, List[Dict[str, Any]]]:
     """Async version of extract_properties_only for use in async contexts (e.g., FastAPI).
     
     See extract_properties_only() for full documentation.
@@ -168,21 +168,21 @@ async def explain_async(
     df: pd.DataFrame,
     method: str = "single_model",
     system_prompt: str = None,
-    prompt_builder: Optional[Callable[[pd.Series], str]] = None,
-    task_description: Optional[str] = None,
+    prompt_builder: Callable[[pd.Series, str], str] | None = None,
+    task_description: str | None = None,
     *,
-    sample_size: Optional[int] = None,
-    model_a: Optional[str] = None,
-    model_b: Optional[str] = None,
-    score_columns: Optional[List[str]] = None,
+    sample_size: int | None = None,
+    model_a: str | None = None,
+    model_b: str | None = None,
+    score_columns: List[str] | None = None,
     prompt_column: str = "prompt",
-    model_column: Optional[str] = None,
-    model_response_column: Optional[str] = None,
-    question_id_column: Optional[str] = None,
-    model_a_column: Optional[str] = None,
-    model_b_column: Optional[str] = None,
-    model_a_response_column: Optional[str] = None,
-    model_b_response_column: Optional[str] = None,
+    model_column: str | None = None,
+    model_response_column: str | None = None,
+    question_id_column: str | None = None,
+    model_a_column: str | None = None,
+    model_b_column: str | None = None,
+    model_a_response_column: str | None = None,
+    model_b_response_column: str | None = None,
     model_name: str = "gpt-4.1",
     temperature: float = 0.7,
     top_p: float = 0.95,
@@ -196,16 +196,16 @@ async def explain_async(
     assign_outliers: bool = False,
     summary_model: str = "gpt-4.1",
     cluster_assignment_model: str = "gpt-4.1-mini",
-    metrics_kwargs: Optional[Dict[str, Any]] = None,
+    metrics_kwargs: Dict[str, Any | None] = None,
     use_wandb: bool = True,
-    wandb_project: Optional[str] = None,
+    wandb_project: str | None = None,
     include_embeddings: bool = False,
     verbose: bool = False,
-    output_dir: Optional[str] = None,
-    custom_pipeline: Optional[Pipeline] = None,
-    extraction_cache_dir: Optional[str] = None,
-    clustering_cache_dir: Optional[str] = None,
-    metrics_cache_dir: Optional[str] = None,
+    output_dir: str | None = None,
+    custom_pipeline: Pipeline | None = None,
+    extraction_cache_dir: str | None = None,
+    clustering_cache_dir: str | None = None,
+    metrics_cache_dir: str | None = None,
     **kwargs
 ) -> Tuple[pd.DataFrame, Dict[str, pd.DataFrame]]:
     """Async version of explain() for use in async contexts (e.g., FastAPI).
@@ -288,19 +288,19 @@ def extract_properties_only(
     system_prompt: str | None = None,
     task_description: str | None = None,
     # Data preparation
-    score_columns: Optional[List[str]] = None,
-    sample_size: Optional[int] = None,
-    model_a: Optional[str] = None,
-    model_b: Optional[str] = None,
+    score_columns: List[str] | None = None,
+    sample_size: int | None = None,
+    model_a: str | None = None,
+    model_b: str | None = None,
     # Column mapping parameters
     prompt_column: str = "prompt",
-    model_column: Optional[str] = None,
-    model_response_column: Optional[str] = None,
-    question_id_column: Optional[str] = None,
-    model_a_column: Optional[str] = None,
-    model_b_column: Optional[str] = None,
-    model_a_response_column: Optional[str] = None,
-    model_b_response_column: Optional[str] = None,
+    model_column: str | None = None,
+    model_response_column: str | None = None,
+    question_id_column: str | None = None,
+    model_a_column: str | None = None,
+    model_b_column: str | None = None,
+    model_a_response_column: str | None = None,
+    model_b_response_column: str | None = None,
     # Extraction parameters
     model_name: str = "gpt-4.1",
     temperature: float = 0.7,
@@ -437,23 +437,23 @@ def explain(
     df: pd.DataFrame,
     method: str = "single_model",
     system_prompt: str = None,
-    prompt_builder: Optional[Callable[[pd.Series], str]] = None,
-    task_description: Optional[str] = None,
+    prompt_builder: Callable[[pd.Series, str], str] | None = None,
+    task_description: str | None = None,
     *,
     # Data preparation
-    sample_size: Optional[int] = None,
-    model_a: Optional[str] = None,
-    model_b: Optional[str] = None,
-    score_columns: Optional[List[str]] = None,
+    sample_size: int | None = None,
+    model_a: str | None = None,
+    model_b: str | None = None,
+    score_columns: List[str] | None = None,
     # Column mapping parameters
     prompt_column: str = "prompt",
-    model_column: Optional[str] = None,
-    model_response_column: Optional[str] = None,
-    question_id_column: Optional[str] = None,
-    model_a_column: Optional[str] = None,
-    model_b_column: Optional[str] = None,
-    model_a_response_column: Optional[str] = None,
-    model_b_response_column: Optional[str] = None,
+    model_column: str | None = None,
+    model_response_column: str | None = None,
+    question_id_column: str | None = None,
+    model_a_column: str | None = None,
+    model_b_column: str | None = None,
+    model_a_response_column: str | None = None,
+    model_b_response_column: str | None = None,
     # Extraction parameters
     model_name: str = "gpt-4.1",
     temperature: float = 0.7,
@@ -474,21 +474,21 @@ def explain(
     summary_model: str = "gpt-4.1",
     cluster_assignment_model: str = "gpt-4.1-mini",
     # Metrics parameters
-    metrics_kwargs: Optional[Dict[str, Any]] = None,
+    metrics_kwargs: Dict[str, Any | None] = None,
     # Caching & logging
     use_wandb: bool = True,
-    wandb_project: Optional[str] = None,
+    wandb_project: str | None = None,
     include_embeddings: bool = False,
     verbose: bool = False,
     # Output parameters
-    output_dir: Optional[str] = None,
+    output_dir: str | None = None,
     # Pipeline configuration
-    custom_pipeline: Optional[Pipeline] = None,
+    custom_pipeline: Pipeline | None = None,
     # Cache configuration
-    extraction_cache_dir: Optional[str] = None,
-    clustering_cache_dir: Optional[str] = None,
-    metrics_cache_dir: Optional[str] = None,
-    progress_callback: Optional[Callable[[float], None]] = None,
+    extraction_cache_dir: str | None = None,
+    clustering_cache_dir: str | None = None,
+    metrics_cache_dir: str | None = None,
+    progress_callback: Callable[[float], None] | None = None,
     **kwargs
 ) -> Tuple[pd.DataFrame, Dict[str, pd.DataFrame]]:
     """
@@ -897,7 +897,7 @@ def _check_contains_score(df: pd.DataFrame, method: str) -> bool:
 def _build_default_pipeline(
     method: str,
     system_prompt: str,
-    prompt_builder: Optional[Callable[[pd.Series], str]],
+    prompt_builder: Callable[[pd.Series, str], str] | None,
     model_name: str,
     temperature: float,
     top_p: float,
@@ -911,15 +911,15 @@ def _build_default_pipeline(
     prettify_labels: bool,
     summary_model: str,
     cluster_assignment_model: str,
-    metrics_kwargs: Optional[Dict[str, Any]],
+    metrics_kwargs: Dict[str, Any | None],
     use_wandb: bool,
-    wandb_project: Optional[str],
+    wandb_project: str | None,
     include_embeddings: bool,
     verbose: bool,
-    extraction_cache_dir: Optional[str] = None,
-    clustering_cache_dir: Optional[str] = None,
-    metrics_cache_dir: Optional[str] = None,
-    output_dir: Optional[str] = "./results",
+    extraction_cache_dir: str | None = None,
+    clustering_cache_dir: str | None = None,
+    metrics_cache_dir: str | None = None,
+    output_dir: str | None = "./results",
     **kwargs
 ) -> Pipeline:
     """
@@ -1296,16 +1296,16 @@ def _build_fixed_axes_pipeline(
     top_p: float,
     max_tokens: int,
     max_workers: int,
-    metrics_kwargs: Optional[Dict[str, Any]],
+    metrics_kwargs: Dict[str, Any | None],
     use_wandb: bool,
-    wandb_project: Optional[str],
+    wandb_project: str | None,
     include_embeddings: bool,
     verbose: bool,
-    output_dir: Optional[str],
-    extraction_cache_dir: Optional[str] = None,
-    metrics_cache_dir: Optional[str] = None,
-    **kwargs,
-):
+    output_dir: str | None,
+    extraction_cache_dir: str | None = None,
+    metrics_cache_dir: str | None = None,
+    **kwargs: Any,
+) -> Pipeline:
     """Internal helper that constructs a pipeline for *label()* calls."""
 
     from .postprocess import LLMJsonParser, PropertyValidator
@@ -1342,27 +1342,27 @@ def label(
     df: pd.DataFrame,
     *,
     taxonomy: Dict[str, str],
-    sample_size: Optional[int] = None,
+    sample_size: int | None = None,
     # Column mapping parameters
-    score_columns: Optional[List[str]] = None,
+    score_columns: List[str] | None = None,
     prompt_column: str = "prompt",
-    model_column: Optional[str] = None,
-    model_response_column: Optional[str] = None,
-    question_id_column: Optional[str] = None,
+    model_column: str | None = None,
+    model_response_column: str | None = None,
+    question_id_column: str | None = None,
     model_name: str = "gpt-4.1",
     temperature: float = 0.0,
     top_p: float = 1.0,
     max_tokens: int = 2048,
     max_workers: int = 64,
-    metrics_kwargs: Optional[Dict[str, Any]] = None,
+    metrics_kwargs: Dict[str, Any | None] = None,
     use_wandb: bool = True,
-    wandb_project: Optional[str] = None,
+    wandb_project: str | None = None,
     include_embeddings: bool = False,
     verbose: bool = False,
-    output_dir: Optional[str] = None,
-    extraction_cache_dir: Optional[str] = None,
-    metrics_cache_dir: Optional[str] = None,
-    **kwargs,
+    output_dir: str | None = None,
+    extraction_cache_dir: str | None = None,
+    metrics_cache_dir: str | None = None,
+    **kwargs: Any,
 ) -> Tuple[pd.DataFrame, Dict[str, pd.DataFrame]]:
     """Run the *fixed-taxonomy* analysis pipeline. This is just you're run of the mill LLM-judge with a given rubric. 
 
@@ -1575,9 +1575,9 @@ def label(
 # Convenience functions for common use cases
 def explain_side_by_side(
     df: pd.DataFrame,
-    system_prompt: str = None,
-    tidy_side_by_side_models: Optional[Tuple[str, str]] = None,
-    **kwargs
+    system_prompt: str | None = None,
+    tidy_side_by_side_models: Tuple[str, str] | None = None,
+    **kwargs: Any
 ) -> Tuple[pd.DataFrame, Dict[str, pd.DataFrame]]:
     """
     Convenience function for side-by-side model comparison.
@@ -1601,8 +1601,8 @@ def explain_side_by_side(
 
 def explain_single_model(
     df: pd.DataFrame,
-    system_prompt: str = None,
-    **kwargs
+    system_prompt: str | None = None,
+    **kwargs: Any
 ) -> Tuple[pd.DataFrame, Dict[str, pd.DataFrame]]:
     """
     Convenience function for single model analysis.
@@ -1642,8 +1642,8 @@ def explain_with_custom_pipeline(
 def compute_metrics_only(
     input_path: str,
     method: str = "single_model",
-    output_dir: Optional[str] = None,
-    metrics_kwargs: Optional[Dict[str, Any]] = None,
+    output_dir: str | None = None,
+    metrics_kwargs: Dict[str, Any | None] = None,
     use_wandb: bool = True,
     verbose: bool = False
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:

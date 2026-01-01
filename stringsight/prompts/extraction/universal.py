@@ -228,7 +228,7 @@ agent_sbs_config = {
 }
 
 
-def format_universal_prompt(task_description: str, config: dict[str, Any]) -> str:
+def format_universal_prompt(task_description: str, config: dict[str, str]) -> str:
     """
     Format the universal prompt template with a task description and configuration.
     

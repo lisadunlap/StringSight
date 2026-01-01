@@ -6,27 +6,29 @@ These mixins provide reusable functionality that can be composed into pipeline s
 
 import time
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 from functools import wraps
 from tqdm import tqdm
 
 
 class LoggingMixin:
     """Mixin for consistent logging across pipeline stages."""
-    
-    def __init__(self, *, verbose: bool = True, **kwargs):
+
+    name: str  # Expected to be provided by PipelineStage
+
+    def __init__(self, *, verbose: bool = True, **kwargs: Any):
         self.verbose = verbose
         self.logger = logging.getLogger(self.__class__.__name__)
         # Forward all remaining kwargs so downstream mixins (e.g., WandbMixin)
         # receive configuration such as `use_wandb`, `wandb_project`, etc.
         super().__init__(**kwargs)
-        
+
     def log(self, message: str, level: str = "info") -> None:
         """Log a message if verbose mode is enabled."""
         if self.verbose:
             getattr(self.logger, level.lower())(f"[{self.name}] {message}")
-    
-    def log_progress(self, iterable, desc: str = "Processing"):
+
+    def log_progress(self, iterable: Any, desc: str = "Processing") -> Any:
         """Create a progress bar for an iterable."""
         if self.verbose:
             return tqdm(iterable, desc=f"[{self.name}] {desc}")
@@ -47,7 +49,7 @@ class CacheMixin:
         """Generate a cache key from arguments."""
         return f"{args}_{kwargs}"
     
-    def get_cached(self, key: str) -> Optional[Any]:
+    def get_cached(self, key: str) -> Any | None:
         """Get a cached value."""
         if not self.use_cache:
             return None
@@ -65,10 +67,12 @@ class CacheMixin:
 
 class ErrorHandlingMixin:
     """Mixin for consistent error handling across pipeline stages."""
-    
-    def __init__(self, *, fail_fast: bool = False, **kwargs):
+
+    name: str  # Expected to be provided by PipelineStage
+
+    def __init__(self, *, fail_fast: bool = False, **kwargs: Any):
         self.fail_fast = fail_fast
-        self.errors    = []
+        self.errors: list[Dict[str, Any]] = []
         # Forward remaining kwargs (e.g., wandb flags) to next mixin
         super().__init__(**kwargs)
     
@@ -88,7 +92,7 @@ class ErrorHandlingMixin:
         if self.fail_fast:
             raise error
     
-    def get_errors(self) -> list:
+    def get_errors(self) -> list[Dict[str, Any]]:
         """Get all errors encountered during processing."""
         return self.errors
     
@@ -100,10 +104,12 @@ class ErrorHandlingMixin:
 class WandbMixin:
     """Mixin for Weights & Biases logging."""
 
+    name: str  # Expected to be provided by PipelineStage
+
     def __init__(self, *, use_wandb: bool = True, wandb_project: str | None = None, **_: Any):
-        self.use_wandb     = use_wandb
+        self.use_wandb = use_wandb
         self.wandb_project = wandb_project
-        self._wandb_ok     = False
+        self._wandb_ok = False
         self._summary_metrics: Dict[str, Any] = {}  # Accumulate summary metrics
         super().__init__()
     
@@ -274,10 +280,10 @@ class TimingMixin:
         return self.end_timer() or 0.0
 
 
-def timed_stage(func):
+def timed_stage(func: Any) -> Any:
     """Decorator to automatically time stage execution."""
     @wraps(func)
-    def wrapper(self, *args, **kwargs):
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
         if hasattr(self, 'start_timer'):
             self.start_timer()
         result = func(self, *args, **kwargs)

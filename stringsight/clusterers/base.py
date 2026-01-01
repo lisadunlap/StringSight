@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import os
 import asyncio
 import pandas as pd
@@ -47,12 +47,12 @@ class BaseClusterer(LoggingMixin, TimingMixin, WandbMixin, PipelineStage, ABC):
     def __init__(
         self,
         *,
-        output_dir: Optional[str] = None,
+        output_dir: str | None = None,
         include_embeddings: bool = False,
         use_wandb: bool = False,
-        wandb_project: Optional[str] = None,
+        wandb_project: str | None = None,
         prettify_labels: bool = False,
-        config: Optional[ClusterConfig] = None,
+        config: ClusterConfig | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the clusterer with common options.
@@ -79,7 +79,7 @@ class BaseClusterer(LoggingMixin, TimingMixin, WandbMixin, PipelineStage, ABC):
         self.output_dir = output_dir
         self.include_embeddings = include_embeddings
         self.prettify_labels = prettify_labels
-        self.config: Optional[ClusterConfig] = config
+        self.config: ClusterConfig | None = config
 
     @abstractmethod
     def cluster(self, data: PropertyDataset, column_name: str, progress_callback: Any = None) -> pd.DataFrame:

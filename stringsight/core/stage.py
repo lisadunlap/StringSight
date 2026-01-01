@@ -5,7 +5,7 @@ All pipeline stages must implement the PipelineStage interface.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 from .data_objects import PropertyDataset
 
 
@@ -101,6 +101,6 @@ class PipelineStage(ABC):
 
 class PassthroughStage(PipelineStage):
     """A stage that passes data through unchanged. Useful for testing."""
-    
-    def run(self, data: PropertyDataset) -> PropertyDataset:
+
+    def run(self, data: PropertyDataset, progress_callback: Any = None) -> PropertyDataset:
         return data 
