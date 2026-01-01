@@ -76,7 +76,7 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         self.include_scores_in_prompt = include_scores_in_prompt
         # Note: Caching is handled by parallel_completions via UnifiedCache singleton
 
-    async def run(self, data: PropertyDataset, progress_callback=None) -> PropertyDataset:
+    async def run(self, data: PropertyDataset, progress_callback: Any = None, **kwargs: Any) -> PropertyDataset:
         """Run OpenAI extraction for all conversations.
 
         Each conversation is formatted with ``prompt_builder`` and sent to the
@@ -143,10 +143,11 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
             # We don't yet know which model(s) the individual properties will
             # belong to; parser will figure it out.  Use a placeholder model
             # name so that validation passes.
+            model_name = conv.model if isinstance(conv.model, str) else conv.model[0] if isinstance(conv.model, list) and conv.model else "unknown"
             prop = Property(
                 id=str(uuid.uuid4()),
                 question_id=conv.question_id,
-                model=conv.model,
+                model=model_name,
                 raw_response=raw,
             )
             properties.append(prop)
@@ -402,7 +403,7 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         messages.append({"role": "user", "content": content})
         return messages
     
-    def _log_extraction_to_wandb(self, user_messages: List[str], raw_responses: List[str], conversations):
+    def _log_extraction_to_wandb(self, user_messages: List[Union[str, List[Dict[str, Any]]]], raw_responses: List[str | None], conversations):
         """Log extraction inputs/outputs to wandb."""
         try:
             import wandb

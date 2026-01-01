@@ -5,7 +5,7 @@ This module migrates the clustering logic from clustering/hierarchical_clusterin
 into pipeline stages.
 """
 
-from typing import Optional
+from typing import Optional, Any
 import asyncio
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 try:
     from .config import ClusterConfig
 except ImportError:
-    from config import ClusterConfig
+    from config import ClusterConfig  # type: ignore[no-redef]
 
 try:
     from stringsight.clusterers.hierarchical_clustering import (
@@ -47,20 +47,20 @@ class HDBSCANClusterer(BaseClusterer):
         embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
         include_embeddings: bool = False,
         use_wandb: bool = False,
-        wandb_project: Optional[str] = None,
-        output_dir: Optional[str] = None,
+        wandb_project: str | None = None,
+        output_dir: str | None = None,
         # Additional explicit configuration parameters\
-        min_samples: Optional[int] = None,
+        min_samples: int | None = None,
         cluster_selection_epsilon: float = 0.0,
         disable_dim_reduction: bool = False,
         dim_reduction_method: str = "adaptive",
-        context: Optional[str] = None,
-        groupby_column: Optional[str] = None,
+        context: str | None = None,
+        groupby_column: str | None = None,
         parallel_clustering: bool = True,
         cluster_positive: bool = True,
-        precomputed_embeddings: Optional[object] = None,
+        precomputed_embeddings: Any | None = None,
         cache_embeddings: bool = True,
-        input_model_name: Optional[str] = None,
+        input_model_name: str | None = None,
         summary_model: str = "gpt-4.1",
         cluster_assignment_model: str = "gpt-4.1-mini",
         verbose: bool = True,
@@ -383,8 +383,8 @@ class LLMOnlyClusterer(HDBSCANClusterer):
     clustering/hierarchical_clustering.py into the pipeline architecture.
     """
 
-    def run(self, data: PropertyDataset, column_name: str = "property_description", progress_callback=None) -> PropertyDataset:
+    async def run(self, data: PropertyDataset, progress_callback: Any = None, column_name: str = "property_description", **kwargs: Any) -> PropertyDataset:
         """Cluster properties using HDBSCAN (delegates to base)."""
-        return super().run(data, column_name, progress_callback=progress_callback)
+        return await super().run(data, progress_callback=progress_callback, column_name=column_name, **kwargs)
 
 

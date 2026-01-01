@@ -285,6 +285,8 @@ def enrich_clusters_with_metrics(
     enriched: List[Dict[str, Any]] = []
     for c in clusters:
         label = c.get("label")
+        if label is None:
+            continue
         cs = cluster_scores.get(label, {})
         # update size if available
         if isinstance(cs.get("size"), int):

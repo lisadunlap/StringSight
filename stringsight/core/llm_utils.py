@@ -11,7 +11,7 @@ import os
 import asyncio
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Dict, Any, Optional, Callable, Union, Tuple
+from typing import List, Dict, Any, Callable, Union, Tuple
 from dataclasses import dataclass
 import litellm
 import numpy as np
@@ -38,11 +38,12 @@ litellm.drop_params = True
 # ==================== LiteLLM Timing Callback ====================
 try:
     from litellm.integrations.custom_logger import CustomLogger as LiteLLMCustomLogger
+    _LiteLLMCustomLoggerBase = LiteLLMCustomLogger
 except ImportError:
-    LiteLLMCustomLogger = object
+    _LiteLLMCustomLoggerBase = object  # type: ignore[assignment, misc]
 
 
-class LLMTimingCallback(LiteLLMCustomLogger):
+class LLMTimingCallback(_LiteLLMCustomLoggerBase):  # type: ignore[misc]
     """Custom LiteLLM callback to log API call timing information."""
 
     def log_pre_api_call(self, model, messages, kwargs):
@@ -128,10 +129,10 @@ class LLMConfig:
     max_workers: int = 64
     max_retries: int = 3
     base_sleep_time: float = 2.0
-    timeout: Optional[float] = None
+    timeout: float | None = None
     temperature: float = 0.0
     top_p: float = 1.0
-    max_tokens: Optional[int] = None
+    max_tokens: int | None = None
     
 
 @dataclass
@@ -147,7 +148,7 @@ class EmbeddingConfig:
 class LLMUtils:
     """Utility class for parallel LLM operations with caching."""
 
-    def __init__(self, cache: Optional[UnifiedCache] = None):
+    def __init__(self, cache: UnifiedCache | None = None):
         """Initialize with optional cache instance."""
         self.cache = cache
         self._lock = threading.Lock()
@@ -156,11 +157,11 @@ class LLMUtils:
         self,
         messages: List[Union[str, List[Dict[str, Any]]]],
         config: LLMConfig,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         show_progress: bool = True,
         progress_desc: str = "LLM calls",
-        progress_callback: Optional[Callable[[int, int], None]] = None
-    ) -> List[str]:
+        progress_callback: Callable[[int, int], None] | None = None
+    ) -> List[str | None]:
         """
         Execute LLM completions in parallel with order preservation.
         
@@ -183,10 +184,10 @@ class LLMUtils:
             return []
             
         # Pre-allocate results to preserve order
-        results: List[str] = [""] * len(messages)
+        results: List[str | None] = [""] * len(messages)
         
         # Weave removed: directly define function
-        def _single_completion(idx: int, message: Union[str, List[Dict[str, Any]]]) -> Tuple[int, str]:
+        def _single_completion(idx: int, message: Union[str, List[Dict[str, Any]]]) -> Tuple[int, str | None]:
             """Process a single completion with retries."""
             for attempt in range(config.max_retries):
                 try:
@@ -206,11 +207,11 @@ class LLMUtils:
                     
                     # GPT-5 models only support temperature=1, so skip temperature/top_p for them
                     if "gpt-5" not in config.model.lower():
-                        request_data["temperature"] = config.temperature
-                        request_data["top_p"] = config.top_p
+                        request_data["temperature"] = config.temperature  # type: ignore[assignment]
+                        request_data["top_p"] = config.top_p  # type: ignore[assignment]
                     
                     if config.max_tokens:
-                        request_data["max_completion_tokens"] = config.max_tokens
+                        request_data["max_completion_tokens"] = config.max_tokens  # type: ignore[assignment]
                     
                     # Check cache first
                     cached_response = None
@@ -338,8 +339,11 @@ class LLMUtils:
                             # For other errors, use standard exponential backoff
                             sleep_time = config.base_sleep_time * (2 ** attempt)
                             logger.warning(f"LLM call attempt {attempt + 1} failed, retrying in {sleep_time}s: {e}")
-                        
+
                         time.sleep(sleep_time)
+
+            # Fallback return if loop exits without returning (should not happen)
+            return idx, None
 
         # Execute in parallel
         with ThreadPoolExecutor(max_workers=config.max_workers) as executor:
@@ -393,7 +397,7 @@ class LLMUtils:
             return []
         
         # Pre-allocate results to preserve order
-        embeddings: List[Optional[List[float]]] = [None] * len(texts)
+        embeddings_raw: List[List[float] | None] = [None] * len(texts)
         
         # Normalize model identifier for provider-prefixed LiteLLM routing
         model_name = _normalize_embedding_model_name(config.model)
@@ -510,22 +514,24 @@ class LLMUtils:
             for future in as_completed(futures):
                 start_idx, batch_embeddings = future.result()
                 batch_size = len(batch_embeddings)
-                embeddings[start_idx:start_idx + batch_size] = batch_embeddings
+                embeddings_raw[start_idx:start_idx + batch_size] = batch_embeddings
                 pbar.update(batch_size)
             pbar.close()
-        
+
         # Verify all embeddings were filled
-        if any(e is None for e in embeddings):
+        if any(e is None for e in embeddings_raw):
             raise RuntimeError("Some embeddings are missing - check logs for errors.")
-        
+
+        # Type assertion: we've verified no None values exist
+        embeddings: List[List[float]] = embeddings_raw  # type: ignore[assignment]
         return embeddings
     
     def single_completion(
         self,
         message: Union[str, List[Dict[str, Any]]],
         config: LLMConfig,
-        system_prompt: Optional[str] = None
-    ) -> str:
+        system_prompt: str | None = None
+    ) -> str | None:
         """
         Single completion call with caching (convenience method).
         
@@ -566,13 +572,13 @@ def get_default_llm_utils() -> LLMUtils:
 def parallel_completions(
     messages: List[Union[str, List[Dict[str, Any]]]],
     model: str = "gpt-4.1-mini",
-    system_prompt: Optional[str] = None,
+    system_prompt: str | None = None,
     max_workers: int = 64,
     show_progress: bool = True,
     progress_desc: str = "LLM calls",
-    progress_callback: Optional[Callable[[int, int], None]] = None,
-    **kwargs
-) -> List[str]:
+    progress_callback: Callable[[int, int], None] | None = None,
+    **kwargs: Any
+) -> List[str | None]:
     """Convenience function for parallel completions with default settings."""
     # Separate function-specific parameters from config parameters
     config_kwargs = {k: v for k, v in kwargs.items()
@@ -586,13 +592,13 @@ def parallel_completions(
 async def parallel_completions_async(
     messages: List[Union[str, List[Dict[str, Any]]]],
     model: str = "gpt-4.1-mini",
-    system_prompt: Optional[str] = None,
+    system_prompt: str | None = None,
     max_workers: int = 64,
     show_progress: bool = True,
     progress_desc: str = "LLM calls",
-    progress_callback: Optional[Callable[[int, int], None]] = None,
-    **kwargs
-) -> List[str]:
+    progress_callback: Callable[[int, int], None] | None = None,
+    **kwargs: Any
+) -> List[str | None]:
     """Async wrapper for parallel completions with default settings."""
     # Run the synchronous function in an executor to avoid blocking
     loop = asyncio.get_event_loop()
@@ -657,9 +663,9 @@ def _normalize_embedding_model_name(model: str) -> str:
 def single_completion(
     message: Union[str, List[Dict[str, Any]]],
     model: str = "gpt-4.1-mini", 
-    system_prompt: Optional[str] = None,
-    **kwargs
-) -> str:
+    system_prompt: str | None = None,
+    **kwargs: Any
+) -> str | None:
     """Convenience function for single completion with caching."""
     # Separate function-specific parameters from config parameters (no function-specific params for single)
     config_kwargs = {k: v for k, v in kwargs.items() 

@@ -115,7 +115,7 @@ def format_trace_with_metadata(trace: Dict[str, object], metadata: Dict[str, obj
 
     For the MVP we keep metadata empty; this is a future-proof hook.
     """
-    out = {"trace": trace}
+    out: Dict[str, object] = {"trace": trace}
     if metadata:
         out["metadata"] = metadata
     return out

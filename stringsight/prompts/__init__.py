@@ -4,6 +4,8 @@ Prompts module for StringSight.
 This module contains system prompts and prompt utilities for property extraction.
 """
 
+from typing import Any, cast
+
 from .task_descriptions import (
     sbs_default_task_description,
     single_model_default_task_description,
@@ -111,15 +113,15 @@ def get_default_system_prompt(method: str) -> str:
     """Return the fully formatted default prompt for the given method."""
     if method not in ("single_model", "side_by_side"):
         raise ValueError(f"Unknown method: {method}. Supported methods: 'side_by_side', 'single_model'")
-    entry = PROMPTS["default"][method]
-    default_desc = entry["default_task_description"]
-    
+    entry = cast(dict[str, Any], PROMPTS["default"][method])
+    default_desc = cast(str, entry["default_task_description"])
+
     # Handle config-based prompts (universal)
     if "config" in entry:
-        return format_universal_prompt(default_desc, entry["config"])
-    
+        return format_universal_prompt(default_desc, cast(dict[str, str], entry["config"]))
+
     # Handle template-based prompts (legacy)
-    template = entry["template"]
+    template = cast(str, entry["template"])
     return _format_task_aware(template, default_desc)
 
 
@@ -138,51 +140,51 @@ def get_system_prompt(method: str, system_prompt: str | None = None, task_descri
     try:
         # No explicit prompt → use default alias
         if system_prompt is None:
-            entry = PROMPTS["default"][method]
+            entry = cast(dict[str, Any], PROMPTS["default"][method])
             default_desc = entry.get("default_task_description")
             if default_desc is None:
                 raise ValueError(f"No default task description found for method '{method}'")
-            desc = task_description if task_description is not None else default_desc
-            
+            desc = task_description if task_description is not None else cast(str, default_desc)
+
             # Handle config-based prompts (universal)
             if "config" in entry:
                 config = entry.get("config")
                 if config is None:
                     raise ValueError(f"No config found for default prompt with method '{method}'")
-                result = format_universal_prompt(desc, config)
+                result = format_universal_prompt(desc, cast(dict[str, str], config))
                 if result is None:
                     raise ValueError(f"format_universal_prompt returned None for method '{method}'")
                 return result
-            
+
             # Handle template-based prompts (legacy)
             template = entry.get("template")
             if template is None:
                 raise ValueError(f"No template found for default prompt with method '{method}'")
-            return _format_task_aware(template, desc)
+            return _format_task_aware(cast(str, template), desc)
 
         # Alias: "default", "agent", "universal", or "agent_universal"
         if system_prompt in PROMPTS:
-            entry = PROMPTS[system_prompt][method]
+            entry = cast(dict[str, Any], PROMPTS[system_prompt][method])
             default_desc = entry.get("default_task_description")
             if default_desc is None:
                 raise ValueError(f"No default task description found for prompt '{system_prompt}' with method '{method}'")
-            desc = task_description if task_description is not None else default_desc
-            
+            desc = task_description if task_description is not None else cast(str, default_desc)
+
             # Handle config-based prompts (universal)
             if "config" in entry:
                 config = entry.get("config")
                 if config is None:
                     raise ValueError(f"No config found for prompt '{system_prompt}' with method '{method}'")
-                result = format_universal_prompt(desc, config)
+                result = format_universal_prompt(desc, cast(dict[str, str], config))
                 if result is None:
                     raise ValueError(f"format_universal_prompt returned None for prompt '{system_prompt}' with method '{method}'")
                 return result
-            
+
             # Handle template-based prompts (legacy)
             template = entry.get("template")
             if template is None:
                 raise ValueError(f"No template found for prompt '{system_prompt}' with method '{method}'")
-            return _format_task_aware(template, desc)
+            return _format_task_aware(cast(str, template), desc)
 
         # Try to resolve as a prompt name from the prompts module
         # This allows names like "agent_system_prompt" to be resolved
@@ -192,10 +194,10 @@ def get_system_prompt(method: str, system_prompt: str | None = None, task_descri
             template = getattr(current_module, system_prompt)
             # If the template has {task_description}, format it
             if isinstance(template, str) and "{task_description}" in template:
-                default_desc = PROMPTS["default"][method].get("default_task_description")
+                default_desc = cast(dict[str, Any], PROMPTS["default"][method]).get("default_task_description")
                 if default_desc is None:
                     raise ValueError(f"No default task description found for method '{method}'")
-                desc = task_description if task_description is not None else default_desc
+                desc = task_description if task_description is not None else cast(str, default_desc)
                 return _format_task_aware(template, desc)
             # Otherwise return as-is (no task description support)
             if isinstance(template, str):
@@ -211,10 +213,10 @@ def get_system_prompt(method: str, system_prompt: str | None = None, task_descri
         # Literal string
         template = system_prompt
         if "{task_description}" in template:
-            default_desc = PROMPTS["default"][method].get("default_task_description")
+            default_desc = cast(dict[str, Any], PROMPTS["default"][method]).get("default_task_description")
             if default_desc is None:
                 raise ValueError(f"No default task description found for method '{method}'")
-            desc = task_description if task_description is not None else default_desc
+            desc = task_description if task_description is not None else cast(str, default_desc)
             return _format_task_aware(template, desc)
         if task_description is not None:
             raise ValueError(

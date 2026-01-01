@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List
 from datetime import datetime
 from pathlib import Path
 import pandas as pd
@@ -47,7 +47,7 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
             logger.error(f"Job {job_id} not found in database")
             return
 
-        job.status = "running"
+        job.status = "running"  # type: ignore[assignment]
         db.commit()
 
         # Reconstruct request object
@@ -86,7 +86,7 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
                     with SessionLocal() as session:
                         current_job = session.query(Job).filter(Job.id == job_uuid).first()
                         if current_job:
-                            current_job.progress = completed / total_count if total_count > 0 else 0.0
+                            current_job.progress = completed / total_count if total_count > 0 else 0.0  # type: ignore[assignment]
                             session.commit()
                     last_update = now
                 except Exception as e:
@@ -108,7 +108,7 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
         )
 
         # Run extraction with progress callback
-        extracted_dataset = await extractor.run(dataset, progress_callback=update_progress)
+        extracted_dataset = await extractor.run(dataset, progress_callback=update_progress)  # type: ignore[misc]
 
         # Determine output directory
         base_results_dir = _get_results_dir()
@@ -134,9 +134,9 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
         # Update job with success
         # Refresh job object
         job = db.query(Job).filter(Job.id == job_uuid).first()
-        job.status = "completed"
-        job.progress = 1.0
-        job.result_path = req.output_dir if req.output_dir else f"extract_{job_id}_{timestamp}"
+        job.status = "completed"  # type: ignore[union-attr]
+        job.progress = 1.0  # type: ignore[union-attr]
+        job.result_path = req.output_dir if req.output_dir else f"extract_{job_id}_{timestamp}"  # type: ignore[union-attr]
         db.commit()
 
     except Exception as e:
@@ -144,8 +144,8 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
         try:
             job = db.query(Job).filter(Job.id == job_uuid).first()
             if job:
-                job.status = "failed"
-                job.error_message = str(e)
+                job.status = "failed"  # type: ignore[assignment]
+                job.error_message = str(e)  # type: ignore[assignment]
                 db.commit()
         except Exception as db_e:
             logger.error(f"Failed to update job error state: {db_e}")
@@ -183,10 +183,10 @@ def _run_pipeline_job(job_id: str, req_data: Dict[str, Any]) -> None:
         if not job:
             logger.error(f"Job {job_id} not found")
             return
-        
-        job.status = "running"
+
+        job.status = "running"  # type: ignore[assignment]
         db.commit()
-        
+
         req = PipelineJobRequest(**req_data)
         df = pd.DataFrame(req.rows)
         
@@ -237,17 +237,17 @@ def _run_pipeline_job(job_id: str, req_data: Dict[str, Any]) -> None:
                 with SessionLocal() as session:
                     current_job = session.query(Job).filter(Job.id == job_uuid).first()
                     if current_job:
-                        current_job.progress = progress
+                        current_job.progress = progress  # type: ignore[assignment]
                         session.commit()
             except Exception as e:
                 logger.error(f"Failed to update progress: {e}")
 
-        explain(df, **explain_kwargs, progress_callback=update_progress)
+        explain(df, **explain_kwargs, progress_callback=update_progress)  # type: ignore[arg-type]
 
         job = db.query(Job).filter(Job.id == job_uuid).first()
-        job.status = "completed"
-        job.progress = 1.0
-        job.result_path = req.output_dir if req.output_dir else f"pipeline_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        job.status = "completed"  # type: ignore[union-attr]
+        job.progress = 1.0  # type: ignore[union-attr]
+        job.result_path = req.output_dir if req.output_dir else f"pipeline_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"  # type: ignore[union-attr]
         db.commit()
 
     except Exception as e:
@@ -255,8 +255,8 @@ def _run_pipeline_job(job_id: str, req_data: Dict[str, Any]) -> None:
         try:
             job = db.query(Job).filter(Job.id == job_uuid).first()
             if job:
-                job.status = "failed"
-                job.error_message = str(e)
+                job.status = "failed"  # type: ignore[assignment]
+                job.error_message = str(e)  # type: ignore[assignment]
                 db.commit()
         except Exception as db_e:
             logger.error(f"Failed to update job error state: {db_e}")
@@ -303,9 +303,9 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
         if not job:
             logger.error(f"Job {job_id} not found")
             return
-        
-        job.status = "running"
-        job.progress = 0.0
+
+        job.status = "running"  # type: ignore[assignment]
+        job.progress = 0.0  # type: ignore[assignment]
         db.commit()
         
         # Reconstruct request
@@ -320,7 +320,7 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
                 with SessionLocal() as session:
                     current_job = session.query(Job).filter(Job.id == job_uuid).first()
                     if current_job:
-                        current_job.progress = progress
+                        current_job.progress = progress  # type: ignore[assignment]
                         session.commit()
             except Exception as e:
                 logger.error(f"Failed to update progress: {e}")
@@ -402,11 +402,11 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
         
         # Handle side-by-side if needed
         if req.method == "side_by_side":
-            properties_by_qid = {}
-            for p in properties:
-                if p.question_id not in properties_by_qid:
-                    properties_by_qid[p.question_id] = []
-                properties_by_qid[p.question_id].append(p)
+            properties_by_qid: Dict[str, List[Property]] = {}
+            for prop in properties:
+                if prop.question_id not in properties_by_qid:
+                    properties_by_qid[prop.question_id] = []
+                properties_by_qid[prop.question_id].append(prop)
             
             operational_rows_map = {}
             for row in req.operationalRows:
@@ -487,10 +487,14 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
             groupby_column=groupby_column,
         )
         
-        clustered_dataset = await clusterer.run(dataset, column_name="property_description")
+        clustered_dataset = await clusterer.run(dataset)  # type: ignore[misc]
         update_progress(0.75)
         
         # Phase 4: Compute metrics (20%)
+        from stringsight.metrics.functional_metrics import FunctionalMetrics
+        from stringsight.metrics.side_by_side import SideBySideMetrics
+
+        metrics_computer: SideBySideMetrics | FunctionalMetrics
         if req.method == "side_by_side":
             metrics_computer = SideBySideMetrics(
                 output_dir=None,
@@ -505,7 +509,7 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
                 log_to_wandb=False,
                 generate_plots=False
             )
-        
+
         clustered_dataset = metrics_computer.run(clustered_dataset)
         update_progress(0.95)
         
@@ -530,13 +534,14 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
         
         # Save conversations
         try:
-            method = "side_by_side" if any(isinstance(conv.model, list) for conv in clustered_dataset.conversations) else "single_model"
-            conv_df = clustered_dataset.to_dataframe(type="base", method=method)
-            formatted_conversations = format_conversations(conv_df, method)
+            from typing import cast, Literal
+            detected_method: Literal['single_model', 'side_by_side'] = "side_by_side" if any(isinstance(conv.model, list) for conv in clustered_dataset.conversations) else "single_model"
+            conv_df = clustered_dataset.to_dataframe(type="base", method=detected_method)
+            formatted_conversations_list = format_conversations(conv_df, detected_method)
             conversation_path = results_dir / "conversation.jsonl"
             with open(conversation_path, 'w') as f:
-                for conv in formatted_conversations:
-                    f.write(json.dumps(conv, default=str) + '\n')
+                for conv_dict in formatted_conversations_list:
+                    f.write(json.dumps(conv_dict, default=str) + '\n')
         except Exception as e:
             logger.warning(f"Failed to save conversation.jsonl: {e}")
         
@@ -580,12 +585,13 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
         # Update job completion
         update_progress(1.0)
         job = db.query(Job).filter(Job.id == job_uuid).first()
-        job.status = "completed"
-        job.progress = 1.0
-        # Store relative path from results directory for API compatibility
-        relative_path = req.output_dir if req.output_dir else f"{base_filename}_{timestamp}"
-        job.result_path = relative_path
-        db.commit()
+        if job:
+            job.status = "completed"  # type: ignore[assignment]
+            job.progress = 1.0  # type: ignore[assignment]
+            # Store relative path from results directory for API compatibility
+            relative_path = req.output_dir if req.output_dir else f"{base_filename}_{timestamp}"
+            job.result_path = relative_path  # type: ignore[assignment]
+            db.commit()
 
         logger.info(f"Cluster job {job_id} completed successfully")
         
@@ -594,8 +600,8 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
         try:
             job = db.query(Job).filter(Job.id == job_uuid).first()
             if job:
-                job.status = "failed"
-                job.error_message = str(e)
+                job.status = "failed"  # type: ignore[assignment]
+                job.error_message = str(e)  # type: ignore[assignment]
                 db.commit()
         except Exception as db_e:
             logger.error(f"Failed to update job error state: {db_e}")

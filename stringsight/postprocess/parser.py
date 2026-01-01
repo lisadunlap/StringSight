@@ -39,11 +39,11 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
         can opt-in to strict mode by passing ``fail_fast=True``.
         """
         super().__init__(fail_fast=fail_fast, **kwargs)
-        self.parsing_failures = []
+        self.parsing_failures: list[dict[str, Any]] = []
         self.output_dir = output_dir
         self.storage = storage or get_storage_adapter()
         
-    def run(self, data: PropertyDataset, progress_callback=None) -> PropertyDataset:
+    def run(self, data: PropertyDataset, progress_callback: Any = None, **kwargs: Any) -> PropertyDataset:
         """
         Parse raw LLM responses into Property objects.
         
@@ -271,6 +271,8 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
         """Save parsing results to the specified output directory."""
         # Create output directory if it doesn't exist
         output_path = self.output_dir
+        if not output_path:
+            return
         self.storage.ensure_directory(output_path)
 
         self.log(f"✅ Auto-saving parsing results to: {output_path}")
@@ -303,7 +305,7 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
             self.log(f"  • Parsing failures: {failures_path}")
 
             # Also save a summary of error types
-            error_types = {}
+            error_types: dict[str, int] = {}
             for failure in self.parsing_failures:
                 error_type = failure['error_type']
                 error_types[error_type] = error_types.get(error_type, 0) + 1
@@ -717,7 +719,7 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
             # Log parsing failures if any
             if self.parsing_failures:
                 # Log failure summary by error type
-                error_type_counts = {}
+                error_type_counts: dict[str, int] = {}
                 for failure in self.parsing_failures:
                     error_type = failure['error_type']
                     error_type_counts[error_type] = error_type_counts.get(error_type, 0) + 1

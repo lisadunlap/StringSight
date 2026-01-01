@@ -1,7 +1,7 @@
 # Development configuration with volume mounts for live code reloading
 # Usage:
-#   Option 1: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
-#   Option 2: cp docker-compose.dev.yml docker-compose.override.yml && docker-compose up
+#   Option 1 (recommended): docker compose -f docker-compose.yml -f docker/docker-compose.dev.yml up
+#   Option 2 (auto-loaded override): cp docker/docker-compose.dev.yml docker-compose.override.yml && docker compose up
 
 version: '3.8'
 
@@ -9,7 +9,7 @@ services:
   api:
     volumes:
       # Mount source code for live reload
-      - .:/app
+      - ..:/app
       # Exclude Python bytecode and build artifacts to avoid permission issues
       - /app/__pycache__
       - /app/.pytest_cache
@@ -21,7 +21,7 @@ services:
   worker:
     volumes:
       # Mount source code for live reload
-      - .:/app
+      - ..:/app
       # Exclude Python bytecode and build artifacts
       - /app/__pycache__
       - /app/.pytest_cache

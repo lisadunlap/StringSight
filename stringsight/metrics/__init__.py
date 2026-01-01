@@ -12,7 +12,10 @@ Currently available:
 """
 
 from importlib import import_module as _imp
-from typing import Dict, Any
+from typing import Dict, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from stringsight.core.stage import PipelineStage
 
 __all__: list[str] = [
     "SideBySideMetrics",

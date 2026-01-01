@@ -29,6 +29,7 @@ class SideBySideMetrics(FunctionalMetrics):
         output_dir: str | None = None,
         compute_bootstrap: bool = True,
         bootstrap_samples: int = 100,
+        bootstrap_seed: int | None = None,
         log_to_wandb: bool = True,
         generate_plots: bool = True,
         **kwargs: Any,
@@ -37,6 +38,7 @@ class SideBySideMetrics(FunctionalMetrics):
             output_dir=output_dir,
             compute_bootstrap=compute_bootstrap,
             bootstrap_samples=bootstrap_samples,
+            bootstrap_seed=bootstrap_seed,
             log_to_wandb=log_to_wandb,
             generate_plots=generate_plots,
             **kwargs,
@@ -292,6 +294,25 @@ class SideBySideMetrics(FunctionalMetrics):
 
         return model_cluster_scores
 
+    def _bootstrap_salience_from_proportions(self, proportions: Any, *, n_models: int) -> Any:
+        """Compute bootstrap salience for side-by-side from proportions.
+
+        For SxS with exactly 2 models, `proportion_delta` is the **pairwise difference**:
+            - model_a: p_a - p_b
+            - model_b: p_b - p_a
+
+        If there are not exactly 2 models, we fall back to the base definition
+        (deviation from the average of other models).
+        """
+        import numpy as np
+
+        if n_models == 2:
+            out = np.zeros_like(proportions, dtype=float)
+            out[0, :] = proportions[0, :] - proportions[1, :]
+            out[1, :] = proportions[1, :] - proportions[0, :]
+            return out
+        return super()._bootstrap_salience_from_proportions(proportions, n_models=n_models)
+
     def compute_cluster_metrics(self, df: pd.DataFrame, clusters: List[str] | str, models: List[str] | str, *, include_metadata: bool = True) -> Dict[str, Any]:
         """Override to avoid indexing into empty DataFrames during bootstrap.
 
@@ -318,9 +339,9 @@ class SideBySideMetrics(FunctionalMetrics):
         if len(cluster_model_df) == 0:
             return self.empty_metrics(metric_keys)
 
-        # Compute sizes and raw quality scores
-        model_size, model_scores = self.compute_size_and_score(model_df)
-        cluster_model_size, cluster_model_scores = self.compute_size_and_score(cluster_model_df)
+        # Compute sizes and raw quality scores (pass metrics to ensure consistency)
+        model_size, model_scores = self.compute_size_and_score(model_df, metrics=metric_keys)
+        cluster_model_size, cluster_model_scores = self.compute_size_and_score(cluster_model_df, metrics=metric_keys)
 
         # Align keys without asserting strict equality
         all_keys = set(metric_keys) | set(model_scores.keys()) | set(cluster_model_scores.keys())

@@ -6,6 +6,8 @@ for different modes (single model, side-by-side, agent, etc.) using configuratio
 dictionaries.
 """
 
+from typing import Any
+
 # Universal System Prompt Template
 universal_system_prompt = """You are an expert model behavior analyst. {intro_task} We are looking for **actionable** behaviors, meaning behaviors that can provide information that can be used to improve the system. Think about whether a developer could use this information to improve the agent's performance or if a user could use this information to choose this model over others.
 
@@ -226,7 +228,7 @@ agent_sbs_config = {
 }
 
 
-def format_universal_prompt(task_description: str, config: dict) -> str:
+def format_universal_prompt(task_description: str, config: dict[str, str]) -> str:
     """
     Format the universal prompt template with a task description and configuration.
     

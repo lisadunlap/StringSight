@@ -600,9 +600,34 @@ def validate_and_prepare_dataframe(
     
     # Step 2: Convert score_columns to score dict if specified (and not already done)
     if score_columns and not score_columns_already_converted:
-        if verbose:
-            logger.info(f"Converting score columns {score_columns} to dictionary format")
-        df = convert_score_columns_to_dict(df, score_columns, method)
+        # Check if score column already exists with dict values
+        # If so, skip conversion (user's data is already in the correct format)
+        score_col_exists = False
+        if method == "single_model" and "score" in df.columns:
+            # Check if it contains dict values
+            sample_score = df["score"].iloc[0] if len(df) > 0 else None
+            if isinstance(sample_score, dict):
+                score_col_exists = True
+                if verbose:
+                    logger.info(f"'score' column already exists with dict format - skipping score_columns conversion")
+        elif method == "side_by_side" and ("score_a" in df.columns or "score_b" in df.columns):
+            # Check if they contain dict values
+            if "score_a" in df.columns:
+                sample_score = df["score_a"].iloc[0] if len(df) > 0 else None
+                if isinstance(sample_score, dict):
+                    score_col_exists = True
+            if "score_b" in df.columns:
+                sample_score = df["score_b"].iloc[0] if len(df) > 0 else None
+                if isinstance(sample_score, dict):
+                    score_col_exists = True
+            if score_col_exists and verbose:
+                logger.info(f"'score_a'/'score_b' columns already exist with dict format - skipping score_columns conversion")
+        
+        # Only convert if score dict doesn't already exist
+        if not score_col_exists:
+            if verbose:
+                logger.info(f"Converting score columns {score_columns} to dictionary format")
+            df = convert_score_columns_to_dict(df, score_columns, method)
     
     # Step 3: Sample data if requested
     if sample_size is not None and sample_size > 0 and sample_size < len(df):

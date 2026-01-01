@@ -5,7 +5,7 @@ These objects define the data contract that flows between pipeline stages.
 """
 
 from dataclasses import dataclass, field, asdict
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 import pandas as pd
 from pydantic import BaseModel, Field, validator
 import numpy as np
@@ -137,16 +137,16 @@ class Property:
     question_id: str
     model: str
     # Parsed fields (filled by LLMJsonParser)
-    property_description: Optional[str] = None
-    category: Optional[str] = None
-    reason: Optional[str] = None
-    evidence: Optional[str] = None
-    behavior_type: Optional[str] = None # Positive|Negative (non-critical)|Negative (critical)|Style
+    property_description: str | None = None
+    category: str | None = None
+    reason: str | None = None
+    evidence: str | None = None
+    behavior_type: str | None = None # Positive|Negative (non-critical)|Negative (critical)|Style
 
     # Raw LLM response (captured by extractor before parsing)
-    raw_response: Optional[str] = None
-    contains_errors: Optional[bool] = None
-    unexpected_behavior: Optional[bool] = None
+    raw_response: str | None = None
+    contains_errors: bool | None = None
+    unexpected_behavior: bool | None = None
     meta: Dict[str, Any] = field(default_factory=dict) # all other metadata
 
     def to_dict(self):
@@ -165,7 +165,7 @@ class Property:
 @dataclass
 class Cluster:
     """A cluster of properties."""
-    id: str # cluster id
+    id: str | int # cluster id
     label: str # cluster label
     size: int # cluster size
     property_descriptions: List[str] = field(default_factory=list) # property descriptions in the cluster
@@ -211,12 +211,12 @@ class ModelStats:
     metadata: Dict[str, Any] = field(default_factory=dict) # all other metadata
 
     # Confidence intervals for uncertainty quantification
-    score_ci: Optional[Dict[str, float]] = None  # 95% CI for distinctiveness score: {"lower": x, "upper": y}
-    quality_score_ci: Optional[Dict[str, Dict[str, float]]] = None  # CI bounds for each quality score key: {"key": {"lower": x, "upper": y}}
+    score_ci: Dict[str, float] | None = None  # 95% CI for distinctiveness score: {"lower": x, "upper": y}
+    quality_score_ci: Dict[str, Dict[str, float]] | None = None  # CI bounds for each quality score key: {"key": {"lower": x, "upper": y}}
 
     # Statistical significance
-    score_statistical_significance: Optional[bool] = None
-    quality_score_statistical_significance: Optional[Dict[str, bool]] = None
+    score_statistical_significance: bool | None = None
+    quality_score_statistical_significance: Dict[str, bool] | None = None
 
     def to_dict(self):
         return asdict(self)
@@ -260,7 +260,7 @@ class PropertyDataset:
         Returns:
             PropertyDataset with populated conversations
         """
-        conversations = []
+        conversations: list[dict[str, Any]] = []
         if method == "side_by_side":
             all_models = list(set(df["model_a"].unique().tolist() + df["model_b"].unique().tolist()))
             # Expected columns: question_id, prompt, model_a, model_b,
@@ -295,6 +295,8 @@ class PropertyDataset:
 
             # Now build conversations with pre-converted OAI responses
             for idx, result in enumerate(oai_results):
+                if result is None:
+                    continue
                 oai_response_a, oai_response_b, row = result
                 prompt = str(row.get('prompt', row.get('user_prompt', '')))
                 
@@ -403,6 +405,8 @@ class PropertyDataset:
 
             # Now build conversations with pre-converted OAI responses
             for idx, result in enumerate(oai_results):
+                if result is None:
+                    continue
                 oai_response, row = result
                 scores = parse_single_score_field(row.get('score'))
                 prompt = str(row.get('prompt', row.get('user_prompt', '')))
@@ -424,7 +428,12 @@ class PropertyDataset:
         else:
             raise ValueError(f"Unknown method: {method}. Must be 'side_by_side' or 'single_model'")
             
-        return cls(conversations=conversations, all_models=all_models)
+        # Convert dict conversations to ConversationRecord objects
+        conversation_records = [
+            ConversationRecord(**conv) if isinstance(conv, dict) else conv
+            for conv in conversations
+        ]
+        return cls(conversations=conversation_records, all_models=all_models)
     
     def to_dataframe(self, type: str = "all", method: str = "side_by_side") -> pd.DataFrame:
         """
@@ -481,7 +490,7 @@ class PropertyDataset:
         # Add properties if they exist
         if self.properties and type in ["all", "properties", "clusters"]:
             # Create a mapping from (question_id, model) to properties
-            prop_map = {}
+            prop_map: Dict[tuple, List[Property]] = {}
             for prop in self.properties:
                 key = (prop.question_id, prop.model)
                 if key not in prop_map:
@@ -636,6 +645,7 @@ class PropertyDataset:
             json_safe_dict = {}
             for k, v in obj.items():
                 # Convert tuple/list keys to string representation
+                safe_key: str | int | float | bool | None
                 if isinstance(k, (tuple, list)):
                     safe_key = str(k)
                 elif isinstance(k, (str, int, float, bool)) or k is None:
@@ -657,17 +667,18 @@ class PropertyDataset:
             "all_models": self.all_models,
         }
     
-    def get_valid_properties(self):
+    def get_valid_properties(self) -> List[Property]:
         """Get all properties where the property model is unknown, there is no property description, or the property description is empty."""
-        logger.debug(f"All models: {self.all_models}")
-        logger.debug(f"Properties: {self.properties[0].model}")
-        logger.debug(f"Property description: {self.properties[0].property_description}")
+        if self.properties:
+            logger.debug(f"All models: {self.all_models}")
+            logger.debug(f"Properties: {self.properties[0].model}")
+            logger.debug(f"Property description: {self.properties[0].property_description}")
         return [prop for prop in self.properties if prop.model in self.all_models and prop.property_description is not None and prop.property_description.strip() != ""]
 
     # ------------------------------------------------------------------
     # 📝 Persistence helpers
     # ------------------------------------------------------------------
-    def save(self, path: str, format: str = "json", storage: Optional[StorageAdapter] = None) -> None:
+    def save(self, path: str, format: str = "json", storage: StorageAdapter | None = None) -> None:
         """Save the dataset to *path* in either ``json``, ``dataframe``, ``parquet`` or ``pickle`` format.
 
         The JSON variant produces a fully human-readable file while the pickle
@@ -726,7 +737,7 @@ class PropertyDataset:
         return list(models)
 
     @classmethod
-    def load(cls, path: str, format: str = "json", storage: Optional[StorageAdapter] = None) -> "PropertyDataset":
+    def load(cls, path: str, format: str = "json", storage: StorageAdapter | None = None) -> "PropertyDataset":
         """Load a dataset previously saved with :py:meth:`save`."""
         import json, pickle, io
 
@@ -799,7 +810,7 @@ class PropertyDataset:
                 "property_description",
             }
             if required_cols.issubset(df.columns):
-                clusters_dict = {}
+                clusters_dict: Dict[Any, Cluster] = {}
                 for _, row in df.iterrows():
                     cid = row["cluster_id"]
                     if pd.isna(cid):

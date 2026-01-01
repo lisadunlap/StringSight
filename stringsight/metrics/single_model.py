@@ -34,6 +34,7 @@ class SingleModelMetrics(FunctionalMetrics):
         # Functional name (preferred)
         compute_bootstrap: bool | None = None,
         bootstrap_samples: int = 100,
+        bootstrap_seed: int | None = None,
         log_to_wandb: bool = True,
         generate_plots: bool = True,
         **kwargs: Any,
@@ -49,6 +50,7 @@ class SingleModelMetrics(FunctionalMetrics):
             output_dir=output_dir,
             compute_bootstrap=compute_bootstrap,
             bootstrap_samples=bootstrap_samples,
+            bootstrap_seed=bootstrap_seed,
             log_to_wandb=log_to_wandb,
             generate_plots=generate_plots,
             **kwargs,

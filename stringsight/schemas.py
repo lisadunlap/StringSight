@@ -66,7 +66,7 @@ class ClusterJobRequest(BaseModel):
     # Data
     properties: List[Dict[str, Any]]
     operationalRows: List[Dict[str, Any]]
-    
+
     # Clustering params
     params: ClusterParams
     method: Optional[Literal["single_model", "side_by_side"]] = "single_model"
@@ -75,3 +75,149 @@ class ClusterJobRequest(BaseModel):
     # Output
     output_dir: Optional[str] = None
 
+class LabelRequest(BaseModel):
+    """Request for fixed-taxonomy labeling pipeline."""
+    rows: List[Dict[str, Any]]
+    taxonomy: Dict[str, str]  # Label name -> description
+
+    # Column mapping
+    prompt_column: Optional[str] = "prompt"
+    model_column: Optional[str] = "model"
+    model_response_column: Optional[str] = "model_response"
+    question_id_column: Optional[str] = None
+
+    # LLM config (defaults optimized for labeling)
+    model_name: Optional[str] = "gpt-4.1"
+    temperature: Optional[float] = 0.0
+    top_p: Optional[float] = 1.0
+    max_tokens: Optional[int] = 2048
+    max_workers: Optional[int] = 64
+
+    # Data preparation
+    sample_size: Optional[int] = None
+    score_columns: Optional[List[str]] = None
+
+    # Metrics config
+    metrics_kwargs: Optional[Dict[str, Any]] = None
+
+    # Logging & output
+    use_wandb: Optional[bool] = False
+    wandb_project: Optional[str] = None
+    verbose: Optional[bool] = False
+    output_dir: Optional[str] = None
+    extraction_cache_dir: Optional[str] = None
+    metrics_cache_dir: Optional[str] = None
+
+
+class LabelPromptRequest(BaseModel):
+    """Request to get the system prompt for labeling with a given taxonomy."""
+    taxonomy: Dict[str, str]  # Label name -> description
+
+
+class RowsPayload(BaseModel):
+    rows: List[Dict[str, Any]]
+    method: Optional[Literal["single_model", "side_by_side"]] = None
+
+
+class ReadRequest(BaseModel):
+    """Request body for reading a dataset from the server filesystem."""
+    path: str
+    method: Optional[Literal["single_model", "side_by_side"]] = None
+    limit: Optional[int] = None
+
+
+class ListRequest(BaseModel):
+    path: str
+    exts: Optional[List[str]] = None
+
+
+class ResultsLoadRequest(BaseModel):
+    """Request to load a results directory from the server filesystem."""
+    path: str
+    max_conversations: Optional[int] = None
+    max_properties: Optional[int] = None
+    conversations_page: int = 1
+    conversations_per_page: int = 100
+    properties_page: int = 1
+    properties_per_page: int = 100
+
+
+class ExtractSingleRequest(BaseModel):
+    row: Dict[str, Any]
+    method: Optional[Literal["single_model", "side_by_side"]] = None
+    system_prompt: Optional[str] = None
+    task_description: Optional[str] = None
+    model_name: Optional[str] = "gpt-4.1"
+    temperature: Optional[float] = 0.7
+    top_p: Optional[float] = 0.95
+    max_tokens: Optional[int] = 16000
+    max_workers: Optional[int] = 128
+    include_scores_in_prompt: Optional[bool] = False
+    use_wandb: Optional[bool] = False
+    output_dir: Optional[str] = None
+    return_debug: Optional[bool] = False
+
+
+class DFRows(BaseModel):
+    rows: List[Dict[str, Any]]
+
+
+class DFSelectRequest(DFRows):
+    include: Dict[str, List[Any]] = {}
+    exclude: Dict[str, List[Any]] = {}
+
+
+class DFGroupPreviewRequest(DFRows):
+    by: str
+    numeric_cols: Optional[List[str]] = None
+
+
+class DFCustomRequest(DFRows):
+    code: str
+
+
+class ClusterRunParams(BaseModel):
+    minClusterSize: Optional[int] = None
+    embeddingModel: str = "openai/text-embedding-3-large"
+    groupBy: Optional[str] = "none"
+
+
+class ClusterRunRequest(BaseModel):
+    operationalRows: List[Dict[str, Any]]
+    properties: List[Dict[str, Any]]
+    params: ClusterRunParams
+    output_dir: Optional[str] = None
+    score_columns: Optional[List[str]] = None
+    method: Optional[str] = "single_model"
+
+
+class ClusterMetricsRequest(BaseModel):
+    clusters: List[Dict[str, Any]]
+    properties: List[Dict[str, Any]]
+    operationalRows: List[Dict[str, Any]]
+    included_property_ids: Optional[List[str]] = None
+    score_columns: Optional[List[str]] = None
+    method: Optional[str] = "single_model"
+
+
+class TidyRow(BaseModel):
+    """A single tidy row for single-model data."""
+    question_id: Optional[str] = None
+    prompt: str
+    model: str
+    model_response: Any
+    score: Optional[Dict[str, Optional[float]]] = None
+
+    class Config:
+        extra = "allow"
+
+
+class ExplainSideBySideTidyRequest(BaseModel):
+    """Request payload to run side-by-side analysis from tidy rows."""
+    method: Literal["side_by_side"]
+    model_a: str
+    model_b: str
+    data: List[TidyRow]
+    score_columns: Optional[List[str]] = None
+    sample_size: Optional[int] = None
+    output_dir: Optional[str] = None

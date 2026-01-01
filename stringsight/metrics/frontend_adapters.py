@@ -19,13 +19,15 @@ from dataclasses import dataclass
 import json
 
 try:
-    from pydantic import BaseModel, Field
+    from pydantic import BaseModel as PydanticBaseModel, Field as PydanticField
     PYDANTIC_AVAILABLE = True
+    BaseModel = PydanticBaseModel
+    Field = PydanticField
 except ImportError:
     PYDANTIC_AVAILABLE = False
     # Fallback to dataclass if pydantic not available
-    from dataclasses import dataclass as BaseModel
-    def Field(**kwargs):
+    from dataclasses import dataclass as BaseModel  # type: ignore
+    def Field(**kwargs):  # type: ignore
         return None
 
 

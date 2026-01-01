@@ -1,10 +1,16 @@
 import uuid
+from typing import TYPE_CHECKING
 from sqlalchemy import Column, DateTime, Float, ForeignKey, String, Text, Uuid
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from stringsight.database import Base
 
-class Job(Base):
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Mapped, DeclarativeBase
+    from stringsight.database import Base
+else:
+    from stringsight.database import Base
+
+class Job(Base):  # type: ignore[misc, valid-type]
     __tablename__ = "jobs"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)

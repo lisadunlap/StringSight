@@ -291,6 +291,7 @@ def run_pipeline(
 def main():
     """Main function with command line interface."""
     parser = argparse.ArgumentParser(description="Run StringSight pipeline on full datasets")
+    default_llm_model = "openai/gpt-4.1"
     
     # Dataset and output
     parser.add_argument("--data_path", type=str, required=True,
@@ -345,11 +346,17 @@ def main():
                         ))
     parser.add_argument("--score_columns", nargs="+", type=str, default=None,
                         help="Optional list of column names containing score metrics (e.g., accuracy, helpfulness)")
-    parser.add_argument("--extraction_model", type=str, default=None,
-                        help="Model for property extraction (e.g., gpt-4.1)")
-    parser.add_argument("--summary_model", type=str, default=None,
-                        help="Model for cluster summarization (e.g., gpt-4.1)")
-    parser.add_argument("--cluster_assignment_model", type=str, default=None,
+    parser.add_argument("--extraction_model", type=str, default=default_llm_model,
+                        help=(
+                            "Model for property extraction "
+                            f"(default: {default_llm_model}; e.g., gpt-4.1)"
+                        ))
+    parser.add_argument("--summary_model", type=str, default=default_llm_model,
+                        help=(
+                            "Model for cluster summarization "
+                            f"(default: {default_llm_model}; e.g., gpt-4.1)"
+                        ))
+    parser.add_argument("--cluster_assignment_model", type=str, default="gpt-5-nano",
                         help="Model for cluster matching/assignment (e.g., gpt-4.1-mini)")
 
     args = parser.parse_args()

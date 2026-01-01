@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING, Generator
 import threading
 
 from sqlalchemy import create_engine
@@ -9,6 +9,13 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 from stringsight.config import settings
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import DeclarativeBase
+    Base: type[DeclarativeBase]
+else:
+    # Create Base class for models
+    Base = declarative_base()
 
 def _create_engine(database_url: str) -> Engine:
     """Create the SQLAlchemy engine.
@@ -35,9 +42,6 @@ engine = _create_engine(settings.DATABASE_URL)
 
 # Create SessionLocal class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Create Base class for models
-Base = declarative_base()
 
 _sqlite_init_lock = threading.Lock()
 _sqlite_initialized = False

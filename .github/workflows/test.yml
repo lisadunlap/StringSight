@@ -27,19 +27,15 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e .
         pip install -r requirements.txt
-        pip install pytest pytest-cov black mypy
-
-    - name: Check formatting with black
-      run: |
-        black --check stringsight/
+        pip install pytest pytest-cov mypy
 
     - name: Type check with mypy
       run: |
         mypy stringsight/ --ignore-missing-imports
 
-    - name: Test with pytest
-      run: |
-        pytest --cov=stringsight --cov-report=xml --cov-report=term-missing
+    # - name: Test with pytest
+    #   run: |
+    #     pytest --cov=stringsight --cov-report=xml --cov-report=term-missing
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3

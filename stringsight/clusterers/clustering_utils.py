@@ -193,7 +193,7 @@ def _get_openai_embeddings(texts: List[str], *, model: str = "openai/text-embedd
 # Generic embedding helper
 # -----------------------------------------------------------------------------
 
-def _get_embeddings(texts: List[str], embedding_model: str, verbose: bool = False, use_gpu: Optional[bool] = None) -> List[List[float]]:
+def _get_embeddings(texts: List[str], embedding_model: str, verbose: bool = False, use_gpu: bool | None = None) -> List[List[float]]:
     """Return embeddings for *texts* using either OpenAI or a SentenceTransformer.
     
     Args:
@@ -274,7 +274,7 @@ def _clean_list_item(text: str) -> str:
 
 def generate_coarse_labels(
     cluster_names: List[str],
-    max_coarse_clusters: int,
+    max_coarse_clusters: int | None,
     *,
     systems_prompt: str = deduplication_clustering_systems_prompt,
     model: str = "gpt-4.1",

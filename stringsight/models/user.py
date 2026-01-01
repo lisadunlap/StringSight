@@ -1,10 +1,16 @@
 import uuid
+from typing import TYPE_CHECKING
 from sqlalchemy import Boolean, Column, DateTime, String, Uuid
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from stringsight.database import Base
 
-class User(Base):
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Mapped, DeclarativeBase
+    from stringsight.database import Base
+else:
+    from stringsight.database import Base
+
+class User(Base):  # type: ignore[misc, valid-type]
     __tablename__ = "users"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)

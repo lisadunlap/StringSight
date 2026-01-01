@@ -9,7 +9,7 @@ try:
     from botocore.exceptions import ClientError
 except ImportError:
     boto3 = None
-    class ClientError(Exception):
+    class ClientError(Exception):  # type: ignore[no-redef]
         pass
 
 from stringsight.config import settings

@@ -7,7 +7,7 @@ This stage validates and cleans extracted properties.
 from pathlib import Path
 import json
 import pandas as pd
-from typing import Optional, List
+from typing import Optional, List, Any
 from ..core.stage import PipelineStage
 from ..core.data_objects import PropertyDataset, Property
 from ..core.mixins import LoggingMixin
@@ -33,7 +33,7 @@ class PropertyValidator(LoggingMixin, PipelineStage):
         self.output_dir = output_dir
         self.storage = storage or get_storage_adapter()
         
-    def run(self, data: PropertyDataset, progress_callback=None) -> PropertyDataset:
+    def run(self, data: PropertyDataset, progress_callback: Any = None, **kwargs: Any) -> PropertyDataset:
         """
         Validate and clean properties.
         
@@ -91,6 +91,8 @@ class PropertyValidator(LoggingMixin, PipelineStage):
         """Save validation results to the specified output directory."""
         # Create output directory if it doesn't exist
         output_path = self.output_dir
+        if not output_path:
+            return
         self.storage.ensure_directory(output_path)
 
         self.log(f"✅ Auto-saving validation results to: {output_path}")
@@ -126,8 +128,10 @@ class PropertyValidator(LoggingMixin, PipelineStage):
         if not (prop.property_description and prop.property_description.strip()):
             return False
 
-        # Validate behavior_type if present
-        if prop.behavior_type:
+        # Validate behavior_type if present AND non-empty
+        # Note: For fixed-taxonomy labeling (FixedAxesLabeler), behavior_type is not used
+        # and will be None or empty, which is perfectly valid
+        if prop.behavior_type and prop.behavior_type.strip():
             allowed_types = {
                 "Positive",
                 "Negative (critical)",

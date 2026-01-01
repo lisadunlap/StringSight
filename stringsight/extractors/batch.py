@@ -4,6 +4,7 @@ Batch API extraction stage.
 This stage creates batch API requests for OpenAI's batch processing.
 """
 
+from typing import Any
 from ..core.stage import PipelineStage
 from ..core.data_objects import PropertyDataset
 from ..core.mixins import LoggingMixin
@@ -28,7 +29,7 @@ class BatchExtractor(PipelineStage, LoggingMixin):
         super().__init__(**kwargs)
         self.output_dir = output_dir
         
-    def run(self, data: PropertyDataset) -> PropertyDataset:
+    def run(self, data: PropertyDataset, progress_callback: Any = None, **kwargs: Any) -> PropertyDataset:
         """
         Generate batch API request files.
         

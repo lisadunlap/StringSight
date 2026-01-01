@@ -36,18 +36,18 @@ class ClusterConfig:
     into a lightweight module to avoid importing heavy dependencies at import time.
     """
     # Core clustering
-    min_cluster_size: Optional[int] = 5  # Smaller = fewer outliers, more clusters
+    min_cluster_size: int | None = 5  # Smaller = fewer outliers, more clusters
     verbose: bool = True
     include_embeddings: bool = False
-    context: Optional[str] = None
-    precomputed_embeddings: Optional[Union[np.ndarray, Dict, str]] = None
+    context: str | None = None
+    precomputed_embeddings: Union[np.ndarray, Dict, str | None] = None
     disable_dim_reduction: bool = False
     assign_outliers: bool = True
-    input_model_name: Optional[str] = None
-    min_samples: Optional[int] = None
+    input_model_name: str | None = None
+    min_samples: int | None = None
     cluster_selection_epsilon: float = 0.0  
     cache_embeddings: bool = True
-    groupby_column: Optional[str] = None # if not None, the data will be grouped by this column before clustering
+    groupby_column: str | None = None # if not None, the data will be grouped by this column before clustering
     parallel_clustering: bool = False  # if True, parallelize clustering when groupby_column is set
     cluster_positive: bool = True  # if False and groupby_column is "behavior_type", skip clustering positive behaviors
 
@@ -60,16 +60,16 @@ class ClusterConfig:
     llm_max_workers: int = 64
 
     # GPU acceleration (auto-detected by default)
-    use_gpu: Optional[bool] = None  # None means auto-detect; will be set in __post_init__
+    use_gpu: bool | None = None  # None means auto-detect; will be set in __post_init__
 
     # Dimension reduction settings
     dim_reduction_method: str = "adaptive"  # "adaptive", "pca", "none"
 
     # wandb configuration
     use_wandb: bool = True
-    wandb_project: Optional[str] = None
-    wandb_entity: Optional[str] = None
-    wandb_run_name: Optional[str] = None
+    wandb_project: str | None = None
+    wandb_entity: str | None = None
+    wandb_run_name: str | None = None
 
     def __post_init__(self) -> None:
         # Auto-detect GPU availability if not explicitly set

@@ -138,7 +138,7 @@ def parse_trace_to_oai(trace: Union[Dict[str, Any], str]) -> List[Dict[str, Any]
     
     # Convert events to OAI format messages
     messages = []
-    tool_call_counter = {}  # Track tool call IDs
+    tool_call_counter: dict[str, int] = {}  # Track tool call IDs
     
     for event in events:
         if event['type'] == 'llm_input':
@@ -385,16 +385,21 @@ def _extract_flattened_messages(span_attributes: Dict[str, Any], prefix: str) ->
             if tool_call_id_key not in span_attributes:
                 break
             
-            tool_call = {}
-            tool_call['id'] = span_attributes.get(tool_call_id_key)
-            
+            tool_call_id = span_attributes.get(tool_call_id_key)
+            if tool_call_id is None:
+                tool_call_idx += 1
+                continue
+
+            tool_call: dict[str, Any] = {}
+            tool_call['id'] = tool_call_id
+
             # Extract function name
             function_name_key = f"{prefix}.{idx}.message.tool_calls.{tool_call_idx}.function.name"
             if function_name_key in span_attributes:
                 if 'function' not in tool_call:
                     tool_call['function'] = {}
                 tool_call['function']['name'] = span_attributes[function_name_key]
-            
+
             # Extract function arguments
             function_args_key = f"{prefix}.{idx}.message.tool_calls.{tool_call_idx}.function.arguments"
             if function_args_key in span_attributes:

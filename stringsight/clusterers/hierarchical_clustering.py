@@ -59,16 +59,16 @@ import litellm
 # HELPER FUNCTIONS
 # =============================================================================
 
-def prepare_embeddings(unique_values: List[Any], config: ClusterConfig) -> np.ndarray:
+def prepare_embeddings(unique_values: List[Any], config: ClusterConfig) -> tuple[Any, Any]:
     """
     Prepare embeddings for clustering with caching and optional dimensionality reduction.
-    
+
     Args:
         unique_values: List of unique values to embed
         config: ClusterConfig containing embedding parameters
-        
+
     Returns:
-        np.ndarray: Processed embeddings ready for clustering
+        tuple: (processed_embeddings, original_embeddings) - Both as np.ndarray
     """
     unique_strings = [str(value) for value in unique_values]
     
@@ -81,20 +81,24 @@ def prepare_embeddings(unique_values: List[Any], config: ClusterConfig) -> np.nd
             logger.info("Using precomputed embeddings...")
         embeddings = config.precomputed_embeddings
         if isinstance(embeddings, dict):
+            embeddings_dict = embeddings
             if config.verbose:
-                logger.info(f"Mapping {len(unique_values)} values to embeddings from dict with {len(embeddings)} entries...")
+                logger.info(f"Mapping {len(unique_values)} values to embeddings from dict with {len(embeddings_dict)} entries...")
             try:
-                embeddings = np.array([embeddings[str(val)] for val in unique_values])
+                embeddings_array = np.array([embeddings_dict[str(val)] for val in unique_values])
                 if config.verbose:
-                    logger.info(f"Successfully mapped to {len(embeddings)} embeddings")
+                    logger.info(f"Successfully mapped to {len(embeddings_array)} embeddings")
+                embeddings = embeddings_array
             except KeyError as e:
                 logger.error(f"Error: Some values not found in precomputed embeddings: {e}")
-                logger.error(f"Available keys (first 5): {list(embeddings.keys())[:5]}")
-                logger.error(f"Missing values (first 5): {[str(val) for val in unique_values if str(val) not in embeddings][:5]}")
+                logger.error(f"Available keys (first 5): {list(embeddings_dict.keys())[:5]}")
+                logger.error(f"Missing values (first 5): {[str(val) for val in unique_values if str(val) not in embeddings_dict][:5]}")
                 raise
         else:
             if config.verbose:
                 logger.info(f"Using precomputed embeddings array with {len(embeddings)} entries...")
+            if isinstance(embeddings, dict):
+                raise ValueError("Expected embeddings array but got dict")
             embeddings = np.array(embeddings)
         
         if config.verbose:
@@ -191,7 +195,7 @@ def generate_cluster_summaries(cluster_values: Dict[int, List], config: ClusterC
     
     # Parallel LLM calls!
     summaries = parallel_completions(
-        messages,
+        messages,  # type: ignore[arg-type]
         model=config.summary_model,
         system_prompt=clustering_systems_prompt,
         max_workers=getattr(config, 'llm_max_workers', 64),
@@ -529,18 +533,18 @@ async def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> 
         label_to_new_id = {lbl: idx for idx, lbl in enumerate(unique_dedup_labels)}
 
         # 3. Re-assign cluster_labels array so duplicates share the same id
-        new_cluster_labels = []
+        remapped_labels = []
         for original_cid in cluster_labels:
             if original_cid < 0:
-                new_cluster_labels.append(-1)
+                remapped_labels.append(-1)
             else:
                 deduped = cluster_label_map[original_cid]
                 if deduped == "Outliers" or deduped.startswith("Outliers - "):
-                    new_cluster_labels.append(-1)
+                    remapped_labels.append(-1)
                 else:
-                    new_cluster_labels.append(label_to_new_id[deduped])
+                    remapped_labels.append(label_to_new_id[deduped])
 
-        cluster_labels = np.array(new_cluster_labels)
+        cluster_labels = np.array(remapped_labels)
 
         # 4. Rebuild cluster_values & cluster_label_map using new ids
         cluster_values = defaultdict(list)

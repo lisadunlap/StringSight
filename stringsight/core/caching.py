@@ -414,7 +414,7 @@ class LMDBCache:
         try:
             with self.env.begin(db=db_handle, write=True) as txn:
                 txn.put(key.encode('utf-8'), value)
-        except lmdb.MapFullError:
+        except lmdb.MapFullError:  # type: ignore[name-defined]
             logger.warning("LMDB MapFullError: resizing map...")
             self._resize_map()
             # Retry once
@@ -435,7 +435,7 @@ class LMDBCache:
             with self.env.begin(db=db_handle, write=True) as txn:
                 for key, value in mapping.items():
                     txn.put(key.encode('utf-8'), value)
-        except lmdb.MapFullError:
+        except lmdb.MapFullError:  # type: ignore[name-defined]
             logger.warning("LMDB MapFullError: resizing map...")
             self._resize_map()
             # Retry once

@@ -143,10 +143,10 @@ For active development where you want code changes to reflect immediately:
 
 ```bash
 # Option 1: Use the dev compose file explicitly
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+docker compose -f docker-compose.yml -f docker/docker-compose.dev.yml up
 
 # Option 2: Copy to override file (auto-loaded by docker compose)
-cp docker-compose.dev.yml docker-compose.override.yml
+cp docker/docker-compose.dev.yml docker-compose.override.yml
 docker compose up
 ```
 

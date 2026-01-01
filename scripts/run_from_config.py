@@ -432,6 +432,7 @@ Examples:
     # Determine wandb toggle: default ON unless explicitly disabled via CLI/YAML
     use_wandb_flag = not bool(cfg.get("disable_wandb", False))
 
+
     # Route to label() or explain() based on taxonomy presence
     if use_label_mode:
         # Load taxonomy
@@ -457,6 +458,9 @@ Examples:
         top_p = cfg.get("label_top_p", 1.0)
         max_tokens = cfg.get("label_max_tokens", 2048)
         
+        if verbose:
+            print(f"Label model (model_name): {model_name}")
+
         # Extract metrics_kwargs if provided
         metrics_kwargs = cfg.get("metrics_kwargs")
         
@@ -492,6 +496,10 @@ Examples:
         # Standard explain() mode
         if verbose:
             print("Running explain() mode (clustering-based analysis)")
+            print("Effective model configuration:")
+            print(f"  - extraction_model: {cfg.get('extraction_model')}")
+            print(f"  - summary_model: {cfg.get('summary_model')}")
+            print(f"  - cluster_assignment_model: {cfg.get('cluster_assignment_model')}")
         
         clustered_df, model_stats = run_pipeline(
             data_path=data_path,
