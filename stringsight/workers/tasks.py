@@ -108,7 +108,7 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
         )
 
         # Run extraction with progress callback
-        extracted_dataset = await extractor.run(dataset, progress_callback=update_progress)
+        extracted_dataset = await extractor.run(dataset, progress_callback=update_progress)  # type: ignore[misc]
 
         # Determine output directory
         base_results_dir = _get_results_dir()
@@ -134,9 +134,9 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
         # Update job with success
         # Refresh job object
         job = db.query(Job).filter(Job.id == job_uuid).first()
-        job.status = "completed"  # type: ignore[assignment]
-        job.progress = 1.0  # type: ignore[assignment]
-        job.result_path = req.output_dir if req.output_dir else f"extract_{job_id}_{timestamp}"  # type: ignore[assignment]
+        job.status = "completed"  # type: ignore[union-attr]
+        job.progress = 1.0  # type: ignore[union-attr]
+        job.result_path = req.output_dir if req.output_dir else f"extract_{job_id}_{timestamp}"  # type: ignore[union-attr]
         db.commit()
 
     except Exception as e:
@@ -242,12 +242,12 @@ def _run_pipeline_job(job_id: str, req_data: Dict[str, Any]) -> None:
             except Exception as e:
                 logger.error(f"Failed to update progress: {e}")
 
-        explain(df, **explain_kwargs, progress_callback=update_progress)
+        explain(df, **explain_kwargs, progress_callback=update_progress)  # type: ignore[arg-type]
 
         job = db.query(Job).filter(Job.id == job_uuid).first()
-        job.status = "completed"  # type: ignore[assignment]
-        job.progress = 1.0  # type: ignore[assignment]
-        job.result_path = req.output_dir if req.output_dir else f"pipeline_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"  # type: ignore[assignment]
+        job.status = "completed"  # type: ignore[union-attr]
+        job.progress = 1.0  # type: ignore[union-attr]
+        job.result_path = req.output_dir if req.output_dir else f"pipeline_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"  # type: ignore[union-attr]
         db.commit()
 
     except Exception as e:
@@ -403,10 +403,10 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
         # Handle side-by-side if needed
         if req.method == "side_by_side":
             properties_by_qid: Dict[str, List[Property]] = {}
-            for p in properties:
-                if p.question_id not in properties_by_qid:
-                    properties_by_qid[p.question_id] = []
-                properties_by_qid[p.question_id].append(p)
+            for prop in properties:
+                if prop.question_id not in properties_by_qid:
+                    properties_by_qid[prop.question_id] = []
+                properties_by_qid[prop.question_id].append(prop)
             
             operational_rows_map = {}
             for row in req.operationalRows:
@@ -487,28 +487,28 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
             groupby_column=groupby_column,
         )
         
-        clustered_dataset = await clusterer.run(dataset)
+        clustered_dataset = await clusterer.run(dataset)  # type: ignore[misc]
         update_progress(0.75)
         
         # Phase 4: Compute metrics (20%)
         from stringsight.metrics.functional_metrics import FunctionalMetrics
         from stringsight.metrics.side_by_side import SideBySideMetrics
 
+        metrics_computer: SideBySideMetrics | FunctionalMetrics
         if req.method == "side_by_side":
-            metrics_computer: SideBySideMetrics = SideBySideMetrics(
+            metrics_computer = SideBySideMetrics(
                 output_dir=None,
                 compute_bootstrap=False,
                 log_to_wandb=False,
                 generate_plots=False
             )
         else:
-            metrics_computer_temp = FunctionalMetrics(
+            metrics_computer = FunctionalMetrics(
                 output_dir=None,
                 compute_bootstrap=False,
                 log_to_wandb=False,
                 generate_plots=False
             )
-            metrics_computer = metrics_computer_temp
 
         clustered_dataset = metrics_computer.run(clustered_dataset)
         update_progress(0.95)

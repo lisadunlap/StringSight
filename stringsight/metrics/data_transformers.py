@@ -412,7 +412,7 @@ def convert_flattened_to_nested(df: pd.DataFrame) -> Dict[str, Dict[str, Dict[st
         This is primarily for migration/compatibility purposes. New code should
         use the flattened format directly.
     """
-    nested = {}
+    nested: dict[str, dict[str, Any]] = {}
     
     for _, row in df.iterrows():
         model = row["model"]

@@ -38,11 +38,12 @@ litellm.drop_params = True
 # ==================== LiteLLM Timing Callback ====================
 try:
     from litellm.integrations.custom_logger import CustomLogger as LiteLLMCustomLogger
+    _LiteLLMCustomLoggerBase = LiteLLMCustomLogger
 except ImportError:
-    LiteLLMCustomLogger = object
+    _LiteLLMCustomLoggerBase = object  # type: ignore[assignment, misc]
 
 
-class LLMTimingCallback(LiteLLMCustomLogger):
+class LLMTimingCallback(_LiteLLMCustomLoggerBase):  # type: ignore[misc]
     """Custom LiteLLM callback to log API call timing information."""
 
     def log_pre_api_call(self, model, messages, kwargs):
@@ -206,11 +207,11 @@ class LLMUtils:
                     
                     # GPT-5 models only support temperature=1, so skip temperature/top_p for them
                     if "gpt-5" not in config.model.lower():
-                        request_data["temperature"] = config.temperature
-                        request_data["top_p"] = config.top_p
+                        request_data["temperature"] = config.temperature  # type: ignore[assignment]
+                        request_data["top_p"] = config.top_p  # type: ignore[assignment]
                     
                     if config.max_tokens:
-                        request_data["max_completion_tokens"] = config.max_tokens
+                        request_data["max_completion_tokens"] = config.max_tokens  # type: ignore[assignment]
                     
                     # Check cache first
                     cached_response = None
@@ -396,7 +397,7 @@ class LLMUtils:
             return []
         
         # Pre-allocate results to preserve order
-        embeddings: List[List[float] | None] = [None] * len(texts)
+        embeddings_raw: List[List[float] | None] = [None] * len(texts)
         
         # Normalize model identifier for provider-prefixed LiteLLM routing
         model_name = _normalize_embedding_model_name(config.model)
@@ -513,14 +514,16 @@ class LLMUtils:
             for future in as_completed(futures):
                 start_idx, batch_embeddings = future.result()
                 batch_size = len(batch_embeddings)
-                embeddings[start_idx:start_idx + batch_size] = batch_embeddings
+                embeddings_raw[start_idx:start_idx + batch_size] = batch_embeddings
                 pbar.update(batch_size)
             pbar.close()
-        
+
         # Verify all embeddings were filled
-        if any(e is None for e in embeddings):
+        if any(e is None for e in embeddings_raw):
             raise RuntimeError("Some embeddings are missing - check logs for errors.")
-        
+
+        # Type assertion: we've verified no None values exist
+        embeddings: List[List[float]] = embeddings_raw  # type: ignore[assignment]
         return embeddings
     
     def single_completion(

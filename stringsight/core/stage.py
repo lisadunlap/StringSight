@@ -27,16 +27,19 @@ class PipelineStage(ABC):
         super().__init__()
     
     @abstractmethod
-    def run(self, data: PropertyDataset, progress_callback: Any = None) -> PropertyDataset:
+    def run(self, data: PropertyDataset, progress_callback: Any = None, **kwargs: Any) -> PropertyDataset | Any:
         """
         Process the input data and return the modified data.
-        
+
+        Can be either sync or async (returning PropertyDataset or Coroutine[Any, Any, PropertyDataset]).
+
         Args:
             data: Input PropertyDataset
             progress_callback: Optional callback(completed, total) for progress updates
-            
+            **kwargs: Additional keyword arguments specific to the stage implementation
+
         Returns:
-            Modified PropertyDataset
+            Modified PropertyDataset (or Coroutine that resolves to PropertyDataset for async stages)
         """
         pass
     
@@ -102,5 +105,5 @@ class PipelineStage(ABC):
 class PassthroughStage(PipelineStage):
     """A stage that passes data through unchanged. Useful for testing."""
 
-    def run(self, data: PropertyDataset, progress_callback: Any = None) -> PropertyDataset:
+    def run(self, data: PropertyDataset, progress_callback: Any = None, **kwargs: Any) -> PropertyDataset:
         return data 

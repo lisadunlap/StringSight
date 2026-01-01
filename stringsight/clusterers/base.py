@@ -16,7 +16,7 @@ from ..core.mixins import LoggingMixin, TimingMixin, WandbMixin
 try:
     from .config import ClusterConfig
 except ImportError:
-    from config import ClusterConfig
+    from config import ClusterConfig  # type: ignore[no-redef]
 
 
 class BaseClusterer(LoggingMixin, TimingMixin, WandbMixin, PipelineStage, ABC):
@@ -78,7 +78,7 @@ class BaseClusterer(LoggingMixin, TimingMixin, WandbMixin, PipelineStage, ABC):
         super().__init__(use_wandb=use_wandb, wandb_project=wandb_project, **kwargs)
         self.output_dir = output_dir
         self.include_embeddings = include_embeddings
-        self.prettify_labels = prettify_labels
+        self._prettify_labels_enabled = prettify_labels
         self.config: ClusterConfig | None = config
 
     @abstractmethod
@@ -193,7 +193,7 @@ Do not include any other text in your response."""
         )
         return self.config
 
-    async def run(self, data: PropertyDataset, column_name: str = "property_description", progress_callback=None) -> PropertyDataset:
+    async def run(self, data: PropertyDataset, progress_callback: Any = None, column_name: str = "property_description", **kwargs: Any) -> PropertyDataset:
         """Execute the clustering pipeline and return an updated dataset.
 
         Expected orchestration steps:
@@ -231,7 +231,7 @@ Do not include any other text in your response."""
                 clustered_df = self.cluster(data, column_name)
         if "meta" not in clustered_df.columns:
             clustered_df["meta"] = [{} for _ in range(len(clustered_df))]
-        clustered_df = await self.postprocess_clustered_df(clustered_df, column_name, prettify_labels=self.prettify_labels)
+        clustered_df = await self.postprocess_clustered_df(clustered_df, column_name, prettify_labels=self._prettify_labels_enabled)
 
         clusters = self._build_clusters_from_df(clustered_df, column_name)
         self.add_no_properties_cluster(data, clusters)

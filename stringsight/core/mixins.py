@@ -43,7 +43,7 @@ class CacheMixin:
         filtered_kwargs = {k: v for k, v in kwargs.items() if k not in ['use_cache']}
         super().__init__(*args, **filtered_kwargs)
         self.use_cache = use_cache
-        self._cache = {}
+        self._cache: dict[str, Any] = {}
     
     def cache_key(self, *args, **kwargs) -> str:
         """Generate a cache key from arguments."""

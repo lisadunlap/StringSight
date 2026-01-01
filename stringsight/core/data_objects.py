@@ -260,7 +260,7 @@ class PropertyDataset:
         Returns:
             PropertyDataset with populated conversations
         """
-        conversations = []
+        conversations: list[dict[str, Any]] = []
         if method == "side_by_side":
             all_models = list(set(df["model_a"].unique().tolist() + df["model_b"].unique().tolist()))
             # Expected columns: question_id, prompt, model_a, model_b,
@@ -295,6 +295,8 @@ class PropertyDataset:
 
             # Now build conversations with pre-converted OAI responses
             for idx, result in enumerate(oai_results):
+                if result is None:
+                    continue
                 oai_response_a, oai_response_b, row = result
                 prompt = str(row.get('prompt', row.get('user_prompt', '')))
                 
@@ -403,6 +405,8 @@ class PropertyDataset:
 
             # Now build conversations with pre-converted OAI responses
             for idx, result in enumerate(oai_results):
+                if result is None:
+                    continue
                 oai_response, row = result
                 scores = parse_single_score_field(row.get('score'))
                 prompt = str(row.get('prompt', row.get('user_prompt', '')))
@@ -424,7 +428,12 @@ class PropertyDataset:
         else:
             raise ValueError(f"Unknown method: {method}. Must be 'side_by_side' or 'single_model'")
             
-        return cls(conversations=conversations, all_models=all_models)
+        # Convert dict conversations to ConversationRecord objects
+        conversation_records = [
+            ConversationRecord(**conv) if isinstance(conv, dict) else conv
+            for conv in conversations
+        ]
+        return cls(conversations=conversation_records, all_models=all_models)
     
     def to_dataframe(self, type: str = "all", method: str = "side_by_side") -> pd.DataFrame:
         """
@@ -481,7 +490,7 @@ class PropertyDataset:
         # Add properties if they exist
         if self.properties and type in ["all", "properties", "clusters"]:
             # Create a mapping from (question_id, model) to properties
-            prop_map = {}
+            prop_map: Dict[tuple, List[Property]] = {}
             for prop in self.properties:
                 key = (prop.question_id, prop.model)
                 if key not in prop_map:
@@ -636,6 +645,7 @@ class PropertyDataset:
             json_safe_dict = {}
             for k, v in obj.items():
                 # Convert tuple/list keys to string representation
+                safe_key: str | int | float | bool | None
                 if isinstance(k, (tuple, list)):
                     safe_key = str(k)
                 elif isinstance(k, (str, int, float, bool)) or k is None:
@@ -800,7 +810,7 @@ class PropertyDataset:
                 "property_description",
             }
             if required_cols.issubset(df.columns):
-                clusters_dict = {}
+                clusters_dict: Dict[Any, Cluster] = {}
                 for _, row in df.iterrows():
                     cid = row["cluster_id"]
                     if pd.isna(cid):

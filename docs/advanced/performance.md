@@ -152,26 +152,6 @@ for chunk in pd.read_csv("large_file.csv", chunksize=5000):
     result, _ = explain(chunk, output_dir="results/chunk")
 ```
 
-## Cost Estimation
-
-```python
-# Estimate costs before running
-num_conversations = len(df)
-avg_response_length = 500  # tokens
-
-# Extraction cost (input + output)
-extraction_cost = num_conversations * (
-    (avg_response_length / 1_000_000) * 3.50 +  # input
-    (200 / 1_000_000) * 14.00                     # output (estimated)
-)
-
-# Embedding cost
-num_properties = num_conversations * 1.5  # estimate
-embedding_cost = (num_properties * 50 / 1_000_000) * 0.02
-
-print(f"Estimated cost: ${extraction_cost + embedding_cost:.2f}")
-```
-
 ## Benchmarks
 
 Typical performance on common hardware:

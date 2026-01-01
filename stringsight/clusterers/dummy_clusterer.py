@@ -10,7 +10,7 @@ from ..core.data_objects import PropertyDataset, Cluster
 try:
     from .config import ClusterConfig
 except ImportError:
-    from config import ClusterConfig
+    from config import ClusterConfig  # type: ignore[no-redef]
 
 
 class DummyClusterer(BaseClusterer):
@@ -58,15 +58,15 @@ class DummyClusterer(BaseClusterer):
             include_embeddings=include_embeddings,
         )
 
-    async def run(self, data: PropertyDataset, column_name: str = "category", progress_callback=None) -> PropertyDataset:
+    async def run(self, data: PropertyDataset, progress_callback: Any = None, column_name: str = "category", **kwargs: Any) -> PropertyDataset:
         """Execute clustering using `category` as the key for fixed-axes.
 
         We intentionally ignore the incoming `column_name` and cluster by
         the `category` field emitted by the fixed-axes extractor.
         """
-        return await super().run(data, column_name="category", progress_callback=progress_callback)
+        return await super().run(data, progress_callback=progress_callback, column_name="category")
 
-    def cluster(self, data: PropertyDataset, column_name: str) -> pd.DataFrame:
+    def cluster(self, data: PropertyDataset, column_name: str, progress_callback: Any = None) -> pd.DataFrame:
         """Map properties to a fixed taxonomy and return a standardized DataFrame."""
         # 1) Sanitize property descriptions in-memory for clustering
         for prop in data.properties:

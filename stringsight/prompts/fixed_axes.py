@@ -25,9 +25,9 @@ If the trace contains any of the behaviors, return a list of objects with the fo
 [
   {
     "category": "which behavior is present in the trace, select one of {fixed_axes_names}",
-    "property_description": a explanation of the exact behaviors in the trace that fall under the property_description (1-2 sentences),
-    "evidence": "exact quote one", "exact quote two", "exact quote three",
-    "reason": "1-2 sentence explanation of why this property is notable or important",
+    "property_description": "a concise explanation of the exact behaviors in the trace that fall under this category (1-2 sentences)",
+    "evidence": "exact quote or specific example from the trace that demonstrates this behavior",
+    "reason": "1-2 sentence explanation of why this property is notable or important"
   }
 ]
 ```"""

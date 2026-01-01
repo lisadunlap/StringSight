@@ -4,7 +4,7 @@ Pipeline orchestration for StringSight.
 The Pipeline class manages the execution of multiple pipeline stages in sequence.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, cast
 import time
 from .core.stage import PipelineStage
 from .core.data_objects import PropertyDataset
@@ -39,8 +39,8 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
         # Set name first, before calling parent __init__ methods that might use it
         self.name = name
         self.stages = stages or []
-        self.stage_times = {}
-        self.stage_errors = {}
+        self.stage_times: dict[str, float] = {}
+        self.stage_errors: dict[str, str] = {}
         # Store output directory (if any) so that we can automatically persist
         # intermediate pipeline results after each stage.  This enables tooling
         # such as compute_metrics_only() to pick up from any point in the
@@ -57,7 +57,7 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
         
         # Mark all stages as using the same wandb run
         for stage in self.stages:
-            if hasattr(stage, 'use_wandb') and stage.use_wandb:
+            if hasattr(stage, 'use_wandb') and stage.use_wandb and hasattr(stage, '_wandb_ok'):
                 stage._wandb_ok = True  # Mark that wandb is available
         
     def add_stage(self, stage: PipelineStage) -> None:
@@ -65,7 +65,7 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
         self.stages.append(stage)
         
         # Mark the new stage as using the same wandb run if wandb is enabled
-        if hasattr(self, 'use_wandb') and self.use_wandb and hasattr(stage, 'use_wandb') and stage.use_wandb:
+        if hasattr(self, 'use_wandb') and self.use_wandb and hasattr(stage, 'use_wandb') and stage.use_wandb and hasattr(stage, '_wandb_ok'):
             stage._wandb_ok = True  # Mark that wandb is available
         
     def insert_stage(self, index: int, stage: PipelineStage) -> None:
@@ -73,7 +73,7 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
         self.stages.insert(index, stage)
         
         # Mark the inserted stage as using the same wandb run if wandb is enabled
-        if hasattr(self, 'use_wandb') and self.use_wandb and hasattr(stage, 'use_wandb') and stage.use_wandb:
+        if hasattr(self, 'use_wandb') and self.use_wandb and hasattr(stage, 'use_wandb') and stage.use_wandb and hasattr(stage, '_wandb_ok'):
             stage._wandb_ok = True  # Mark that wandb is available
         
     def remove_stage(self, index: int) -> PipelineStage:
@@ -168,57 +168,70 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
             # --------------------------------------------------------------
             # 📝  Auto-save full dataset snapshot after each stage
             # --------------------------------------------------------------
-            if getattr(self, "output_dir", None):
+            output_dir = getattr(self, "output_dir", None)
+            if output_dir:
                 from pathlib import Path
                 import os
                 import json
 
                 # Ensure the directory exists
-                self.storage.ensure_directory(self.output_dir)
+                self.storage.ensure_directory(output_dir)
 
                 # File name pattern: full_dataset_after_<idx>_<stage>.json
                 # snapshot_name = (
                 #     f"full_dataset_after_{i+1}_{stage.name.replace(' ', '_').lower()}.json"
                 # )
                 snapshot_name = f"full_dataset.json"
-                snapshot_path = os.path.join(self.output_dir, snapshot_name)
+                snapshot_path = os.path.join(output_dir, snapshot_name)
 
                 # Persist using the JSON format for maximum portability
                 current_data.save(snapshot_path, storage=self.storage)
 
                 # Also save conversations separately as JSONL
-                conversation_path = os.path.join(self.output_dir, "conversation.jsonl")
-                conv_records = []
+                conversation_path = os.path.join(output_dir, "conversation.jsonl")
+                conv_records: list[dict[str, Any]] = []
                 for conv in current_data.conversations:
                     # Build base conversation dict
-                    conv_dict = {
-                        "question_id": conv.question_id,
-                        "prompt": conv.prompt,
-                    }
+                    conv_dict = cast(
+                        dict[str, Any],
+                        {
+                            "question_id": conv.question_id,
+                            "prompt": conv.prompt,
+                        },
+                    )
 
                     # Handle side-by-side vs single model format
                     if isinstance(conv.model, list):
                         # Side-by-side format
-                        conv_dict["model_a"] = conv.model[0]
-                        conv_dict["model_b"] = conv.model[1]
-                        conv_dict["model_a_response"] = conv.responses[0]
-                        conv_dict["model_b_response"] = conv.responses[1]
+                        conv_dict["model_a"] = str(conv.model[0]) if len(conv.model) > 0 else ""
+                        conv_dict["model_b"] = str(conv.model[1]) if len(conv.model) > 1 else ""
+
+                        # Type narrow responses to list
+                        responses = conv.responses if isinstance(conv.responses, list) else [conv.responses]
+                        conv_dict["model_a_response"] = str(responses[0]) if len(responses) > 0 else ""
+                        conv_dict["model_b_response"] = str(responses[1]) if len(responses) > 1 else ""
 
                         # Convert scores list to score_a/score_b
                         if isinstance(conv.scores, list) and len(conv.scores) == 2:
-                            conv_dict["score_a"] = conv.scores[0]
-                            conv_dict["score_b"] = conv.scores[1]
+                            score_a_val = cast(Dict[str, Any], conv.scores[0]) if isinstance(conv.scores[0], dict) else {}
+                            score_b_val = cast(Dict[str, Any], conv.scores[1]) if isinstance(conv.scores[1], dict) else {}
+                            conv_dict["score_a"] = score_a_val
+                            conv_dict["score_b"] = score_b_val
                         else:
-                            conv_dict["score_a"] = {}
-                            conv_dict["score_b"] = {}
+                            conv_dict["score_a"] = cast(dict[str, Any], {})
+                            conv_dict["score_b"] = cast(dict[str, Any], {})
 
                         # Add meta fields (includes winner)
                         conv_dict.update(conv.meta)
                     else:
                         # Single model format
-                        conv_dict["model"] = conv.model
-                        conv_dict["model_response"] = conv.responses
-                        conv_dict["score"] = conv.scores
+                        model_str = str(conv.model) if not isinstance(conv.model, list) else (str(conv.model[0]) if len(conv.model) > 0 else "")
+                        response_str = str(conv.responses) if not isinstance(conv.responses, list) else (str(conv.responses[0]) if len(conv.responses) > 0 else "")
+                        score_val = cast(Dict[str, Any], conv.scores) if isinstance(conv.scores, dict) else (cast(Dict[str, Any], conv.scores[0]) if isinstance(conv.scores, list) and len(conv.scores) > 0 and isinstance(conv.scores[0], dict) else {})
+
+                        conv_dict["model"] = model_str
+                        conv_dict["model_response"] = response_str
+                        conv_dict["score"] = score_val
 
                         # Add meta fields
                         conv_dict.update(conv.meta)
@@ -232,13 +245,13 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
 
                 # Save properties separately as JSONL
                 if current_data.properties:
-                    properties_path = os.path.join(self.output_dir, "properties.jsonl")
+                    properties_path = os.path.join(output_dir, "properties.jsonl")
                     prop_records = [current_data._json_safe(prop.to_dict()) for prop in current_data.properties]
                     self.storage.write_jsonl(properties_path, prop_records)
 
                 # Save clusters separately as JSONL
                 if current_data.clusters:
-                    clusters_path = os.path.join(self.output_dir, "clusters.jsonl")
+                    clusters_path = os.path.join(output_dir, "clusters.jsonl")
                     cluster_records = [current_data._json_safe(cluster.to_dict()) for cluster in current_data.clusters]
                     self.storage.write_jsonl(clusters_path, cluster_records)
 
@@ -321,8 +334,8 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
         
         # Log to wandb as summary metrics (not regular metrics)
         if hasattr(self, 'log_wandb'):
-            wandb_data = {f"{stage.name}_{k}": v for k, v in metrics.items()}
-            wandb_data[f"{stage.name}_execution_time"] = self.stage_times.get(stage.name, 0)
+            wandb_data: dict[str, int | float] = {f"{stage.name}_{k}": v for k, v in metrics.items()}
+            wandb_data[f"{stage.name}_execution_time"] = self.stage_times.get(stage.name, 0.0)
             self.log_wandb(wandb_data, is_summary=True)
     
     def log_final_summary(self) -> None:

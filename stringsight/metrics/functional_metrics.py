@@ -209,7 +209,7 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         self.generate_plots = generate_plots
         self.storage = storage or get_storage_adapter()
 
-    def run(self, data: PropertyDataset, progress_callback=None) -> PropertyDataset:
+    def run(self, data: PropertyDataset, progress_callback: Any = None, **kwargs: Any) -> PropertyDataset:
         """Main entry point for metrics computation."""
         self.log("⚖️  Computing functional metrics...")
 
@@ -395,7 +395,7 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
 
         return properties
 
-    def compute_quality_scores(self, df: pd.DataFrame, metrics: List[str] = None) -> Dict[str, float]:
+    def compute_quality_scores(self, df: pd.DataFrame, metrics: List[str] | None = None) -> Dict[str, float]:
         """Compute average score for each quality metric.
 
         Parameters:
@@ -424,7 +424,7 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
 
         return {col: scores[col].mean() for col in scores.columns}
 
-    def compute_size_and_score(self, df: pd.DataFrame, metrics: List[str] = None) -> tuple[int, Dict[str, float]]:
+    def compute_size_and_score(self, df: pd.DataFrame, metrics: List[str] | None = None) -> tuple[int, Dict[str, float]]:
         """Compute size and quality scores for a dataframe subset.
 
         Parameters:
@@ -532,7 +532,7 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         """
         if df is None or df.empty or "scores" not in df.columns:
             return []
-        keys = set()
+        keys: set[str] = set()
         for scores in df["scores"]:
             if isinstance(scores, dict):
                 keys.update(scores.keys())
@@ -668,7 +668,7 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         model_cluster_scores = {}
         for model in model_names:
             model_cluster_scores[model] = {
-                cluster: self.compute_cluster_metrics(df, cluster, [model], include_metadata=include_metadata)
+                cluster: self.compute_cluster_metrics(df, [cluster], [model], include_metadata=include_metadata)
                 for cluster in cluster_names
             }
         return model_cluster_scores
@@ -676,7 +676,7 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
     def _compute_cluster_scores(self, df: pd.DataFrame, cluster_names: List[str], model_names: List[str], *, include_metadata: bool = True) -> Dict[str, Dict[str, Any]]:
         """Compute metrics for each cluster across all models."""
         return {
-            cluster: self.compute_cluster_metrics(df, cluster, list(model_names), include_metadata=include_metadata)
+            cluster: self.compute_cluster_metrics(df, [cluster], list(model_names), include_metadata=include_metadata)
             for cluster in cluster_names
         }
 

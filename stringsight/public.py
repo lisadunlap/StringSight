@@ -142,19 +142,19 @@ async def extract_properties_only_async(
         **common_cfg,
     }
 
-    extractor = get_extractor(**extractor_kwargs)
-    parser = LLMJsonParser(fail_fast=False, **common_cfg)
-    validator = PropertyValidator(**common_cfg)
+    extractor = get_extractor(**extractor_kwargs)  # type: ignore[arg-type]
+    parser = LLMJsonParser(fail_fast=False, **common_cfg)  # type: ignore[arg-type]
+    validator = PropertyValidator(**common_cfg)  # type: ignore[arg-type]
 
     if output_dir:
-        extractor.output_dir = output_dir
+        extractor.output_dir = output_dir  # type: ignore[attr-defined]
         parser.output_dir = output_dir
         validator.output_dir = output_dir
 
     pipeline = Pipeline(
         name=f"extract-{method}",
         stages=[extractor, parser, validator],
-        **common_cfg,
+        **common_cfg,  # type: ignore[arg-type]
     )
 
     result_dataset = await pipeline.run(dataset)
@@ -167,7 +167,7 @@ async def extract_properties_only_async(
 async def explain_async(
     df: pd.DataFrame,
     method: str = "single_model",
-    system_prompt: str = None,
+    system_prompt: str | None = None,
     prompt_builder: Callable[[pd.Series, str], str] | None = None,
     task_description: str | None = None,
     *,
@@ -196,7 +196,7 @@ async def explain_async(
     assign_outliers: bool = False,
     summary_model: str = "gpt-4.1",
     cluster_assignment_model: str = "gpt-4.1-mini",
-    metrics_kwargs: Dict[str, Any | None] = None,
+    metrics_kwargs: Dict[str, Any | None] | None = None,
     use_wandb: bool = True,
     wandb_project: str | None = None,
     include_embeddings: bool = False,
@@ -206,7 +206,7 @@ async def explain_async(
     extraction_cache_dir: str | None = None,
     clustering_cache_dir: str | None = None,
     metrics_cache_dir: str | None = None,
-    **kwargs
+    **kwargs: Any
 ) -> Tuple[pd.DataFrame, Dict[str, pd.DataFrame]]:
     """Async version of explain() for use in async contexts (e.g., FastAPI).
     
@@ -223,55 +223,64 @@ async def explain_async(
         return result_dataset.to_dataframe(), result_dataset.model_stats
     
     system_prompt = get_system_prompt(method, system_prompt, task_description)
-    dataset = PropertyDataset.from_dataframe(
-        df, 
-        method=method,
-        sample_size=sample_size,
-        model_a=model_a,
-        model_b=model_b,
-        score_columns=score_columns,
-        prompt_column=prompt_column,
-        model_column=model_column,
-        model_response_column=model_response_column,
-        question_id_column=question_id_column,
-        model_a_column=model_a_column,
-        model_b_column=model_b_column,
-        model_a_response_column=model_a_response_column,
-        model_b_response_column=model_b_response_column,
-    )
+    dataset = PropertyDataset.from_dataframe(df, method=method)
     
+    from .extractors import get_extractor
+    from .postprocess import LLMJsonParser, PropertyValidator
+    from .clusterers import get_clusterer
+    from .metrics import get_metrics
+
     common_cfg = {
         'verbose': verbose,
         'use_wandb': use_wandb,
         'wandb_project': wandb_project,
     }
-    
+
+    # Create extractor
+    extractor = get_extractor(
+        model_name=model_name,
+        system_prompt=system_prompt,
+        prompt_builder=prompt_builder,
+        temperature=temperature,
+        top_p=top_p,
+        max_tokens=max_tokens,
+        max_workers=max_workers,
+        include_scores_in_prompt=include_scores_in_prompt,
+        **common_cfg
+    )
+
+    # Create parser
+    parser = LLMJsonParser(**common_cfg)  # type: ignore[arg-type]
+
+    # Create validator
+    validator = PropertyValidator(**common_cfg)  # type: ignore[arg-type]
+
+    # Create clusterer
+    clusterer_kwargs = {
+        'min_cluster_size': min_cluster_size,
+        'embedding_model': embedding_model,
+        'prettify_labels': prettify_labels,
+        'assign_outliers': assign_outliers,
+        'summary_model': summary_model,
+        'cluster_assignment_model': cluster_assignment_model,
+        'include_embeddings': include_embeddings,
+        **common_cfg
+    }
+    if isinstance(clusterer, str):
+        clusterer_stage = get_clusterer(clusterer, **clusterer_kwargs)  # type: ignore[arg-type]
+    else:
+        clusterer_stage = clusterer
+
+    # Create metrics
+    metrics_stage = get_metrics(method, **(metrics_kwargs or {}), **common_cfg)
+
+    # Build pipeline
     pipeline = PipelineBuilder(name=f"StringSight-{method}") \
-        .add_extractor(
-            model_name=model_name,
-            system_prompt=system_prompt,
-            prompt_builder=prompt_builder,
-            temperature=temperature,
-            top_p=top_p,
-            max_tokens=max_tokens,
-            max_workers=max_workers,
-            include_scores_in_prompt=include_scores_in_prompt,
-            **common_cfg
-        ) \
-        .add_parser(**common_cfg) \
-        .add_validator(**common_cfg) \
-        .add_clusterer(
-            clusterer=clusterer,
-            min_cluster_size=min_cluster_size,
-            embedding_model=embedding_model,
-            prettify_labels=prettify_labels,
-            assign_outliers=assign_outliers,
-            summary_model=summary_model,
-            cluster_assignment_model=cluster_assignment_model,
-            include_embeddings=include_embeddings,
-            **common_cfg
-        ) \
-        .add_metrics(**(metrics_kwargs or {})) \
+        .extract_properties(extractor) \
+        .parse_properties(parser) \
+        .add_stage(validator) \
+        .cluster_properties(clusterer_stage) \
+        .compute_metrics(metrics_stage) \
         .configure(output_dir=output_dir, **common_cfg) \
         .build()
     
@@ -412,10 +421,10 @@ def extract_properties_only(
         **common_cfg,
     }
 
-    extractor = get_extractor(**extractor_kwargs)
+    extractor = get_extractor(**extractor_kwargs)  # type: ignore[arg-type]
     # Do not fail the whole run on parsing errors – collect failures and drop those rows
-    parser = LLMJsonParser(fail_fast=False, output_dir=output_dir, **common_cfg)
-    validator = PropertyValidator(output_dir=output_dir, **common_cfg)
+    parser = LLMJsonParser(fail_fast=False, output_dir=output_dir, **common_cfg)  # type: ignore[arg-type]
+    validator = PropertyValidator(output_dir=output_dir, **common_cfg)  # type: ignore[arg-type]
 
     pipeline = PipelineBuilder(name=f"StringSight-extract-{method}") \
         .extract_properties(extractor) \
@@ -436,7 +445,7 @@ def extract_properties_only(
 def explain(
     df: pd.DataFrame,
     method: str = "single_model",
-    system_prompt: str = None,
+    system_prompt: str | None = None,
     prompt_builder: Callable[[pd.Series, str], str] | None = None,
     task_description: str | None = None,
     *,
@@ -465,7 +474,7 @@ def explain(
     prompt_expansion: bool = False,
     expansion_num_traces: int = 5,
     expansion_model: str = "gpt-4.1",
-    # Clustering parameters  
+    # Clustering parameters
     clusterer: Union[str, Any] = "hdbscan",
     min_cluster_size: int | None = 5,
     embedding_model: str = "text-embedding-3-large",
@@ -474,7 +483,7 @@ def explain(
     summary_model: str = "gpt-4.1",
     cluster_assignment_model: str = "gpt-4.1-mini",
     # Metrics parameters
-    metrics_kwargs: Dict[str, Any | None] = None,
+    metrics_kwargs: Dict[str, Any | None] | None = None,
     # Caching & logging
     use_wandb: bool = True,
     wandb_project: str | None = None,
@@ -489,7 +498,7 @@ def explain(
     clustering_cache_dir: str | None = None,
     metrics_cache_dir: str | None = None,
     progress_callback: Callable[[float], None] | None = None,
-    **kwargs
+    **kwargs: Any
 ) -> Tuple[pd.DataFrame, Dict[str, pd.DataFrame]]:
     """
     Explain model behavior patterns from conversation data.
@@ -789,7 +798,7 @@ def explain(
             prettify_labels=prettify_labels,
             summary_model=summary_model,
             cluster_assignment_model=cluster_assignment_model,
-            metrics_kwargs=metrics_kwargs,
+            metrics_kwargs=metrics_kwargs or {},  # type: ignore[arg-type]
             use_wandb=use_wandb,
             wandb_project=wandb_project,
             include_embeddings=include_embeddings,
@@ -865,35 +874,6 @@ def explain(
     return clustered_df, model_stats
 
 
-def _check_contains_score(df: pd.DataFrame, method: str) -> bool:
-    """
-    Check if the DataFrame contains score/preference information.
-    
-    Args:
-        df: Input DataFrame
-        method: Analysis method
-        
-    Returns:
-        True if the data contains scores, False otherwise
-    """
-    if method == "side_by_side":
-        if "score" in df.columns:
-            # Check if score column has any non-empty, non-None values
-            return df["score"].notna().any() and (df["score"] != {}).any()
-        return False
-    
-    elif method == "single_model":
-        # Check for score column
-        if "score" in df.columns:
-            # Check if score column has any non-empty, non-None values
-            return df["score"].notna().any() and (df["score"] != {}).any()
-        return False
-    
-    else:
-        # Default to False for unknown methods
-        return False
-
-
 def _build_default_pipeline(
     method: str,
     system_prompt: str,
@@ -948,11 +928,11 @@ def _build_default_pipeline(
     
     # Create stage-specific output directories if output_dir is provided
     if output_dir:
-        extraction_output = output_dir
-        parsing_output = output_dir
-        validation_output = output_dir
-        clustering_output = output_dir
-        metrics_output = output_dir
+        extraction_output: str | None = output_dir
+        parsing_output: str | None = output_dir
+        validation_output: str | None = output_dir
+        clustering_output: str | None = output_dir
+        metrics_output: str | None = output_dir
     else:
         extraction_output = parsing_output = validation_output = clustering_output = metrics_output = None
     
@@ -974,23 +954,23 @@ def _build_default_pipeline(
     if extraction_cache_dir:
         extractor_kwargs['cache_dir'] = extraction_cache_dir
     
-    extractor = get_extractor(**extractor_kwargs)
+    extractor = get_extractor(**extractor_kwargs)  # type: ignore[arg-type]
     builder.extract_properties(extractor)
-    
+
     # 2. JSON parsing stage
     parser_kwargs = {
         'output_dir': parsing_output,
         **common_config
     }
-    parser = LLMJsonParser(**parser_kwargs)
+    parser = LLMJsonParser(**parser_kwargs)  # type: ignore[arg-type]
     builder.parse_properties(parser)
-    
+
     # 3. Property validation stage
     validator_kwargs = {
         'output_dir': validation_output,
         **common_config
     }
-    validator = PropertyValidator(**validator_kwargs)
+    validator = PropertyValidator(**validator_kwargs)  # type: ignore[arg-type]
     builder.add_stage(validator)
     
     # 4. Clustering stage
@@ -1021,14 +1001,14 @@ def _build_default_pipeline(
         clusterer_kwargs['cache_dir'] = clustering_cache_dir
     
     if isinstance(clusterer, str):
-        clusterer_stage = get_clusterer(clusterer, **clusterer_kwargs)
+        clusterer_stage = get_clusterer(clusterer, **clusterer_kwargs)  # type: ignore[arg-type]
     else:
         clusterer_stage = clusterer
-    
+
     builder.cluster_properties(clusterer_stage)
-    
+
     # 5. Metrics computation stage
-    metrics_kwargs = {
+    metrics_kwargs_dict = {
         'method': method,
         'output_dir': metrics_output,
         'compute_bootstrap': metrics_kwargs.get('compute_confidence_intervals', True) if metrics_kwargs else True,
@@ -1038,12 +1018,12 @@ def _build_default_pipeline(
         **(metrics_kwargs or {}),
         **common_config
     }
-    
+
     # Add cache directory for metrics if provided
     if metrics_cache_dir:
-        metrics_kwargs['cache_dir'] = metrics_cache_dir
-    
-    metrics_stage = get_metrics(**metrics_kwargs)
+        metrics_kwargs_dict['cache_dir'] = metrics_cache_dir
+
+    metrics_stage = get_metrics(method, **{k: v for k, v in metrics_kwargs_dict.items() if k != 'method'})
     builder.compute_metrics(metrics_stage)
     
     # Build and return the pipeline
@@ -1296,7 +1276,7 @@ def _build_fixed_axes_pipeline(
     top_p: float,
     max_tokens: int,
     max_workers: int,
-    metrics_kwargs: Dict[str, Any | None],
+    metrics_kwargs: Dict[str, Any | None] | None = None,
     use_wandb: bool,
     wandb_project: str | None,
     include_embeddings: bool,
@@ -1306,7 +1286,31 @@ def _build_fixed_axes_pipeline(
     metrics_cache_dir: str | None = None,
     **kwargs: Any,
 ) -> Pipeline:
-    """Internal helper that constructs a pipeline for *label()* calls."""
+    """
+    Internal helper that constructs a pipeline for *label()* calls.
+
+    Args:
+        extractor: Extractor instance used to label properties.
+        taxonomy: Mapping of allowed label -> human-readable description.
+        model_name: Model identifier used in labeling.
+        temperature: Sampling temperature for the model.
+        top_p: Nucleus sampling parameter.
+        max_tokens: Maximum tokens for model outputs.
+        max_workers: Parallelism for extraction/processing stages.
+        metrics_kwargs: Optional keyword arguments forwarded into `get_metrics(...)`.
+            Expected to be a dict of metric-stage configuration keys to values (or None).
+        use_wandb: Whether to log to Weights & Biases.
+        wandb_project: W&B project name (if enabled).
+        include_embeddings: Whether to compute / include embeddings.
+        verbose: Whether to emit verbose logs.
+        output_dir: Optional output directory for artifacts.
+        extraction_cache_dir: Optional cache directory for extraction stage.
+        metrics_cache_dir: Optional cache directory for metrics stage.
+        **kwargs: Additional configuration forwarded to downstream components.
+
+    Returns:
+        Pipeline configured for fixed-axis labeling.
+    """
 
     from .postprocess import LLMJsonParser, PropertyValidator
     from .clusterers.dummy_clusterer import DummyClusterer
@@ -1320,15 +1324,15 @@ def _build_fixed_axes_pipeline(
     builder.extract_properties(extractor)
 
     # 2️⃣  JSON parsing
-    parser = LLMJsonParser(output_dir=output_dir, fail_fast=True, **common_cfg)
+    parser = LLMJsonParser(output_dir=output_dir, fail_fast=True, **common_cfg)  # type: ignore[arg-type]
     builder.parse_properties(parser)
 
     # 3️⃣  Validation
-    validator = PropertyValidator(output_dir=output_dir, **common_cfg)
+    validator = PropertyValidator(output_dir=output_dir, **common_cfg)  # type: ignore[arg-type]
     builder.add_stage(validator)
 
     # 4️⃣  Dummy clustering
-    dummy_clusterer = DummyClusterer(allowed_labels=list(taxonomy.keys()), output_dir=output_dir, **common_cfg)
+    dummy_clusterer = DummyClusterer(allowed_labels=list(taxonomy.keys()), output_dir=output_dir, **common_cfg)  # type: ignore[arg-type]
     builder.cluster_properties(dummy_clusterer)
 
     # 5️⃣  Metrics (single-model only)
@@ -1354,7 +1358,7 @@ def label(
     top_p: float = 1.0,
     max_tokens: int = 2048,
     max_workers: int = 64,
-    metrics_kwargs: Dict[str, Any | None] = None,
+    metrics_kwargs: Dict[str, Any | None] | None = None,
     use_wandb: bool = True,
     wandb_project: str | None = None,
     include_embeddings: bool = False,
@@ -1409,6 +1413,8 @@ def label(
             - "cluster_scores": Per cluster aggregated metrics (across all models)
             - "model_scores": Per model aggregated metrics (across all clusters)
     """
+    t0 = time.perf_counter()
+    timings = {}
 
     method = "single_model"  # hard-coded, we only support single-model here
 
@@ -1436,6 +1442,9 @@ def label(
         verbose=verbose,
         use_row_sampling=True,  # Use row-level sampling for label() to get exact count
     )
+    
+    timings['preprocessing'] = time.perf_counter() - t0
+    logger.info(f"[TIMING] Preprocessing completed in {timings['preprocessing']:.3f}s")
 
     # ------------------------------------------------------------------
     # Create extractor first to get the system prompt
@@ -1457,6 +1466,9 @@ def label(
         wandb_project=wandb_project or "StringSight"
     )
     
+    timings['extractor_init'] = time.perf_counter() - t0
+    logger.info(f"[TIMING] Extractor initialization completed in {timings['extractor_init'] - timings['preprocessing']:.3f}s")
+    
     # Print the system prompt for verification
     if verbose:
         logger.info("\n" + "="*80)
@@ -1469,13 +1481,16 @@ def label(
     # Build dataset & pipeline
     # ------------------------------------------------------------------
     dataset = PropertyDataset.from_dataframe(df, method=method)
+    
+    timings['dataset_creation'] = time.perf_counter() - t0
+    logger.info(f"[TIMING] Dataset creation completed in {timings['dataset_creation'] - timings['extractor_init']:.3f}s")
 
-    # Initialize wandb if enabled
+    # Initialize wandb if enabled - short-circuit early to avoid expensive string operations
     if use_wandb:
         try:
             import wandb
-            # import weave
             import os
+            import re
             
             # Try to get input filename from the DataFrame or use a default
             input_filename = "unknown_dataset"
@@ -1495,7 +1510,6 @@ def label(
                 # Replace spaces and special characters with underscores
                 input_filename = input_filename.replace(' ', '_').replace('-', '_')
                 # Remove any remaining special characters
-                import re
                 input_filename = re.sub(r'[^a-zA-Z0-9_]', '', input_filename)
             
             wandb_run_name = os.path.basename(os.path.normpath(output_dir)) if output_dir else f"{input_filename}_label"
@@ -1519,6 +1533,10 @@ def label(
         except ImportError:
             # wandb not installed or not available
             use_wandb = False
+    # If wandb is disabled, skip all the initialization overhead entirely
+    
+    timings['wandb_init'] = time.perf_counter() - t0
+    logger.info(f"[TIMING] Wandb initialization completed in {timings['wandb_init'] - timings['dataset_creation']:.3f}s")
 
     pipeline = _build_fixed_axes_pipeline(
         extractor=extractor,
@@ -1538,11 +1556,21 @@ def label(
         metrics_cache_dir=metrics_cache_dir,
         **kwargs,
     )
+    
+    timings['pipeline_build'] = time.perf_counter() - t0
+    logger.info(f"[TIMING] Pipeline build completed in {timings['pipeline_build'] - timings['wandb_init']:.3f}s")
+    
+    timings['setup_total'] = time.perf_counter() - t0
+    logger.info(f"[TIMING] Setup total (before pipeline execution): {timings['setup_total']:.3f}s")
+    logger.info(f"[TIMING] Label() setup breakdown: {timings}")
 
     # ------------------------------------------------------------------
     # Execute
     # ------------------------------------------------------------------
+    t_pipeline_start = time.perf_counter()
     result_dataset = _run_pipeline_smart(pipeline, dataset)
+    timings['pipeline_execution'] = time.perf_counter() - t_pipeline_start
+    logger.info(f"[TIMING] Pipeline execution completed in {timings['pipeline_execution']:.3f}s")
 
     # Check for 0 properties before attempting to save
     if len([p for p in result_dataset.properties if p.property_description is not None]) == 0:
@@ -1643,7 +1671,7 @@ def compute_metrics_only(
     input_path: str,
     method: str = "single_model",
     output_dir: str | None = None,
-    metrics_kwargs: Dict[str, Any | None] = None,
+    metrics_kwargs: Dict[str, Any | None] | None = None,
     use_wandb: bool = True,
     verbose: bool = False
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
@@ -1694,20 +1722,20 @@ def compute_metrics_only(
         _os.environ["WANDB_DISABLED"] = "true"
     else:
         _os.environ.pop("WANDB_DISABLED", None)
-    
-    input_path = Path(input_path)
-    
+
+    path = Path(input_path)
+
     # Load existing dataset
-    if input_path.is_dir():
+    if path.is_dir():
         # Try to load from a directory containing pipeline outputs
         possible_files = [
-            input_path / "full_dataset.json",
-            input_path / "full_dataset.parquet", 
-            input_path / "clustered_results.parquet",
-            input_path / "dataset.json",
-            input_path / "dataset.parquet"
+            path / "full_dataset.json",
+            path / "full_dataset.parquet",
+            path / "clustered_results.parquet",
+            path / "dataset.json",
+            path / "dataset.parquet"
         ]
-        
+
         for file_path in possible_files:
             if file_path.exists():
                 if verbose:
@@ -1715,16 +1743,16 @@ def compute_metrics_only(
                 dataset = PropertyDataset.load(str(file_path))
                 break
         else:
-            raise FileNotFoundError(f"No recognizable dataset file found in {input_path}")
-    
-    elif input_path.is_file():
+            raise FileNotFoundError(f"No recognizable dataset file found in {path}")
+
+    elif path.is_file():
         # Load from a specific file
         if verbose:
-            logger.info(f"Loading from: {input_path}")
-        dataset = PropertyDataset.load(str(input_path))
-    
+            logger.info(f"Loading from: {path}")
+        dataset = PropertyDataset.load(str(path))
+
     else:
-        raise FileNotFoundError(f"Input path does not exist: {input_path}")
+        raise FileNotFoundError(f"Input path does not exist: {path}")
     
     # Verify we have the required data for metrics
     if not dataset.clusters:
@@ -1774,29 +1802,29 @@ def compute_metrics_only(
             import wandb
             # import weave
             import os
-            
+
             # Try to get input filename from the input path
             input_filename = "unknown_dataset"
-            if input_path.is_file():
-                input_filename = input_path.name
-            elif input_path.is_dir():
+            if path.is_file():
+                input_filename = path.name
+            elif path.is_dir():
                 # Try to find a recognizable dataset file in the directory
                 possible_files = [
-                    input_path / "full_dataset.json",
-                    input_path / "full_dataset.parquet", 
-                    input_path / "clustered_results.parquet",
-                    input_path / "dataset.json",
-                    input_path / "dataset.parquet"
+                    path / "full_dataset.json",
+                    path / "full_dataset.parquet",
+                    path / "clustered_results.parquet",
+                    path / "dataset.json",
+                    path / "dataset.parquet"
                 ]
-                
+
                 for file_path in possible_files:
                     if file_path.exists():
                         input_filename = file_path.name
                         break
                 else:
                     # If no recognizable file found, use the directory name
-                    input_filename = input_path.name
-            
+                    input_filename = path.name
+
             # Clean the filename for wandb (remove extension, replace spaces/special chars)
             if isinstance(input_filename, str):
                 # Remove file extension and clean up the name
@@ -1806,15 +1834,15 @@ def compute_metrics_only(
                 # Remove any remaining special characters
                 import re
                 input_filename = re.sub(r'[^a-zA-Z0-9_]', '', input_filename)
-            
+
             wandb_run_name = os.path.basename(os.path.normpath(output_dir)) if output_dir else f"{input_filename}_metrics_only"
-            
+
             wandb.init(
                 project="StringSight",
                 name=wandb_run_name,
                 config={
                     "method": method,
-                    "input_path": str(input_path),
+                    "input_path": str(path),
                     "output_dir": output_dir,
                     "metrics_kwargs": metrics_kwargs,
                 },
@@ -1824,7 +1852,7 @@ def compute_metrics_only(
             # wandb not installed or not available
             use_wandb = False
     
-    metrics_stage = get_metrics(**metrics_config)
+    metrics_stage = get_metrics(method, **{k: v for k, v in metrics_config.items() if k != 'method'})
     
     # Create a minimal pipeline with just the metrics stage
     pipeline = Pipeline("Metrics-Only", [metrics_stage])
