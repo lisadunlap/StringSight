@@ -141,9 +141,13 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
                 continue
 
             # We don't yet know which model(s) the individual properties will
-            # belong to; parser will figure it out.  Use a placeholder model
-            # name so that validation passes.
-            model_name = conv.model if isinstance(conv.model, str) else conv.model[0] if isinstance(conv.model, list) and conv.model else "unknown"
+            # belong to; the parser will figure it out from the model label in
+            # each extracted property JSON.
+            #
+            # Important for side-by-side: preserve the model pair on the
+            # placeholder property so `LLMJsonParser` can map "Model A"/"Model B"
+            # (or equivalent) onto the correct concrete model name.
+            model_name = conv.model
             prop = Property(
                 id=str(uuid.uuid4()),
                 question_id=conv.question_id,

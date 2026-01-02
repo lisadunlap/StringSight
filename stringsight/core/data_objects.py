@@ -135,7 +135,7 @@ class Property:
     """An extracted behavioral property from a model response."""
     id: str # unique id for the property
     question_id: str
-    model: str
+    model: str | list[str]
     # Parsed fields (filled by LLMJsonParser)
     property_description: str | None = None
     category: str | None = None
