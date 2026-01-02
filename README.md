@@ -2,8 +2,6 @@
   <img src="assets/stringsight_github.png" alt="StringSight logo" width="600">
 </p>
 
-<h1 align="center">StringSight</h1>
-
 <p align="center">
   <em>Extract, cluster, and analyze behavioral properties from Generative Models</em>
 </p>
