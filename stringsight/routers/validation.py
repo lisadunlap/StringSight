@@ -8,13 +8,14 @@ Endpoints for:
 - Converting datasets to conversation format
 """
 
-from typing import Dict, List, Any, Literal
+from typing import Dict, List, Any, Literal, Iterator
 from datetime import datetime
 from pathlib import Path
 import os
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException, File, Body, UploadFile
+from fastapi.responses import StreamingResponse
 
 from stringsight.schemas import RowsPayload, ReadRequest, ListRequest, ResultsLoadRequest
 from stringsight.formatters import detect_method, validate_required_columns, format_conversations
@@ -42,6 +43,24 @@ def _resolve_within_base(user_path: str) -> Path:
         raise HTTPException(status_code=403, detail="Access denied: path outside allowed directory")
 
     return requested
+
+
+def _iter_file_bytes(path: Path, chunk_size: int = 1024 * 1024) -> Iterator[bytes]:
+    """Stream a file from disk in fixed-size chunks.
+
+    Args:
+        path: Absolute path to the file on disk.
+        chunk_size: Chunk size in bytes (default: 1 MiB).
+
+    Yields:
+        Byte chunks from the file.
+    """
+    with path.open("rb") as f:
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
+            yield chunk
 
 
 def _read_json_safe(path: Path) -> Any:
@@ -446,3 +465,224 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
         "properties": properties,
         "clusters": clusters,
     }
+
+
+@router.get("/results/zip/{zip_name:path}")
+def download_results_zip(zip_name: str) -> StreamingResponse:
+    """Download a zip file from the server's `final_results/` directory.
+
+    This is intended as a local/offline alternative to S3-hosted dataset zips.
+
+    Expected on-disk location (relative to BASE_BROWSE_DIR or CWD):
+        final_results/<zip_name>
+
+    Args:
+        zip_name: Zip filename (or nested path) under `final_results/`.
+
+    Returns:
+        StreamingResponse with `application/zip` content.
+    """
+    zip_path = _resolve_within_base(str(Path("final_results") / zip_name))
+    if not zip_path.exists():
+        raise HTTPException(status_code=404, detail=f"Zip not found: {zip_path}")
+    if not zip_path.is_file():
+        raise HTTPException(status_code=400, detail=f"Not a file: {zip_path}")
+    if zip_path.suffix.lower() != ".zip":
+        raise HTTPException(status_code=400, detail=f"Not a .zip file: {zip_path.name}")
+
+    headers = {
+        "Content-Disposition": f'attachment; filename="{zip_path.name}"',
+        "Cache-Control": "no-store",
+    }
+    return StreamingResponse(_iter_file_bytes(zip_path), media_type="application/zip", headers=headers)
+
+
+# -----------------------------
+# On-demand results loading endpoints
+# -----------------------------
+
+@router.get("/results/{dataset}/conversations")
+def get_conversations(dataset: str, offset: int = 0, limit: int = 1000) -> Dict[str, Any]:
+    """Get conversations with pagination.
+
+    Returns only the requested slice, not entire file.
+
+    Args:
+        dataset: Dataset name (folder under final_results/)
+        offset: Number of conversations to skip
+        limit: Maximum number of conversations to return
+
+    Returns:
+        Dict with data, offset, limit, and has_more flag
+    """
+    final_results_dir = Path("final_results") / dataset
+
+    # Try lightweight JSONL first, fallback to conversations.jsonl
+    conversations_file = final_results_dir / "clustered_results_lightweight.jsonl"
+    if not conversations_file.exists():
+        conversations_file = final_results_dir / "conversations.jsonl"
+
+    if not conversations_file.exists():
+        raise HTTPException(status_code=404, detail=f"Dataset not found: {dataset}")
+
+    conversations = []
+    import json
+    with open(conversations_file) as f:
+        for i, line in enumerate(f):
+            if i < offset:
+                continue
+            if i >= offset + limit:
+                break
+            conversations.append(json.loads(line))
+
+    return {
+        "data": conversations,
+        "offset": offset,
+        "limit": limit,
+        "has_more": len(conversations) == limit
+    }
+
+
+@router.get("/results/{dataset}/properties")
+def get_properties(dataset: str) -> Dict[str, Any]:
+    """Get properties (usually smaller, can load all at once).
+
+    Args:
+        dataset: Dataset name (folder under final_results/)
+
+    Returns:
+        Dict with data list
+    """
+    final_results_dir = Path("final_results") / dataset
+    properties_file = final_results_dir / "parsed_properties.jsonl"
+
+    if not properties_file.exists():
+        properties_file = final_results_dir / "properties.jsonl"
+
+    if not properties_file.exists():
+        return {"data": []}
+
+    properties = []
+    import json
+    with open(properties_file) as f:
+        for line in f:
+            properties.append(json.loads(line))
+
+    return {"data": properties}
+
+
+@router.get("/results/{dataset}/clusters")
+def get_clusters(dataset: str) -> Dict[str, Any]:
+    """Get clusters.
+
+    Args:
+        dataset: Dataset name (folder under final_results/)
+
+    Returns:
+        Dict with data list
+    """
+    final_results_dir = Path("final_results") / dataset
+    clusters_file = final_results_dir / "clusters.jsonl"
+
+    if not clusters_file.exists():
+        clusters_file = final_results_dir / "clusters.json"
+
+    if not clusters_file.exists():
+        return {"data": []}
+
+    import json
+    if clusters_file.suffix == ".jsonl":
+        clusters = []
+        with open(clusters_file) as f:
+            for line in f:
+                clusters.append(json.loads(line))
+    else:
+        with open(clusters_file) as f:
+            clusters = json.load(f)
+
+    return {"data": clusters}
+
+
+@router.get("/results/{dataset}/metrics")
+def get_metrics(dataset: str) -> Dict[str, Any]:
+    """Get all metrics files.
+
+    Args:
+        dataset: Dataset name (folder under final_results/)
+
+    Returns:
+        Dict with metrics data for model_cluster_scores_df, cluster_scores_df, and model_scores_df
+    """
+    final_results_dir = Path("final_results") / dataset
+    metrics = {}
+
+    import json
+    for metric_type in ["model_cluster_scores_df", "cluster_scores_df", "model_scores_df"]:
+        metric_file = final_results_dir / f"{metric_type}.jsonl"
+        if metric_file.exists():
+            data = []
+            with open(metric_file) as f:
+                for line in f:
+                    data.append(json.loads(line))
+            metrics[metric_type] = data
+
+    return metrics
+
+
+@router.get("/results/{dataset}/summary")
+def get_dataset_summary(dataset: str) -> Dict[str, Any]:
+    """Get dataset summary (fast - just metadata, no full data).
+
+    Use this for the /results browser page.
+
+    Args:
+        dataset: Dataset name (folder under final_results/)
+
+    Returns:
+        Dict with dataset name, counts, and availability flags
+    """
+    final_results_dir = Path("final_results") / dataset
+
+    def count_lines(filepath: Path) -> int:
+        if not filepath.exists():
+            return 0
+        with open(filepath) as f:
+            return sum(1 for _ in f)
+
+    # Check for conversations in either location
+    conversations_file = final_results_dir / "clustered_results_lightweight.jsonl"
+    if not conversations_file.exists():
+        conversations_file = final_results_dir / "conversations.jsonl"
+
+    # Check for properties in either location
+    properties_file = final_results_dir / "parsed_properties.jsonl"
+    if not properties_file.exists():
+        properties_file = final_results_dir / "properties.jsonl"
+
+    return {
+        "name": dataset,
+        "total_conversations": count_lines(conversations_file),
+        "total_properties": count_lines(properties_file),
+        "total_clusters": count_lines(final_results_dir / "clusters.jsonl"),
+        "has_metrics": (final_results_dir / "model_scores_df.jsonl").exists()
+    }
+
+
+@router.get("/results/datasets")
+def list_datasets() -> Dict[str, Any]:
+    """List all available datasets in final_results directory.
+
+    Returns:
+        Dict with list of dataset summaries
+    """
+    final_results_base = Path("final_results")
+
+    if not final_results_base.exists() or not final_results_base.is_dir():
+        return {"datasets": []}
+
+    datasets = []
+    for item in final_results_base.iterdir():
+        if item.is_dir():
+            datasets.append(item.name)
+
+    return {"datasets": datasets}

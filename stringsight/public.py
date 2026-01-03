@@ -12,6 +12,7 @@ from .pipeline import Pipeline, PipelineBuilder
 from .prompts import get_system_prompt
 from .utils.validation import validate_openai_api_key
 from .logging_config import get_logger
+from .constants import DEFAULT_MAX_WORKERS
 import time
 
 logger = get_logger(__name__)
@@ -56,7 +57,7 @@ async def extract_properties_only_async(
     temperature: float = 0.7,
     top_p: float = 0.95,
     max_tokens: int = 16000,
-    max_workers: int = 64,
+    max_workers: int = DEFAULT_MAX_WORKERS,
     include_scores_in_prompt: bool = False,
     score_columns: List[str] | None = None,
     sample_size: int | None = None,
@@ -187,7 +188,7 @@ async def explain_async(
     temperature: float = 0.7,
     top_p: float = 0.95,
     max_tokens: int = 16000,
-    max_workers: int = 64,
+    max_workers: int = DEFAULT_MAX_WORKERS,
     include_scores_in_prompt: bool = False,
     clusterer: Union[str, Any] = "hdbscan",
     min_cluster_size: int | None = 5,
@@ -315,7 +316,7 @@ def extract_properties_only(
     temperature: float = 0.7,
     top_p: float = 0.95,
     max_tokens: int = 16000,
-    max_workers: int = 64,
+    max_workers: int = DEFAULT_MAX_WORKERS,
     include_scores_in_prompt: bool = False,
     # Logging & output
     use_wandb: bool = True,
@@ -468,7 +469,7 @@ def explain(
     temperature: float = 0.7,
     top_p: float = 0.95,
     max_tokens: int = 16000,
-    max_workers: int = 64,
+    max_workers: int = DEFAULT_MAX_WORKERS,
     include_scores_in_prompt: bool = False,
     # Prompt expansion parameters
     prompt_expansion: bool = False,
@@ -1357,7 +1358,7 @@ def label(
     temperature: float = 0.0,
     top_p: float = 1.0,
     max_tokens: int = 2048,
-    max_workers: int = 64,
+    max_workers: int = DEFAULT_MAX_WORKERS,
     metrics_kwargs: Dict[str, Any | None] | None = None,
     use_wandb: bool = True,
     wandb_project: str | None = None,
@@ -1394,7 +1395,7 @@ def label(
         temperature: Temperature for LLM (default: 0.0)
         top_p: Top-p for LLM (default: 1.0)
         max_tokens: Max tokens for LLM (default: 2048)
-        max_workers: Max parallel workers for API calls (default: 8)
+        max_workers: Max parallel workers for API calls (default: 16)
         metrics_kwargs: Additional metrics configuration
         use_wandb: Whether to log to Weights & Biases (default: True)
         wandb_project: W&B project name

@@ -23,6 +23,7 @@ import pandas as pd
 
 from scripts.run_full_pipeline import run_pipeline, load_dataset
 from stringsight import label
+from stringsight.constants import DEFAULT_MAX_WORKERS
 
 
 def _load_taxonomy(taxonomy_spec: Any) -> Dict[str, str]:
@@ -126,7 +127,7 @@ def run_label_pipeline(
     temperature: float = 0.0,
     top_p: float = 1.0,
     max_tokens: int = 2048,
-    max_workers: int = 64,
+    max_workers: int = DEFAULT_MAX_WORKERS,
     use_wandb: bool = True,
     verbose: bool = False,
     sample_size: Optional[int] = None,
@@ -479,7 +480,7 @@ Examples:
             temperature=temperature,
             top_p=top_p,
             max_tokens=max_tokens,
-            max_workers=cfg.get("max_workers", 64),
+            max_workers=cfg.get("max_workers", DEFAULT_MAX_WORKERS),
             use_wandb=use_wandb_flag,
             verbose=verbose,
             sample_size=sample_size,
@@ -510,7 +511,7 @@ Examples:
             clusterer=cfg.get("clusterer", "hdbscan"),
             min_cluster_size=cfg.get("min_cluster_size", 15),
             embedding_model=cfg.get("embedding_model", "text-embedding-3-large"),
-            max_workers=cfg.get("max_workers", 64),
+            max_workers=cfg.get("max_workers", DEFAULT_MAX_WORKERS),
             use_wandb=use_wandb_flag,
             verbose=verbose,
             sample_size=cfg.get("sample_size"),

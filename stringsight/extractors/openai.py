@@ -19,6 +19,7 @@ from ..core.caching import UnifiedCache
 from ..core.llm_utils import parallel_completions_async
 from .conv_to_str import conv_to_str
 from .inp_to_conv import openai_messages_to_conv
+from ..constants import DEFAULT_MAX_WORKERS
 
 
 class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, PipelineStage):
@@ -37,7 +38,7 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         temperature: float = 0.7,
         top_p: float = 0.95,
         max_tokens: int = 16000,
-        max_workers: int = 64,
+        max_workers: int = DEFAULT_MAX_WORKERS,
         include_scores_in_prompt: bool = False,
         **kwargs
     ):

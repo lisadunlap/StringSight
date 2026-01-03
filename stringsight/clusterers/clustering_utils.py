@@ -30,6 +30,7 @@ import litellm  # type: ignore
 # sentence-transformers is optional - imported lazily when needed
 from stringsight.prompts.clustering.prompts import clustering_systems_prompt, coarse_clustering_systems_prompt, deduplication_clustering_systems_prompt
 from stringsight.logging_config import get_logger
+from stringsight.constants import DEFAULT_MAX_WORKERS
 from ..utils.validation import validate_openai_api_key
 
 logger = get_logger(__name__)
@@ -160,7 +161,7 @@ def _get_openai_embeddings_batch(batch: List[str], model: str, retries: int = 3,
             time.sleep(actual_sleep)
 
 
-def _get_openai_embeddings(texts: List[str], *, model: str = "openai/text-embedding-3-large", batch_size: int = 100, max_workers: int = 64) -> List[List[float]]:
+def _get_openai_embeddings(texts: List[str], *, model: str = "openai/text-embedding-3-large", batch_size: int = 100, max_workers: int = DEFAULT_MAX_WORKERS) -> List[List[float]]:
     """Get embeddings for *texts* from the OpenAI API whilst preserving order."""
 
     if not texts:
@@ -405,7 +406,7 @@ async def assign_fine_to_coarse(
     model: str = "gpt-4.1-mini",
     strategy: str = "llm",
     verbose: bool = True,
-    max_workers: int = 64,
+    max_workers: int = DEFAULT_MAX_WORKERS,
 ) -> Dict[str, str]:
     """Assign each fine cluster name to one of the coarse cluster names.
 
@@ -489,7 +490,7 @@ def match_label_names(label_name, label_options):
             return option
     return None
 
-async def llm_match(cluster_names, coarse_cluster_names, max_workers=16, model="gpt-4.1-mini"):
+async def llm_match(cluster_names, coarse_cluster_names, max_workers=DEFAULT_MAX_WORKERS, model="gpt-4.1-mini"):
     """Match fine-grained cluster names to coarse-grained cluster names using an LLM with parallel processing."""
     coarse_names_text = "\n".join(coarse_cluster_names)
     
@@ -611,7 +612,7 @@ def _get_openai_embeddings_batch_litellm(batch, retries=3, sleep_time=2.0):
 
 
 # NOTE: renamed to avoid overriding the DiskCache-cached version defined earlier
-def _get_openai_embeddings_litellm(texts, batch_size=100, max_workers=16):
+def _get_openai_embeddings_litellm(texts, batch_size=100, max_workers=DEFAULT_MAX_WORKERS):
     """Get embeddings using OpenAI API (LiteLLM cache)."""
 
     if not texts:

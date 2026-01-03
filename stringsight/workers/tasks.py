@@ -20,6 +20,7 @@ from stringsight.extractors import get_extractor
 from stringsight.postprocess import LLMJsonParser, PropertyValidator
 from stringsight.prompts import get_system_prompt
 from stringsight import explain
+from stringsight.constants import DEFAULT_MAX_WORKERS
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +102,7 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
             temperature=req.temperature or 0.7,
             top_p=req.top_p or 0.95,
             max_tokens=req.max_tokens or 16000,
-            max_workers=req.max_workers or 64,
+            max_workers=req.max_workers if req.max_workers is not None else DEFAULT_MAX_WORKERS,
             include_scores_in_prompt=False if req.include_scores_in_prompt is None else req.include_scores_in_prompt,
             verbose=False,
             use_wandb=False,

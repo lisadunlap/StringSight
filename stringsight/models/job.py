@@ -23,7 +23,7 @@ class Job(Base):  # type: ignore[misc, valid-type]
     status = Column(String, default="queued", index=True)
     progress = Column(Float, default=0.0)
     
-    # Path to results in storage (e.g., s3://bucket/user/job/results.jsonl)
+    # Path to results in storage (e.g., filesystem path under the results directory)
     result_path = Column(String, nullable=True)
     
     # Error message if failed

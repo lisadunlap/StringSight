@@ -14,6 +14,7 @@ import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from stringsight.logging_config import get_logger
 from stringsight.storage.adapter import StorageAdapter, get_storage_adapter
+from stringsight.constants import DEFAULT_MAX_WORKERS
 
 logger = get_logger(__name__)
 
@@ -286,7 +287,7 @@ class PropertyDataset:
             oai_results = [None] * len(rows_list)
 
             # Process conversions in parallel
-            with ThreadPoolExecutor(max_workers=min(64, len(rows_list))) as executor:
+            with ThreadPoolExecutor(max_workers=min(DEFAULT_MAX_WORKERS, len(rows_list))) as executor:
                 futures = {executor.submit(_process_side_by_side_row, (idx, row)): idx
                           for idx, row in enumerate(rows_list)}
                 for future in as_completed(futures):
@@ -396,7 +397,7 @@ class PropertyDataset:
             oai_results = [None] * len(rows_list)
 
             # Process conversions in parallel
-            with ThreadPoolExecutor(max_workers=min(64, len(rows_list))) as executor:
+            with ThreadPoolExecutor(max_workers=min(DEFAULT_MAX_WORKERS, len(rows_list))) as executor:
                 futures = {executor.submit(_process_single_model_row, (idx, row)): idx
                           for idx, row in enumerate(rows_list)}
                 for future in as_completed(futures):

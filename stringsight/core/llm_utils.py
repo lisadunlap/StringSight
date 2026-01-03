@@ -21,6 +21,7 @@ import logging
 
 from .caching import UnifiedCache
 from ..utils.validation import validate_openai_api_key
+from ..constants import DEFAULT_MAX_WORKERS
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +127,7 @@ def disable_timing_logs():
 class LLMConfig:
     """Configuration for LLM calls."""
     model: str = "gpt-4.1-mini"
-    max_workers: int = 64
+    max_workers: int = DEFAULT_MAX_WORKERS
     max_retries: int = 3
     base_sleep_time: float = 2.0
     timeout: float | None = None
@@ -140,7 +141,7 @@ class EmbeddingConfig:
     """Configuration for embedding calls."""
     model: str = "text-embedding-3-large"
     batch_size: int = 100
-    max_workers: int = 64
+    max_workers: int = DEFAULT_MAX_WORKERS
     max_retries: int = 3
     base_sleep_time: float = 2.0
 
@@ -573,7 +574,7 @@ def parallel_completions(
     messages: List[Union[str, List[Dict[str, Any]]]],
     model: str = "gpt-4.1-mini",
     system_prompt: str | None = None,
-    max_workers: int = 64,
+    max_workers: int = DEFAULT_MAX_WORKERS,
     show_progress: bool = True,
     progress_desc: str = "LLM calls",
     progress_callback: Callable[[int, int], None] | None = None,
@@ -593,7 +594,7 @@ async def parallel_completions_async(
     messages: List[Union[str, List[Dict[str, Any]]]],
     model: str = "gpt-4.1-mini",
     system_prompt: str | None = None,
-    max_workers: int = 64,
+    max_workers: int = DEFAULT_MAX_WORKERS,
     show_progress: bool = True,
     progress_desc: str = "LLM calls",
     progress_callback: Callable[[int, int], None] | None = None,
@@ -619,7 +620,7 @@ def parallel_embeddings(
     texts: List[str],
     model: str = "text-embedding-3-large",
     batch_size: int = 100,
-    max_workers: int = 64,
+    max_workers: int = DEFAULT_MAX_WORKERS,
     show_progress: bool = True,
     progress_desc: str = "Generating embeddings",
     **kwargs

@@ -6,6 +6,7 @@ This module contains stages that extract behavioral properties from model respon
 
 from typing import Callable, Optional
 from ..core.stage import PipelineStage
+from ..constants import DEFAULT_MAX_WORKERS
 
 
 def get_extractor(
@@ -15,7 +16,7 @@ def get_extractor(
     temperature: float = 0.6,
     top_p: float = 0.95,
     max_tokens: int = 16000,
-    max_workers: int = 64,
+    max_workers: int = DEFAULT_MAX_WORKERS,
     include_scores_in_prompt: bool = False,
     **kwargs
 ) -> PipelineStage:

@@ -22,6 +22,7 @@ import pickle
 import argparse
 from tqdm import tqdm
 from ..logging_config import get_logger
+from ..constants import DEFAULT_MAX_WORKERS
 
 logger = get_logger(__name__)
 # from dataclasses import dataclass  # removed: ClusterConfig now imported from config
@@ -198,7 +199,7 @@ def generate_cluster_summaries(cluster_values: Dict[int, List], config: ClusterC
         messages,  # type: ignore[arg-type]
         model=config.summary_model,
         system_prompt=clustering_systems_prompt,
-        max_workers=getattr(config, 'llm_max_workers', 64),
+        max_workers=getattr(config, 'llm_max_workers', DEFAULT_MAX_WORKERS),
         show_progress=config.verbose,
         progress_desc=f"Generating {cluster_type} summaries"
     )
@@ -432,7 +433,7 @@ async def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> 
             model=config.cluster_assignment_model,
             strategy="llm",
             verbose=config.verbose,
-            max_workers=getattr(config, 'llm_max_workers', 64),
+            max_workers=getattr(config, 'llm_max_workers', DEFAULT_MAX_WORKERS),
         )
         
         if config.verbose:
@@ -509,7 +510,7 @@ async def hdbscan_cluster_categories(df, column_name, config=None, **kwargs) -> 
             model=config.cluster_assignment_model,
             strategy="llm",
             verbose=config.verbose,
-            max_workers=getattr(config, 'llm_max_workers', 64),
+            max_workers=getattr(config, 'llm_max_workers', DEFAULT_MAX_WORKERS),
         )
 
         # -------------------------------------------------------------

@@ -28,6 +28,7 @@ from stringsight.formatters import detect_method, validate_required_columns
 from stringsight.utils.paths import _get_results_dir
 from stringsight.logging_config import get_logger
 import stringsight.public as public_api
+from stringsight.constants import DEFAULT_MAX_WORKERS
 
 logger = get_logger(__name__)
 
@@ -231,7 +232,7 @@ async def label_run(req: LabelRequest) -> Dict[str, Any]:
             temperature=req.temperature if req.temperature is not None else 0.0,
             top_p=req.top_p if req.top_p is not None else 1.0,
             max_tokens=req.max_tokens or 2048,
-            max_workers=req.max_workers or 64,
+            max_workers=req.max_workers if req.max_workers is not None else DEFAULT_MAX_WORKERS,
             metrics_kwargs=req.metrics_kwargs or {},
             use_wandb=req.use_wandb or False,
             wandb_project=req.wandb_project,
@@ -379,7 +380,7 @@ async def extract_single(req: ExtractSingleRequest) -> Dict[str, Any]:
             temperature=req.temperature or 0.7,
             top_p=req.top_p or 0.95,
             max_tokens=req.max_tokens or 16000,
-            max_workers=req.max_workers or 64,
+            max_workers=req.max_workers if req.max_workers is not None else DEFAULT_MAX_WORKERS,
             include_scores_in_prompt=False if req.include_scores_in_prompt is None else req.include_scores_in_prompt,
             use_wandb=req.use_wandb or False,
             output_dir=req.output_dir,
@@ -442,7 +443,7 @@ async def extract_batch(req: ExtractBatchRequest) -> Dict[str, Any]:
             temperature=req.temperature or 0.7,
             top_p=req.top_p or 0.95,
             max_tokens=req.max_tokens or 16000,
-            max_workers=req.max_workers or 64,
+            max_workers=req.max_workers if req.max_workers is not None else DEFAULT_MAX_WORKERS,
             include_scores_in_prompt=False if req.include_scores_in_prompt is None else req.include_scores_in_prompt,
             use_wandb=req.use_wandb or False,
             output_dir=req.output_dir,
@@ -547,7 +548,7 @@ async def _run_extract_job_async(job: ExtractJob, req: ExtractJobStartRequest):
             temperature=req.temperature or 0.7,
             top_p=req.top_p or 0.95,
             max_tokens=req.max_tokens or 16000,
-            max_workers=req.max_workers or 64,
+            max_workers=req.max_workers if req.max_workers is not None else DEFAULT_MAX_WORKERS,
             include_scores_in_prompt=False if req.include_scores_in_prompt is None else req.include_scores_in_prompt,
             verbose=False,
             use_wandb=False,
@@ -718,7 +719,7 @@ async def extract_stream(req: ExtractBatchRequest):
             temperature=req.temperature or 0.7,
             top_p=req.top_p or 0.95,
             max_tokens=req.max_tokens or 16000,
-            max_workers=req.max_workers or 64,
+            max_workers=req.max_workers if req.max_workers is not None else DEFAULT_MAX_WORKERS,
             include_scores_in_prompt=req.include_scores_in_prompt or False,
             verbose=False,
             use_wandb=False,

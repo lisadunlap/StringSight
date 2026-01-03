@@ -4,6 +4,7 @@ from typing import Dict, Callable, Optional, Any, List
 
 from .openai import OpenAIExtractor
 from ..prompts.fixed_axes import fixed_axis_prompt
+from ..constants import DEFAULT_MAX_WORKERS
 
 
 class FixedAxesLabeler(OpenAIExtractor):
@@ -26,7 +27,7 @@ class FixedAxesLabeler(OpenAIExtractor):
         temperature: float = 0.0,
         top_p: float = 1.0,
         max_tokens: int = 2048,
-        max_workers: int = 64,
+        max_workers: int = DEFAULT_MAX_WORKERS,
         cache_dir: str = ".cache/stringsight",
         prompt_builder: Optional[Callable] = None,
         **kwargs: Any,

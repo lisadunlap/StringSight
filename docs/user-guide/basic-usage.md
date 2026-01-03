@@ -125,7 +125,7 @@ clustered_df, model_stats = label(
 
 **Other Parameters:**
 - `temperature`: Temperature for classification (default: `0.0`)
-- `max_workers`: Parallel workers (default: `8`)
+- `max_workers`: Parallel workers (default: `16`)
 - `verbose`: Print progress information (default: `True`)
 
 ### Example

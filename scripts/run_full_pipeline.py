@@ -22,6 +22,7 @@ from stringsight import explain
 from stringsight.core.preprocessing import sample_prompts_evenly
 from stringsight.core.data_objects import PropertyDataset
 from typing import Optional, Dict, Any, Tuple, List
+from stringsight.constants import DEFAULT_MAX_WORKERS
 
 
 def load_dataset(
@@ -320,8 +321,8 @@ def main():
                         help="Minimum cluster size (default: 15)")
     parser.add_argument("--embedding_model", type=str, default="text-embedding-3-large",
                         help="Embedding model to use (default: openai)")
-    parser.add_argument("--max_workers", type=int, default=64,
-                        help="Maximum number of workers (default: 64)")
+    parser.add_argument("--max_workers", type=int, default=DEFAULT_MAX_WORKERS,
+                        help=f"Maximum number of workers (default: {DEFAULT_MAX_WORKERS})")
     parser.add_argument("--sample_size", type=int, default=None,
                         help="Sample size to use (default: use full dataset)")
     

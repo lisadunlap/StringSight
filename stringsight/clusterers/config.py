@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Dict, Union, List, Any
 import numpy as np
+from ..constants import DEFAULT_MAX_WORKERS
 
 
 def _cuda_available() -> bool:
@@ -57,7 +58,7 @@ class ClusterConfig:
     summary_model: str = "gpt-4.1"
     cluster_assignment_model: str = "gpt-4.1-mini"
     # Parallelism for LLM calls used during clustering (summaries, matching, prettify)
-    llm_max_workers: int = 64
+    llm_max_workers: int = DEFAULT_MAX_WORKERS
 
     # GPU acceleration (auto-detected by default)
     use_gpu: bool | None = None  # None means auto-detect; will be set in __post_init__

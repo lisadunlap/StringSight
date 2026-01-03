@@ -10,6 +10,7 @@ import pandas as pd
 from stringsight import label
 import json
 from stringsight.core.preprocessing import sample_prompts_evenly
+from stringsight.constants import DEFAULT_MAX_WORKERS
 
 # -----------------------------------------------------------------------------
 # Default taxonomy – feel free to modify / replace via --taxonomy_file later.
@@ -58,7 +59,7 @@ def main() -> None:
     parser.add_argument("--output_dir", required=True, help="Directory to write results")
     parser.add_argument("--model_name", default="gpt-4.1", help="Labeling model (OpenAI)")
     parser.add_argument("--sample_size", type=int, default=None, help="Optional subsample for quick runs")
-    parser.add_argument("--max_workers", type=int, default=64, help="Parallel requests to OpenAI")
+    parser.add_argument("--max_workers", type=int, default=DEFAULT_MAX_WORKERS, help="Parallel requests to OpenAI")
     parser.add_argument("--bootstrap_samples", type=int, default=100, help="Number of bootstrap samples")
     args = parser.parse_args()
 
@@ -73,6 +74,7 @@ def main() -> None:
         df,
         taxonomy=MAST_TAXONOMY,
         model_name=args.model_name,
+        max_workers=args.max_workers,
         output_dir=args.output_dir,
         metrics_kwargs={
             "compute_bootstrap": True,  # Enable bootstrap for FunctionalMetrics

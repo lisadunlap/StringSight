@@ -37,10 +37,10 @@ from stringsight.clusterers import get_clusterer
 from stringsight.metrics.cluster_subset import enrich_clusters_with_metrics, compute_total_conversations_by_model, prepare_long_frame, compute_subset_metrics
 from stringsight.logging_config import get_logger
 from stringsight.schemas import ClusterRunRequest
+from stringsight.constants import DEFAULT_MAX_WORKERS
 import threading, uuid
 from dataclasses import dataclass, field
 from functools import lru_cache
-from datetime import datetime, timedelta
 from datetime import datetime, timedelta
 import hashlib
 
@@ -218,7 +218,7 @@ class ExtractSingleRequest(BaseModel):
     temperature: float | None = 0.7
     top_p: float | None = 0.95
     max_tokens: int | None = 16000
-    max_workers: int | None = 128
+    max_workers: int | None = DEFAULT_MAX_WORKERS
     include_scores_in_prompt: bool | None = False
     use_wandb: bool | None = False
     output_dir: str | None = None

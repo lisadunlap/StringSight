@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional, Literal
+from stringsight.constants import DEFAULT_MAX_WORKERS
 
 class ExtractBatchRequest(BaseModel):
     rows: List[Dict[str, Any]]
@@ -10,7 +11,7 @@ class ExtractBatchRequest(BaseModel):
     temperature: Optional[float] = 0.7
     top_p: Optional[float] = 0.95
     max_tokens: Optional[int] = 16000
-    max_workers: Optional[int] = 128
+    max_workers: Optional[int] = DEFAULT_MAX_WORKERS
     include_scores_in_prompt: Optional[bool] = False
     use_wandb: Optional[bool] = False
     output_dir: Optional[str] = None
@@ -45,7 +46,7 @@ class PipelineJobRequest(BaseModel):
     cluster_assignment_model: Optional[str] = None
     
     # Execution
-    max_workers: Optional[int] = 64
+    max_workers: Optional[int] = DEFAULT_MAX_WORKERS
     use_wandb: Optional[bool] = False
     sample_size: Optional[int] = None
     
@@ -91,7 +92,7 @@ class LabelRequest(BaseModel):
     temperature: Optional[float] = 0.0
     top_p: Optional[float] = 1.0
     max_tokens: Optional[int] = 2048
-    max_workers: Optional[int] = 64
+    max_workers: Optional[int] = DEFAULT_MAX_WORKERS
 
     # Data preparation
     sample_size: Optional[int] = None
@@ -151,7 +152,7 @@ class ExtractSingleRequest(BaseModel):
     temperature: Optional[float] = 0.7
     top_p: Optional[float] = 0.95
     max_tokens: Optional[int] = 16000
-    max_workers: Optional[int] = 128
+    max_workers: Optional[int] = DEFAULT_MAX_WORKERS
     include_scores_in_prompt: Optional[bool] = False
     use_wandb: Optional[bool] = False
     output_dir: Optional[str] = None

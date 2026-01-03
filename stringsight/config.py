@@ -33,11 +33,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # Storage
-    STORAGE_TYPE: str = "local"  # local, s3
-    S3_BUCKET: str = "stringsight-results"
-    S3_ENDPOINT_URL: Optional[str] = "http://localhost:9000"
-    AWS_ACCESS_KEY_ID: Optional[str] = "minioadmin"
-    AWS_SECRET_ACCESS_KEY: Optional[str] = "minioadmin"
+    # StringSight currently uses local filesystem storage.
     
     # Logging
     LOG_LEVEL: str = "INFO"

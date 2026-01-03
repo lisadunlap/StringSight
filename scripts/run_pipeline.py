@@ -12,6 +12,7 @@ from run_full_pipeline import run_pipeline
 from stringsight import compute_metrics_only
 import pandas as pd
 import json
+from stringsight.constants import DEFAULT_MAX_WORKERS
 
 def main():
     """Main function for webdev dataset processing."""
@@ -39,8 +40,8 @@ def main():
                         help="Minimum cluster size (default: 8)")
     parser.add_argument("--max_coarse_clusters", type=int, default=12,
                         help="Maximum number of coarse clusters (default: 12)")
-    parser.add_argument("--max_workers", type=int, default=64,
-                        help="Maximum number of workers (default: 16)")
+    parser.add_argument("--max_workers", type=int, default=DEFAULT_MAX_WORKERS,
+                        help=f"Maximum number of workers (default: {DEFAULT_MAX_WORKERS})")
     
     # Flags
     parser.add_argument("--hierarchical", action="store_true",

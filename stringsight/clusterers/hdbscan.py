@@ -15,6 +15,7 @@ from .base import BaseClusterer
 from ..core.data_objects import PropertyDataset
 from ..core.mixins import LoggingMixin, TimingMixin, WandbMixin
 from ..logging_config import get_logger
+from ..constants import DEFAULT_MAX_WORKERS
 
 logger = get_logger(__name__)
 
@@ -64,7 +65,7 @@ class HDBSCANClusterer(BaseClusterer):
         summary_model: str = "gpt-4.1",
         cluster_assignment_model: str = "gpt-4.1-mini",
         verbose: bool = True,
-        llm_max_workers: int = 64,
+        llm_max_workers: int = DEFAULT_MAX_WORKERS,
         **kwargs,
     ):
         """Initialize the HDBSCAN clusterer with explicit, overridable parameters.
@@ -193,7 +194,7 @@ class HDBSCANClusterer(BaseClusterer):
 
                 # Process groups in parallel using async
                 clustered_parts = []
-                max_workers = min(len(groups), getattr(self.config, 'llm_max_workers', 64))
+                max_workers = min(len(groups), getattr(self.config, 'llm_max_workers', DEFAULT_MAX_WORKERS))
                 
                 # Create coroutines (not tasks yet - we're not in event loop)
                 coros = [_cluster_group_async(group_info) for group_info in groups]
