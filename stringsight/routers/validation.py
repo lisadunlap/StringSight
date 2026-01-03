@@ -502,7 +502,7 @@ def download_results_zip(zip_name: str) -> StreamingResponse:
 # -----------------------------
 
 @router.get("/results/{dataset}/conversations")
-def get_conversations(dataset: str, offset: int = 0, limit: int = 1000) -> Dict[str, Any]:
+def get_conversations(dataset: str, offset: int = 0, limit: int | None = None) -> Dict[str, Any]:
     """Get conversations with pagination.
 
     Returns only the requested slice, not entire file.
@@ -510,7 +510,7 @@ def get_conversations(dataset: str, offset: int = 0, limit: int = 1000) -> Dict[
     Args:
         dataset: Dataset name (folder under final_results/)
         offset: Number of conversations to skip
-        limit: Maximum number of conversations to return
+        limit: Maximum number of conversations to return (None = all)
 
     Returns:
         Dict with data, offset, limit, and has_more flag
@@ -527,11 +527,11 @@ def get_conversations(dataset: str, offset: int = 0, limit: int = 1000) -> Dict[
 
     conversations = []
     import json
-    with open(conversations_file) as f:
+    with open(conversations_file, encoding='utf-8', errors='replace') as f:
         for i, line in enumerate(f):
             if i < offset:
                 continue
-            if i >= offset + limit:
+            if limit is not None and i >= offset + limit:
                 break
             conversations.append(json.loads(line))
 
@@ -539,7 +539,7 @@ def get_conversations(dataset: str, offset: int = 0, limit: int = 1000) -> Dict[
         "data": conversations,
         "offset": offset,
         "limit": limit,
-        "has_more": len(conversations) == limit
+        "has_more": limit is not None and len(conversations) == limit
     }
 
 
