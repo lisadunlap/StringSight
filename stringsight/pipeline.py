@@ -46,6 +46,7 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
         # such as compute_metrics_only() to pick up from any point in the
         # pipeline without the caller having to remember to save explicitly.
         self.output_dir: str | None = kwargs.get('output_dir')
+        self.auto_save = kwargs.get('auto_save', True)  # Allow disabling auto-save for performance
         self.storage = storage or get_storage_adapter()
 
         # Now call parent __init__ methods safely
@@ -169,7 +170,8 @@ class Pipeline(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin):
             # 📝  Auto-save full dataset snapshot after each stage
             # --------------------------------------------------------------
             output_dir = getattr(self, "output_dir", None)
-            if output_dir:
+            auto_save = getattr(self, "auto_save", True)
+            if output_dir and auto_save:
                 from pathlib import Path
                 import os
                 import json

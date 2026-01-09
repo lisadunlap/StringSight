@@ -43,6 +43,8 @@ def convert_tool_calls_to_str(tool_calls: Any) -> str:
             - Preferred: list of dicts, where each dict represents one tool call
               with at least `name`, `arguments`, and optional `id` and extra keys.
             - Also accepted:
+              - OpenAI Chat Completions tool call shape:
+                {"id": "...", "type": "function", "function": {"name": "...", "arguments": "..."}}
               - JSON-encoded string of the above list or a single dict
               - Single dict representing one tool call
               - Any other type, which will be stringified as a fallback
@@ -76,12 +78,28 @@ def convert_tool_calls_to_str(tool_calls: Any) -> str:
             tool_calls_str.append(str(tool_call))
             continue
 
-        name = tool_call.get("name", "<no_name>")
-        args = tool_call.get("arguments", {})
+        # Support both "flat" tool call dicts and OpenAI's nested "function" shape.
+        name = tool_call.get("name")
+        args = tool_call.get("arguments")
+        tool_call_id = tool_call.get("id") or tool_call.get("tool_call_id")
+
+        function_block = tool_call.get("function")
+        if isinstance(function_block, dict):
+            if name is None:
+                name = function_block.get("name")
+            if args is None:
+                args = function_block.get("arguments")
+
+        if name is None:
+            name = "<no_name>"
+        if args is None:
+            args = {}
+
         # Pretty print arguments if dict or dict-string
         args_str = pretty_print_dict(args)
-        base = f"call {name} with args {args_str} (id: {tool_call.get('id', '<no_id>')})"
-        extra_keys = [key for key in tool_call.keys() if key not in ["name", "arguments", "id"]]
+        base = f"call {name} with args {args_str} (id: {tool_call_id or '<no_id>'})"
+        # Avoid duplicating the nested "function" payload in additional info.
+        extra_keys = [key for key in tool_call.keys() if key not in ["name", "arguments", "id", "tool_call_id", "function"]]
         if extra_keys:
             # Show extra key-value pairs, pretty-printed if dict
             extras = {k: tool_call[k] for k in extra_keys}

@@ -7,7 +7,7 @@ from uuid import UUID
 import uuid
 
 from stringsight.database import get_db
-from stringsight.models.job import Job
+from stringsight.db_models.job import Job
 from stringsight.schemas import ExtractJobStartRequest, PipelineJobRequest, ClusterJobRequest
 from stringsight.workers.tasks import run_extract_job_inprocess, run_pipeline_job_inprocess, _run_cluster_job_async
 from stringsight.storage.adapter import get_storage_adapter

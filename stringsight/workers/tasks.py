@@ -8,7 +8,7 @@ import uuid
 
 from stringsight.celery_app import celery_app
 from stringsight.database import SessionLocal, init_db
-from stringsight.models.job import Job
+from stringsight.db_models.job import Job
 from stringsight.utils.paths import _get_results_dir
 from stringsight.storage.adapter import get_storage_adapter
 from stringsight.schemas import ExtractJobStartRequest, PipelineJobRequest

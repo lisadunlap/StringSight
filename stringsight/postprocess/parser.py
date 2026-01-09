@@ -10,6 +10,7 @@ from typing import Dict, Any, Optional, List
 from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..core.stage import PipelineStage
 from ..core.data_objects import PropertyDataset, Property
 from ..core.mixins import LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin
@@ -42,7 +43,90 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
         self.parsing_failures: list[dict[str, Any]] = []
         self.output_dir = output_dir
         self.storage = storage or get_storage_adapter()
-        
+        self.max_workers = kwargs.get('max_workers', 8)
+
+    def _parse_single_property(self, index: int, prop: Property, total_props: int) -> Dict[str, Any]:
+        """Parse a single property response. Returns dict with results and errors."""
+        result = {
+            'index': index,
+            'parsed_properties': [],
+            'errors': [],
+            'parse_failed': False,
+            'empty_response': False
+        }
+
+        if not prop.raw_response:
+            result['empty_response'] = True
+            return result
+
+        parsed_json = self._parse_json_response(prop.raw_response)
+        if parsed_json is None:
+            result['parse_failed'] = True
+            error_details = self._analyze_json_parsing_error(prop.raw_response)
+            result['errors'].append({
+                'property_id': prop.id,
+                'question_id': prop.question_id,
+                'model': prop.model,
+                'raw_response': prop.raw_response,
+                'error_type': 'JSON_PARSE_ERROR',
+                'error_message': error_details,
+                'index': index
+            })
+            return result
+
+        # Handle different JSON shapes
+        if isinstance(parsed_json, dict) and "properties" in parsed_json:
+            prop_dicts = parsed_json["properties"]
+        elif isinstance(parsed_json, list):
+            prop_dicts = parsed_json
+        elif isinstance(parsed_json, dict):
+            prop_dicts = [parsed_json]
+        else:
+            result['parse_failed'] = True
+            error_details = f"Parsed JSON has unsupported type: {type(parsed_json)}. Expected dict, list, or dict with 'properties' key."
+            result['errors'].append({
+                'property_id': prop.id,
+                'question_id': prop.question_id,
+                'model': prop.model,
+                'raw_response': prop.raw_response,
+                'parsed_json': str(parsed_json),
+                'error_type': 'UNSUPPORTED_JSON_SHAPE',
+                'error_message': error_details,
+                'index': index
+            })
+            return result
+
+        # Process property dicts
+        if not prop_dicts or (isinstance(prop_dicts, list) and len(prop_dicts) == 0):
+            result['errors'].append({
+                'property_id': prop.id,
+                'question_id': prop.question_id,
+                'model': prop.model,
+                'error_type': 'EMPTY_LIST_RESPONSE',
+                'error_message': 'LLM returned empty properties list',
+                'index': index
+            })
+            return result
+
+        # Create Property objects
+        for prop_dict in prop_dicts:
+            new_prop = Property(
+                id=str(uuid.uuid4()),
+                question_id=prop.question_id,
+                model=prop.model,
+                property_description=prop_dict.get("property_description"),
+                reason=prop_dict.get("reason"),
+                evidence=prop_dict.get("evidence"),
+                category=prop_dict.get("category"),
+                behavior_type=prop_dict.get("behavior_type"),
+                unexpected_behavior=prop_dict.get("unexpected_behavior"),
+                contains_errors=prop_dict.get("contains_errors"),
+                raw_response=prop.raw_response,
+            )
+            result['parsed_properties'].append(new_prop)
+
+        return result
+
     def run(self, data: PropertyDataset, progress_callback: Any = None, **kwargs: Any) -> PropertyDataset:
         """
         Parse raw LLM responses into Property objects.
@@ -54,70 +138,75 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
         Returns:
             PropertyDataset with parsed and validated properties
         """
-        self.log(f"Parsing {len(data.properties)} raw property responses")
-        
-        
+        self.log(f"Parsing {len(data.properties)} raw property responses in parallel")
+
         parsed_properties: List[Property] = []
         parse_errors = 0
         unknown_model_filtered = 0
-        empty_list_responses = 0  # Track when LLM returns empty lists
-        consecutive_errors = 0  # Track consecutive parsing errors
+        empty_list_responses = 0
+        consecutive_errors = 0
         max_consecutive_errors = 10
 
-        # Add progress bar for better visibility
         total_props = len(data.properties)
-        for i, prop in enumerate(tqdm(data.properties, desc="Parsing properties", disable=not getattr(self, 'verbose', False))):
-            if progress_callback and i % 10 == 0:
-                try:
-                    progress_callback(i / total_props)
-                except Exception:
-                    pass
-            # We only process properties that still have raw_response
-            if not prop.raw_response:
-                # Throw an error to help debug the extraction issue
-                total_empty = sum(1 for p in data.properties if not p.raw_response)
-                self.log(f"⚠️  {total_empty}/{len(data.properties)} properties have empty raw_response", level="error")
-                raise ValueError(
-                    f"ERROR: {total_empty}/{len(data.properties)} properties have empty raw_response. "
-                    f"Extraction stage failed - check API connectivity, rate limits, or model name."
-                )
 
-            parsed_json = self._parse_json_response(prop.raw_response)
-            if parsed_json is None:
+        # Check for empty responses upfront
+        total_empty = sum(1 for p in data.properties if not p.raw_response)
+        if total_empty > 0:
+            self.log(f"⚠️  {total_empty}/{len(data.properties)} properties have empty raw_response", level="error")
+            raise ValueError(
+                f"ERROR: {total_empty}/{len(data.properties)} properties have empty raw_response. "
+                f"Extraction stage failed - check API connectivity, rate limits, or model name."
+            )
+
+        # Parallel parsing with ThreadPoolExecutor
+        results_by_index = {}
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            futures = {
+                executor.submit(self._parse_single_property, i, prop, total_props): i
+                for i, prop in enumerate(data.properties)
+            }
+
+            with tqdm(total=total_props, desc="Parsing properties", disable=not getattr(self, 'verbose', False)) as pbar:
+                for future in as_completed(futures):
+                    idx = futures[future]
+                    result = future.result()
+                    results_by_index[idx] = result
+
+                    # Update progress
+                    pbar.update(1)
+                    if progress_callback and idx % 10 == 0:
+                        try:
+                            progress_callback(len(results_by_index) / total_props)
+                        except Exception:
+                            pass
+
+        # Process results in order to maintain consecutive error tracking
+        for i in range(total_props):
+            result = results_by_index[i]
+
+            if result['empty_response']:
+                continue
+
+            if result['parse_failed']:
                 parse_errors += 1
                 consecutive_errors += 1
-                
-                # Analyze the raw response to determine the specific issue
-                error_details = self._analyze_json_parsing_error(prop.raw_response)
-                
-                # Collect failure information
-                self.parsing_failures.append({
-                    'property_id': prop.id,
-                    'question_id': prop.question_id,
-                    'model': prop.model,
-                    'raw_response': prop.raw_response,
-                    'error_type': 'JSON_PARSE_ERROR',
-                    'error_message': error_details,
-                    'consecutive_errors': consecutive_errors,
-                    'index': i
-                })
-                
-                # Minimal context about the failed input
-                self.log(f"Parse failure input qid={prop.question_id} model={prop.model} raw={prop.raw_response}", level="error")
 
-                # Debug: show a snippet of the offending response to aid troubleshooting
-                snippet = (prop.raw_response or "")[:200].replace("\n", " ")
-                self.log(
-                    f"Failed to parse JSON for property {prop.id} ({consecutive_errors} consecutive errors). {error_details} Snippet: {snippet}…",
-                    level="error",
-                )
-                
-                # Check if we've exceeded consecutive error limit
+                # Add errors to failures list
+                for error in result['errors']:
+                    error['consecutive_errors'] = consecutive_errors
+                    self.parsing_failures.append(error)
+
+                    snippet = (error.get('raw_response', '') or "")[:200].replace("\n", " ")
+                    self.log(
+                        f"Failed to parse JSON for property {error['property_id']} ({consecutive_errors} consecutive errors). {error['error_message']} Snippet: {snippet}…",
+                        level="error",
+                    )
+
+                # Check consecutive error limit
                 if consecutive_errors > max_consecutive_errors:
-                    # Save failures before raising error so user can inspect them
                     if self.output_dir:
                         self._save_failures_immediately()
-                    
+
                     error_msg = (
                         f"ERROR: More than {max_consecutive_errors} consecutive parsing errors detected "
                         f"(currently {consecutive_errors}). This indicates a systematic issue with "
@@ -128,121 +217,19 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
                         error_msg += f"\n\nParsing failures have been saved to: {self.output_dir}/parsing_failures.jsonl"
                     self.log(error_msg, level="error")
                     raise RuntimeError(error_msg)
-                
-                # Log the parsing error but continue processing (parsing failures should never terminate)
-                self.log(f"Parsing failure for property {prop.id}: {error_details}", level="error")
                 continue
 
-            # Successfully parsed JSON - reset consecutive error counter
+            # Successfully parsed
             consecutive_errors = 0
-            
-            # The LLM might return a single property dict or {"properties": [...]} or a list
-            if isinstance(parsed_json, dict) and "properties" in parsed_json:
-                prop_dicts = parsed_json["properties"]
-            elif isinstance(parsed_json, list):
-                prop_dicts = parsed_json
-            elif isinstance(parsed_json, dict):
-                prop_dicts = [parsed_json]
-            else:
-                consecutive_errors += 1  # Count structure errors as parsing errors too
-                
-                error_details = f"Parsed JSON has unsupported type: {type(parsed_json)}. Expected dict, list, or dict with 'properties' key."
-                
-                # Collect structure error information
-                self.parsing_failures.append({
-                    'property_id': prop.id,
-                    'question_id': prop.question_id,
-                    'model': prop.model,
-                    'raw_response': prop.raw_response,
-                    'parsed_json': str(parsed_json),
-                    'error_type': 'UNSUPPORTED_JSON_SHAPE',
-                    'error_message': error_details,
-                    'consecutive_errors': consecutive_errors,
-                    'index': i
-                })
-                
-                # Minimal context about the failed input
-                self.log(f"Parse failure input qid={prop.question_id} model={prop.model} raw={prop.raw_response}", level="error")
 
-                if consecutive_errors > max_consecutive_errors:
-                    # Save failures before raising error so user can inspect them
-                    if self.output_dir:
-                        self._save_failures_immediately()
-                    
-                    error_msg = (
-                        f"ERROR: More than {max_consecutive_errors} consecutive parsing errors detected "
-                        f"(currently {consecutive_errors}). This indicates a systematic issue with "
-                        f"the LLM responses. Check your API connectivity, model configuration, "
-                        f"or system prompts. Failed at property {i+1}/{len(data.properties)}."
-                    )
-                    if self.output_dir:
-                        error_msg += f"\n\nParsing failures have been saved to: {self.output_dir}/parsing_failures.jsonl"
-                    self.log(error_msg, level="error")
-                    raise RuntimeError(error_msg)
-                    
-                # Log the structure error but continue processing (parsing failures should never terminate)
-                self.log(f"Unsupported JSON structure for property {prop.id}: {error_details}", level="error")
-                parse_errors += 1
+            if result['errors']:
+                # Empty list responses
+                empty_list_responses += len(result['errors'])
+                self.parsing_failures.extend(result['errors'])
                 continue
 
-            # Successfully processed structure - reset consecutive error counter
-            consecutive_errors = 0
-            
-            # Log when LLM returns empty list (no properties found)
-            if isinstance(prop_dicts, list) and len(prop_dicts) == 0:
-                self.log(f"LLM returned empty list for conversation {prop.question_id} (model: {prop.model})", level="warning")
-                self.log(f"  Raw response snippet: {(prop.raw_response or '')[:200]}", level="debug")
-                # This is not a parsing failure - the LLM legitimately found no properties
-                empty_list_responses += 1
-                continue
-            
-            for j, p_dict in enumerate(prop_dicts):
-                try:
-                    new_prop = self._to_property(p_dict, prop)
-                    parsed_properties.append(new_prop)
-                except ValueError as e:
-                    if "unknown or invalid model" in str(e):
-                        unknown_model_filtered += 1
-                        self.log(f"Filtered property with unknown model: {e}", level="debug")
-                    else:
-                        parse_errors += 1
-                        
-                        # Analyze the property dict to determine what's missing
-                        error_details = self._analyze_property_dict_error(p_dict, prop, str(e))
-                        
-                        # Collect property building error information
-                        self.parsing_failures.append({
-                            'property_id': prop.id,
-                            'question_id': prop.question_id,
-                            'model': prop.model,
-                            'raw_response': prop.raw_response,
-                            'property_dict': p_dict,
-                            'error_type': 'PROPERTY_BUILDING_ERROR',
-                            'error_message': error_details,
-                            'consecutive_errors': consecutive_errors,
-                            'index': i
-                        })
-                        
-                        # Log the property building error but continue processing (parsing failures should never terminate)
-                        self.log(f"Failed to build property from JSON for {prop.question_id}: {error_details}", level="error")
-                except Exception as e:
-                    parse_errors += 1
-                    
-                    # Collect general error information
-                    self.parsing_failures.append({
-                        'property_id': prop.id,
-                        'question_id': prop.question_id,
-                        'model': prop.model,
-                        'raw_response': prop.raw_response,
-                        'property_dict': p_dict if 'p_dict' in locals() else None,
-                        'error_type': 'GENERAL_ERROR',
-                        'error_message': str(e),
-                        'consecutive_errors': consecutive_errors,
-                        'index': i
-                    })
-                    
-                    # Log the general error but continue processing (parsing failures should never terminate)
-                    self.log(f"Unexpected error building property from JSON for {prop.question_id}: {str(e)}", level="error")
+            # Add parsed properties from this result
+            parsed_properties.extend(result['parsed_properties'])
 
         self.log(f"Parsed {len(parsed_properties)} properties successfully")
         self.log(f"Filtered out {unknown_model_filtered} properties with unknown models")

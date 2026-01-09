@@ -50,6 +50,7 @@ class ExtractJob:
     error: str | None = None
     properties: List[Dict[str, Any]] = field(default_factory=list)
     cancelled: bool = False  # Flag to signal cancellation
+    prompts_metadata: Dict[str, Any] | None = None  # Prompts metadata if dynamic prompts were used
 
 
 _JOBS_LOCK = threading.Lock()
@@ -261,40 +262,24 @@ async def label_run(req: LabelRequest) -> Dict[str, Any]:
         "cluster_id", "cluster_label"
     }
     
-    for _, row in clustered_df.iterrows():
-        # Start with all columns from the row
-        prop: Dict[str, Any] = {}
-        
-        # Only include columns that are in core_columns
-        for col in clustered_df.columns:
-            if col not in core_columns:
-                continue
-            value = row.get(col)
-            # Handle pandas NaN/None values for scalars
-            # For array-like values, check using a different method
-            if isinstance(value, (list, tuple, np.ndarray)):
-                # For array-like values, just pass them through
-                prop[col] = value
-            elif value is None or (isinstance(value, float) and pd.isna(value)):
-                prop[col] = None
-            else:
-                # Convert non-JSON-serializable types to strings
-                if isinstance(value, (str, int, float, bool)):
-                    prop[col] = value
-                elif isinstance(value, dict):
-                    prop[col] = value
-                else:
-                    prop[col] = str(value)
-        
-        # Ensure question_id is always a string
-        if "question_id" in prop:
-            prop["question_id"] = str(prop["question_id"]) if prop["question_id"] is not None else ""
+    # Vectorized conversion: filter to core columns and convert to dict records
+    filtered_df = clustered_df[core_columns].copy()
 
-        # Add property_id as alias for id (frontend expects property_id)
+    # Replace NaN with None for JSON serialization
+    filtered_df = filtered_df.where(pd.notna(filtered_df), None)
+
+    # Convert to list of dicts (much faster than iterrows)
+    properties = filtered_df.to_dict('records')
+
+    # Post-process: ensure question_id is string and add property_id alias
+    for prop in properties:
+        if "question_id" in prop and prop["question_id"] is not None:
+            prop["question_id"] = str(prop["question_id"])
+        elif "question_id" in prop:
+            prop["question_id"] = ""
+
         if "id" in prop:
             prop["property_id"] = prop["id"]
-
-        properties.append(prop)
 
     # Enrich properties with UI row index (same as extraction endpoint)
     properties = _enrich_properties_with_row_index(properties, df, method="single_model")
@@ -323,11 +308,11 @@ async def label_run(req: LabelRequest) -> Dict[str, Any]:
         clusters.append(cluster)
         cluster_id += 1
 
-    # Calculate conversation counts
-    total_conversations_by_model: Dict[str, int] = {}
-    for _, row in clustered_df.iterrows():
-        model = row.get("model", "unknown")
-        total_conversations_by_model[model] = total_conversations_by_model.get(model, 0) + 1
+    # Calculate conversation counts using vectorized operations
+    if "model" in clustered_df.columns:
+        total_conversations_by_model = clustered_df["model"].fillna("unknown").value_counts().to_dict()
+    else:
+        total_conversations_by_model = {"unknown": len(clustered_df)}
 
     total_unique_conversations = len(clustered_df["question_id"].unique()) if "question_id" in clustered_df.columns else len(clustered_df)
 
@@ -370,12 +355,32 @@ async def extract_single(req: ExtractSingleRequest) -> Dict[str, Any]:
             "available": list(df.columns),
         })
 
+    # Generate prompts and capture metadata (always generate to get metadata)
+    # Use sample_rows if provided for better prompt generation, otherwise use single row
+    from stringsight.core.data_objects import PropertyDataset
+    from stringsight.prompt_generation import generate_prompts
+
+    # For prompt generation, use sample_rows if provided (better quality prompts)
+    prompt_gen_df = pd.DataFrame(req.sample_rows) if req.sample_rows else df
+    temp_dataset = PropertyDataset.from_dataframe(prompt_gen_df, method=method)
+
+    discovery_prompt, custom_clustering_prompts, prompts_metadata = generate_prompts(
+        task_description=req.task_description,
+        dataset=temp_dataset,
+        method=method,
+        use_dynamic_prompts=req.use_dynamic_prompts if req.use_dynamic_prompts is not None else True,
+        dynamic_prompt_samples=req.dynamic_prompt_samples or 5,
+        model=req.model_name or "gpt-4.1",
+        system_prompt_override=req.system_prompt,
+        output_dir=req.output_dir
+    )
+
     try:
         result = await public_api.extract_properties_only_async(
             df,
             method=method,
-            system_prompt=req.system_prompt,
-            task_description=req.task_description,
+            system_prompt=discovery_prompt if discovery_prompt else req.system_prompt,
+            task_description=None,  # task_description already incorporated into discovery_prompt
             model_name=req.model_name or "gpt-4.1",
             temperature=req.temperature or 0.7,
             top_p=req.top_p or 0.95,
@@ -399,11 +404,17 @@ async def extract_single(req: ExtractSingleRequest) -> Dict[str, Any]:
 
     # Return parsed properties for this single row
     props = [p.to_dict() for p in dataset.properties]
-    return {
+    response = {
         "properties": props,
         "counts": {"properties": len(props)},
         "failures": failures[:5] if req.return_debug else []
     }
+
+    # Add prompts metadata if available
+    if prompts_metadata:
+        response["prompts"] = prompts_metadata.dict()
+
+    return response
 
 
 # -----------------------------
@@ -432,6 +443,24 @@ async def extract_batch(req: ExtractBatchRequest) -> Dict[str, Any]:
             "missing": missing,
             "available": list(df.columns),
         })
+
+    # Generate prompts and capture metadata
+    prompts_metadata = None
+    if req.task_description and req.use_dynamic_prompts:
+        from stringsight.core.data_objects import PropertyDataset
+        from stringsight.prompt_generation import generate_prompts
+
+        temp_dataset = PropertyDataset.from_dataframe(df, method=method)
+        discovery_prompt, custom_clustering_prompts, prompts_metadata = generate_prompts(
+            task_description=req.task_description,
+            dataset=temp_dataset,
+            method=method,
+            use_dynamic_prompts=req.use_dynamic_prompts,
+            dynamic_prompt_samples=req.dynamic_prompt_samples or 5,
+            model=req.model_name or "gpt-4.1",
+            system_prompt_override=req.system_prompt,
+            output_dir=req.output_dir
+        )
 
     try:
         result = await public_api.extract_properties_only_async(
@@ -474,13 +503,19 @@ async def extract_batch(req: ExtractBatchRequest) -> Dict[str, Any]:
     parse_failures = len(failures)
     empty_lists = 0
 
-    return {
+    response = {
         "rows": rows,
         "columns": columns,
         "counts": {"conversations": int(len(df)), "properties": int(len(rows))},
         "stats": {"parse_failures": parse_failures, "empty_lists": empty_lists},
         "failures": failures[:20] if req.return_debug else []
     }
+
+    # Add prompts metadata if available
+    if prompts_metadata:
+        response["prompts"] = prompts_metadata.dict()
+
+    return response
 
 
 # -----------------------------
@@ -538,9 +573,29 @@ async def _run_extract_job_async(job: ExtractJob, req: ExtractJobStartRequest):
         from stringsight.extractors import get_extractor
         from stringsight.postprocess import LLMJsonParser, PropertyValidator
         from stringsight.prompts import get_system_prompt
+        from stringsight.prompt_generation import generate_prompts
+
+        # Create dataset once and reuse
+        dataset = PropertyDataset.from_dataframe(df, method=method)
+
+        # Generate prompts and capture metadata
+        prompts_metadata = None
+        if req.task_description and req.use_dynamic_prompts:
+            discovery_prompt, custom_clustering_prompts, prompts_metadata = generate_prompts(
+                task_description=req.task_description,
+                dataset=dataset,
+                method=method,
+                use_dynamic_prompts=req.use_dynamic_prompts,
+                dynamic_prompt_samples=req.dynamic_prompt_samples or 5,
+                model=req.model_name or "gpt-4.1",
+                system_prompt_override=req.system_prompt,
+                output_dir=req.output_dir
+            )
+            # Store prompts metadata in job
+            with _JOBS_LOCK:
+                job.prompts_metadata = prompts_metadata.dict() if prompts_metadata else None
 
         system_prompt = get_system_prompt(method, req.system_prompt, req.task_description)
-        dataset = PropertyDataset.from_dataframe(df, method=method)
 
         extractor = get_extractor(
             model_name=req.model_name or "gpt-4.1",
@@ -634,7 +689,18 @@ def extract_jobs_result(job_id: str) -> Dict[str, Any]:
             raise HTTPException(status_code=404, detail="job not found")
         if job.state not in ["done", "cancelled"]:
             raise HTTPException(status_code=409, detail=f"job not done (state: {job.state})")
-        return {"properties": job.properties, "count": len(job.properties), "cancelled": job.state == "cancelled"}
+
+        response = {
+            "properties": job.properties,
+            "count": len(job.properties),
+            "cancelled": job.state == "cancelled"
+        }
+
+        # Add prompts metadata if available
+        if job.prompts_metadata:
+            response["prompts"] = job.prompts_metadata
+
+        return response
 
 
 @router.post("/extract/jobs/cancel")

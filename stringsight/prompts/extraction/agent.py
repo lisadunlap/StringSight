@@ -22,10 +22,12 @@ You will be analyzing a trace for the following task:
 **### DEFINITIONS & RUBRIC**
 
 **1. BEHAVIOR TYPES**
-* **Positive:** Uncommon yet effective strategies, self-correction, or exceptional safety handling. (Max 1 per trace). *Most correct answers should not be included as they are not interesting or notable.* There should be at most 1 positive property per trace.
+* **Positive:** Uncommon yet effective strategies, self-correction, or exceptional safety handling. *Most correct answers should not be included as they are not interesting or notable.* Only include positive behaviors that demonstrate unusual competence or creativity.
 * **Negative (Critical):** Root causes of task failure, hallucinations, or safety violations.
 * **Negative (Non-Critical):** Inefficiencies, formatting slips, errors that were later corrected, or partial errors that don't break the main task.
 * **Style:** Distinctive persona, tone, or formatting choices (e.g., Socratic method, specific slang, use of tables, organizing tasks before solving them, etc.).
+
+**IMPORTANT:** Extract ALL notable behaviors you observe. Do not artificially limit the number of properties. A typical trace may have 3-8 distinct behaviors worth noting.
 
 **2. PROPERTY DESCRIPTION FORMULA**
 You must structure your descriptions using this format:
@@ -79,10 +81,12 @@ You will be analyzing a traces for the following task:
 **### DEFINITIONS & RUBRIC**
 
 **1. BEHAVIOR TYPES**
-* **Positive:** Uncommon yet effective strategies, self-correction, or exceptional safety handling. (Max 1 per trace). *Most correct answers should not be included as they are not interesting or notable.* There should be at most 1 positive property per trace.
+* **Positive:** Uncommon yet effective strategies, self-correction, or exceptional safety handling. *Most correct answers should not be included as they are not interesting or notable.* Only include positive behaviors that demonstrate unusual competence or creativity.
 * **Negative (Critical):** Root causes of task failure, hallucinations, or safety violations.
 * **Negative (Non-Critical):** Inefficiencies, formatting slips, errors that were later corrected, or partial errors that don't break the main task.
 * **Style:** Distinctive persona, tone, or formatting choices (e.g., Socratic method, specific slang, use of tables, organizing tasks before solving them, etc.).
+
+**IMPORTANT:** Extract ALL notable behaviors you observe. Do not artificially limit the number of properties. A typical trace may have 3-8 distinct behaviors worth noting.
 
 **2. PROPERTY DESCRIPTION FORMULA**
 You must structure your descriptions using this format:

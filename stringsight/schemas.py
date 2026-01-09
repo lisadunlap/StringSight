@@ -2,6 +2,19 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional, Literal
 from stringsight.constants import DEFAULT_MAX_WORKERS
 
+
+class PromptsMetadata(BaseModel):
+    """Metadata about prompts used during extraction."""
+    discovery_prompt: str
+    clustering_prompt: Optional[str] = None
+    dedup_prompt: Optional[str] = None
+    outlier_prompt: Optional[str] = None
+    expanded_task_description: Optional[str] = None
+    task_description_original: Optional[str] = None
+    dynamic_prompts_used: bool
+    verification_passed: Optional[bool] = None
+    reflection_attempts: Optional[int] = None
+
 class ExtractBatchRequest(BaseModel):
     rows: List[Dict[str, Any]]
     method: Optional[Literal["single_model", "side_by_side"]] = None
@@ -17,6 +30,8 @@ class ExtractBatchRequest(BaseModel):
     output_dir: Optional[str] = None
     return_debug: Optional[bool] = False
     sample_size: Optional[int] = None
+    use_dynamic_prompts: Optional[bool] = True
+    dynamic_prompt_samples: Optional[int] = 5
 
 class ExtractJobStartRequest(ExtractBatchRequest):
     pass
@@ -145,6 +160,7 @@ class ResultsLoadRequest(BaseModel):
 
 class ExtractSingleRequest(BaseModel):
     row: Dict[str, Any]
+    sample_rows: Optional[List[Dict[str, Any]]] = None  # Optional k sample rows for dynamic prompt generation
     method: Optional[Literal["single_model", "side_by_side"]] = None
     system_prompt: Optional[str] = None
     task_description: Optional[str] = None
@@ -157,6 +173,8 @@ class ExtractSingleRequest(BaseModel):
     use_wandb: Optional[bool] = False
     output_dir: Optional[str] = None
     return_debug: Optional[bool] = False
+    use_dynamic_prompts: Optional[bool] = True
+    dynamic_prompt_samples: Optional[int] = 5
 
 
 class DFRows(BaseModel):

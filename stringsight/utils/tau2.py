@@ -15,12 +15,19 @@ import pandas as pd
 
 class OAIMessage(TypedDict, total=False):
     """
-    A minimal OpenAI Chat Completions message structure.
+    A minimal conversation message structure compatible with StringSight.
+
+    Note:
+        Although this format is inspired by OpenAI chat messages, StringSight's
+        renderers accept a slightly more permissive tool call shape. In
+        particular, for tool-using assistant turns, `tool_calls` is represented
+        as a list of dicts with `name` and dict `arguments`, matching what
+        `stringsight/extractors/conv_to_str.py` expects.
 
     Keys:
     - role: "system" | "user" | "assistant" | "tool"
     - content: string content (may be omitted for tool-calling assistant turns)
-    - tool_calls: OpenAI tool call list for assistant messages
+    - tool_calls: list of tool calls for assistant messages (StringSight-style)
     - tool_call_id: tool call id for tool messages
     - name: tool name for tool messages (optional)
     """
@@ -182,7 +189,7 @@ def _format_keyed_sections(
 
 def _tau2_messages_to_oai(messages: List[Mapping[str, Any]]) -> List[OAIMessage]:
     """
-    Convert TAU2 recorded messages into a minimal OAI chat format.
+    Convert TAU2 recorded messages into a minimal conversation format.
 
     TAU2 message shape (observed):
     - role: str
@@ -191,7 +198,13 @@ def _tau2_messages_to_oai(messages: List[Mapping[str, Any]]) -> List[OAIMessage]
     - id: str (for tool messages; corresponds to the tool call id)
 
     Returns:
-        List of OAI-format messages.
+        List of messages compatible with StringSight's conversation renderer.
+
+        Tool calls:
+            For assistant messages, tool calls are emitted as a list of dicts:
+            - id: str
+            - name: str
+            - arguments: dict
     """
 
     out: List[OAIMessage] = []
@@ -211,11 +224,8 @@ def _tau2_messages_to_oai(messages: List[Mapping[str, Any]]) -> List[OAIMessage]
             msg["tool_calls"] = [
                 {
                     "id": tc["id"],
-                    "type": "function",
-                    "function": {
-                        "name": tc["name"],
-                        "arguments": json.dumps(tc["arguments"], ensure_ascii=False),
-                    },
+                    "name": tc["name"],
+                    "arguments": tc["arguments"],
                 }
                 for tc in tool_calls
             ]

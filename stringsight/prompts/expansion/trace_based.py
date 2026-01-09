@@ -10,7 +10,7 @@ import litellm
 
 from .base import PromptExpander
 from ...extractors.conv_to_str import conv_to_str
-from ..prompt.task_description import single_model_default_task_description
+from ..task_descriptions import single_model_default_task_description
 
 
 EXPANSION_PROMPT_TEMPLATE = """Below is the given task description and examples of traces of agents solving the task. 
@@ -54,21 +54,24 @@ class TraceBasedExpander(PromptExpander):
         self,
         model: str = "gpt-4.1",
         num_traces: int = 5,
-        temperature: float = 0.7,
+        temperature: float = 0.0,
         max_tokens: int = 2000,
+        seed: int = 42,
     ):
         """Initialize the trace-based expander.
-        
+
         Args:
             model: LLM model to use for expansion.
             num_traces: Number of traces to sample for expansion (default: 5).
-            temperature: Temperature for LLM generation.
+            temperature: Temperature for LLM generation (default: 0.0 for determinism).
             max_tokens: Maximum tokens for expansion response.
+            seed: Random seed for deterministic sampling (default: 42).
         """
         self.model = model
         self.num_traces = num_traces
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.seed = seed
     
     def _format_trace(self, trace: Dict[str, Any]) -> str:
         """Format a single trace into a readable string.
@@ -125,12 +128,12 @@ class TraceBasedExpander(PromptExpander):
         **kwargs
     ) -> str:
         """Expand a task description using provided traces.
-        
+
         Args:
             task_description: The original task description to expand.
             traces: List of trace dictionaries containing conversation data.
             **kwargs: Additional parameters (model, num_traces, etc. can override defaults).
-        
+
         Returns:
             Expanded task description string.
         """
@@ -139,7 +142,11 @@ class TraceBasedExpander(PromptExpander):
         num_traces = kwargs.get("num_traces", self.num_traces)
         temperature = kwargs.get("temperature", self.temperature)
         max_tokens = kwargs.get("max_tokens", self.max_tokens)
-        
+        seed = kwargs.get("seed", self.seed)
+
+        # Set seed for deterministic sampling
+        random.seed(seed)
+
         # Sample traces
         if len(traces) > num_traces:
             sampled_traces = random.sample(traces, num_traces)
@@ -177,19 +184,21 @@ def expand_task_description(
     traces: List[Dict[str, Any]],
     model: str = "gpt-4.1",
     num_traces: int = 5,
-    temperature: float = 0.7,
+    temperature: float = 0.0,
     max_tokens: int = 2000,
+    seed: int = 42,
 ) -> str:
     """Convenience function to expand a task description using traces.
-    
+
     Args:
         task_description: The original task description to expand.
         traces: List of trace dictionaries containing conversation data.
         model: LLM model to use for expansion (default: "gpt-4.1").
         num_traces: Number of traces to sample for expansion (default: 5).
-        temperature: Temperature for LLM generation (default: 0.7).
+        temperature: Temperature for LLM generation (default: 0.0 for determinism).
         max_tokens: Maximum tokens for expansion response (default: 2000).
-    
+        seed: Random seed for deterministic sampling (default: 42).
+
     Returns:
         Expanded task description string.
     """
@@ -198,6 +207,7 @@ def expand_task_description(
         num_traces=num_traces,
         temperature=temperature,
         max_tokens=max_tokens,
+        seed=seed,
     )
     return expander.expand(task_description, traces)
 

@@ -129,7 +129,7 @@ class LLMConfig:
     model: str = "gpt-4.1-mini"
     max_workers: int = DEFAULT_MAX_WORKERS
     max_retries: int = 3
-    base_sleep_time: float = 2.0
+    base_sleep_time: float = 5.0  # Increased from 2.0 to handle rate limits better
     timeout: float | None = None
     temperature: float = 0.0
     top_p: float = 1.0
@@ -299,24 +299,32 @@ class LLMUtils:
                     return idx, content
                     
                 except Exception as e:
+                    # Log the actual error for debugging
+                    error_type = type(e).__name__
+                    error_msg = str(e)
+
                     if attempt == config.max_retries - 1:
-                        logger.warning(f"⚠️ LLM call failed after {config.max_retries} attempts (skipping): {e}")
+                        logger.warning(f"⚠️ LLM call failed after {config.max_retries} attempts (skipping)")
+                        logger.warning(f"  Error type: {error_type}")
+                        logger.warning(f"  Error message: {error_msg}")
                         logger.warning(f"  Model: {config.model}")
-                        logger.warning(f"  Message: {str(request_messages)[:200]}")
+                        logger.warning(f"  Message preview: {str(request_messages)[:200]}")
                         # Don't cache, return None to be filtered out later
                         return idx, None
                     else:
                         # Check if this is a rate limit error
                         is_rate_limit = False
                         retry_after = None
-                        
+
                         # Check for litellm rate limit errors
                         if hasattr(litellm, 'RateLimitError') and isinstance(e, litellm.RateLimitError):
                             is_rate_limit = True
                         elif hasattr(e, 'status_code') and e.status_code == 429:
                             is_rate_limit = True
-                        elif "rate limit" in str(e).lower() or "429" in str(e):
+                        elif "rate limit" in error_msg.lower() or "429" in error_msg:
                             is_rate_limit = True
+                        elif "overloaded" in error_msg.lower():
+                            is_rate_limit = True  # Treat overloaded errors as rate limits
                         
                         # Try to extract Retry-After header from exception
                         if is_rate_limit:
@@ -331,15 +339,18 @@ class LLMUtils:
                         # Use Retry-After if available, otherwise use exponential backoff
                         if is_rate_limit and retry_after:
                             sleep_time = retry_after
-                            logger.warning(f"Rate limit hit (attempt {attempt + 1}/{config.max_retries}), waiting {sleep_time}s per Retry-After header: {e}")
+                            logger.warning(f"Rate limit hit (attempt {attempt + 1}/{config.max_retries}), waiting {sleep_time}s per Retry-After header")
+                            logger.warning(f"  Error: {error_type}: {error_msg[:200]}")
                         elif is_rate_limit:
                             # For rate limits, use shorter initial backoff but still exponential
                             sleep_time = max(1.0, config.base_sleep_time * (1.5 ** attempt))
-                            logger.warning(f"Rate limit hit (attempt {attempt + 1}/{config.max_retries}), retrying in {sleep_time}s: {e}")
+                            logger.warning(f"Rate limit hit (attempt {attempt + 1}/{config.max_retries}), retrying in {sleep_time:.1f}s")
+                            logger.warning(f"  Error: {error_type}: {error_msg[:200]}")
                         else:
                             # For other errors, use standard exponential backoff
                             sleep_time = config.base_sleep_time * (2 ** attempt)
-                            logger.warning(f"LLM call attempt {attempt + 1} failed, retrying in {sleep_time}s: {e}")
+                            logger.warning(f"LLM call attempt {attempt + 1} failed, retrying in {sleep_time:.1f}s")
+                            logger.warning(f"  Error: {error_type}: {error_msg[:200]}")
 
                         time.sleep(sleep_time)
 

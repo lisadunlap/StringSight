@@ -66,10 +66,14 @@ class HDBSCANClusterer(BaseClusterer):
         cluster_assignment_model: str = "gpt-4.1-mini",
         verbose: bool = True,
         llm_max_workers: int = DEFAULT_MAX_WORKERS,
+        custom_prompts: dict[str, str] | None = None,
         **kwargs,
     ):
         """Initialize the HDBSCAN clusterer with explicit, overridable parameters.
-        
+
+        Args:
+            custom_prompts: Optional dict of custom clustering prompts from dynamic generation.
+                          Keys: "clustering", "deduplication", "outlier"
         """
         super().__init__(
             output_dir=output_dir,
@@ -78,6 +82,9 @@ class HDBSCANClusterer(BaseClusterer):
             wandb_project=wandb_project,
             **kwargs,
         )
+
+        # Store custom prompts for use during clustering
+        self.custom_prompts = custom_prompts
 
         # Build a unified ClusterConfig (no hardcoded values)
         self.config = ClusterConfig(
@@ -174,13 +181,21 @@ class HDBSCANClusterer(BaseClusterer):
             df_empty = pd.DataFrame(columns=[column_name, id_col, label_col, "question_id", "id", "meta"])
             return df_empty
 
+        # Determine if we should use grouped clustering
+        use_grouped_clustering = False
         if group_col is not None and group_col in df.columns:
+            groups = list(df.groupby(group_col))
+            if len(groups) == 0:
+                logger.warning(f"No groups found for groupby column '{group_col}' - falling back to non-grouped clustering")
+                use_grouped_clustering = False
+            else:
+                use_grouped_clustering = True
+
+        if use_grouped_clustering:
             parallel_clustering = getattr(self.config, "parallel_clustering", False)
 
             if parallel_clustering:
                 # Parallelize clustering per group for better performance (using async)
-                groups = list(df.groupby(group_col))
-
                 async def _cluster_group_async(group_info):
                     group, group_df = group_info
                     if getattr(self, "verbose", False):
@@ -195,10 +210,10 @@ class HDBSCANClusterer(BaseClusterer):
                 # Process groups in parallel using async
                 clustered_parts = []
                 max_workers = min(len(groups), getattr(self.config, 'llm_max_workers', DEFAULT_MAX_WORKERS))
-                
+
                 # Create coroutines (not tasks yet - we're not in event loop)
                 coros = [_cluster_group_async(group_info) for group_info in groups]
-                
+
                 # Use gather to run them all - this works even if not in event loop yet
                 # We'll iterate with as_completed for progress tracking
                 tasks = [asyncio.ensure_future(coro) for coro in coros]
@@ -221,7 +236,6 @@ class HDBSCANClusterer(BaseClusterer):
             else:
                 # Process groups sequentially (default behavior)
                 clustered_parts = []
-                groups = list(df.groupby(group_col))
 
                 # Add progress bar for sequential clustering
                 total_groups = len(groups)
@@ -241,6 +255,7 @@ class HDBSCANClusterer(BaseClusterer):
                             pass
                 clustered_df = pd.concat(clustered_parts, ignore_index=True)
         else:
+            # Non-grouped clustering
             clustered_df = await hdbscan_cluster_categories(
                 df,
                 column_name=column_name,

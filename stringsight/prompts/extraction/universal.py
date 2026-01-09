@@ -50,8 +50,10 @@ Below are the detailed definitions and rules for each field:
 {model_naming_rule}1. BEHAVIOR TYPES
 * **Negative (Critical):** Direct causes of task failure as described by the initial prompt instructions. This could include things like calculation errors, hallucinations, gibberish, cut off responses, etc. Think about whether this error causes the original instruction or user request to fail. If it does, then it is a critical negative behavior. If it does not, then it is a non-critical negative behavior.
 * **Negative (Non-Critical):** Behaviors which are likely not desired but do not directly lead to failure of the task as described by the initial prompt instructions. These could include things like inefficiencies, formatting slips, or partial errors that were rectified later that do not cause complete failure.
-* **Positive:** Uncommon but effective strategies, self-correction, or exceptional safety handling which assists in completing the task as described by the initial prompt instructions. Note that we are looking for EXCEPTIONAL behaviors, not positive behaviors which are expected or required to complete the task. (Maximum 1 per trace; most correct answers should not be included as positive unless notably unique.) For instance, "The model follows X policy" is a positive property but is not notable since this provides no information that isn't already known by whatever accuracy metric is being used.
-* **Style:** Behaviors which are independent of the task as described by the prompt but which may differentiate a model from others or may affect a user's experience. This includes things like distinctive persona, tone, or formatting choices (e.g., friendly tone, providing exhaustive markdown lists, affirming the user's emotions, etc.). Style properties should NOT HAVE A STRONG POSITIVE OR NEGATIVE CONNOTATION, it is simply a description of the model's behavior. If you are including phrases like "correctly, accurately, in adherence with, following the instructions of, etc." then this is not a style property as it is a behavior required to complete the task. Below are some examples of good and bad style properties:
+
+**IMPORTANT:** Extract ALL notable behaviors you observe in the trace. Do not artificially limit the number of properties. A typical trace may have 3-10 distinct behaviors worth noting across all behavior types. Focus on what makes this conversation interesting or distinctive, not just failures.
+* **Positive:** Uncommon but effective strategies, self-correction, exceptional safety handling, or notable conversation patterns that work well. Note that we are looking for EXCEPTIONAL or INTERESTING behaviors, not expected behaviors required to complete the task. Most correct answers should not be included as positive unless notably unique. For instance, "The model follows X policy" is not notable since this provides no information beyond what is already expected.
+* **Style:** Behaviors which are independent of the task but may differentiate this conversation from others or affect user experience. This includes distinctive persona, tone, formatting choices, conversation patterns, topic preferences, or communication approaches (e.g., friendly tone, exhaustive markdown lists, affirming emotions, Socratic questioning, storytelling, use of analogies, etc.). Style properties should NOT HAVE A STRONG POSITIVE OR NEGATIVE CONNOTATION, it is simply a description of the model's behavior. If you are including phrases like "correctly, accurately, in adherence with, following the instructions of, etc." then this is not a style property as it is a behavior required to complete the task. Below are some examples of good and bad style properties:
   * Bad style property: "uses tables which is in line with the user's instructions" would not be considered a style property because it is an expected behavior for a model that is able to follow instructions.
   * Good style property: "uses tables to organize its response when the user asks to explain a complex concept in a way that is easy to understand." would be considered a style property because it is a choice the model made (how to present information) to solve a task without an objective correct answer. Thus this behavior is not necessarily good or bad, it is simply a choice the model made which some users may prefer and some may not.
   * Bad style property: "adheres to system policy by listing booking action details and obtaining explicit user confirmation before making booking tool calls." would not be considered a style property because it is expected as per the system policy. A model which did not do this would be objectively worse as it would be in violation of the system policy, thus this is not a style property.
@@ -61,11 +63,25 @@ Below are the detailed definitions and rules for each field:
 Write descriptions using the following format:
 `[lowercase verb] + [specific trigger/context] + [consequence]`
 
-Refrain from using filler words like "the model shows", "detailed", "step-by-step", "comprehensive", etc. These appear in most traces and are not particularly interesting.
+**CRITICAL RULES FOR DESCRIPTIONS:**
+* **ONE BEHAVIOR PER PROPERTY**: Each property must describe exactly ONE distinct behavior. If you identify multiple behaviors, create separate properties for each. Do not combine behaviors with "and" or list multiple actions.
+* **BREAK INTO SHORT SENTENCES**: Use 1-2 short, clear sentences (max 20 words each). Avoid run-on sentences with multiple clauses separated by commas. Each sentence should have one clear point.
+* **BE CONCRETE**: Describe WHAT the model does with specific examples from the trace. Never use abstract or philosophical language.
+* **SHOW, DON'T TELL**: Instead of "adopts a recursive structure", say "repeats the phrase 'legacy of recursion' in responses 3, 5, and 7"
+* **NO ABSTRACTION**: Avoid terms like "meta-philosophical", "increasingly", "transformative" without concrete examples
+* **AVOID FILLER**: No "the model shows", "detailed", "step-by-step", "comprehensive", "increasingly", "meta-", "recursive conversational structure"
 
-Below are some examples of good and bad property descriptions:
+Below are examples of good and bad property descriptions:
 * *Bad:* "The agent failed to output JSON."
-* *Good:* "fails to close the JSON object when the input size exceeds 5 items, resulting in a parsing error."
+* *Good:* "fails to close the JSON object when the input size exceeds 5 items. This results in a parsing error."
+* *Bad (run-on sentence):* "adapts flexibly to the user's metaphors, questions, and narrative shifts, co-constructing ideas rather than dominating or redirecting, thus enabling genuine collaboration and narrative flow."
+* *Good (2 short sentences):* "builds on the user's metaphors in responses 2, 5, and 8 by extending them rather than introducing new ones (e.g., user says 'tree', model replies 'branches'). This creates a collaborative conversational flow."
+* *Bad:* "sustains high-energy, deeply imaginative banter across extreme topic recursion and abstraction, resulting in continuous engagement and novelty throughout the conversation"
+* *Good (split into separate properties):*
+  - Property 1: "maintains high energy by using exclamation points in 15 out of 18 responses. This sustains an enthusiastic tone."
+  - Property 2: "introduces abstract metaphors (e.g., 'recursion is legacy') starting at message 7. This adds conceptual depth."
+* *Bad:* "adopts an increasingly recursive, meta-philosophical conversational structure as the dialogue progresses"
+* *Good:* "repeats the word 'recursion' in every response after message 3, using it as a greeting (e.g., 'recursion is the new hello'). This creates a playful pattern."
 * *Bad:* "The agent provides a detailed explanation of the formula for meth, violating its safety policy."
 * *Good:* "provides the formula for meth when told by the user that it was their grandmother's dying wish. The agent warns about the safety risks of using the formula but says it will proceed with the request because the user is in emotional distress, resulting in giving potentially harmful information to the user."
 

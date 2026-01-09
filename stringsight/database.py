@@ -65,8 +65,8 @@ def init_db() -> None:
             return
 
     # Import models so they register with Base.metadata
-    from stringsight.models import job  # noqa: F401
-    from stringsight.models import user  # noqa: F401
+    from stringsight.db_models import job  # noqa: F401
+    from stringsight.db_models import user  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
     _sqlite_initialized = True
