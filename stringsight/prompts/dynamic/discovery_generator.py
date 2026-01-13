@@ -232,7 +232,7 @@ class DiscoveryPromptGenerator:
             "expanded_description": expanded_description,
             "method": method,
             "model": model,
-            "version": "1.0",
+            "version": "1.1",  # Bumped to 1.1 for deduplication step
             # Include a deterministic meta-prompt hash for cache invalidation.
             #
             # NOTE: Do NOT use Python's built-in `hash()` here; it is salted per

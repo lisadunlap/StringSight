@@ -19,16 +19,17 @@ Generate a concise "intro_task" section (2-3 sentences) that:
 3. Sets expectations for what behaviors to look for
 4. Emphasizes actionable behaviors (can improve system or inform model choice)
 5. **CRITICAL**: Emphasizes extracting ONE distinct behavior per property (not multiple behaviors combined)
+6. **CRITICAL**: Warns against creating redundant properties that describe the same behavior with different wording
 
 **Format Requirements:**
 - Return ONLY the intro_task text
 - No additional formatting, explanations, or quotes
 - 2-3 sentences maximum
 - Start with "You are..." or "Your task is..."
-- Must mention: "Each property should describe ONE distinct behavior"
+- Must mention: "Each property should describe ONE distinct behavior" and "avoid redundant properties"
 
 **Example for a general chatbot:**
-"You are an expert model behavior analyst. Your task is to meticulously analyze model responses and identify unique, meaningful qualitative properties, failure modes, and interesting behaviors. Each property should describe ONE distinct, concrete behavior with specific examples from the trace. Focus only on properties that genuinely matter to users, evaluators, or developers when judging model quality."
+"You are an expert model behavior analyst. Your task is to meticulously analyze model responses and identify unique, meaningful qualitative properties, failure modes, and interesting behaviors. Each property should describe ONE distinct, concrete behavior with specific examples from the trace—avoid creating multiple properties that describe the same underlying behavior with different wording. Focus only on properties that genuinely matter to users, evaluators, or developers when judging model quality."
 
 **Now generate an intro_task specifically for the task described above:**"""
 
@@ -45,16 +46,17 @@ Generate a "goal_instructions" section (2-4 sentences) that:
 1. States what output format to produce (JSON list of objects)
 2. Mentions specific behavior categories relevant to THIS task
 3. Emphasizes extracting ALL notable behaviors (typically 3-10 per trace) that affect user preference or task performance
-4. References the JSON format template
+4. **CRITICAL**: Emphasizes that each property should be distinct and non-redundant
+5. References the JSON format template
 
 **Format Requirements:**
 - Return ONLY the goal_instructions text
 - No additional formatting or explanations
 - 2-4 sentences maximum
-- Must mention "JSON list of objects" and "behavior categories"
+- Must mention "JSON list of objects", "behavior categories", and "distinct"
 
 **Example for a general task:**
-"Produce a JSON list of objects. Each object should represent a single, distinct property found in the model's response. Focus on identifying key areas of interest such as capabilities, style, errors, and user experience factors. Properties should be limited to those that could affect user preference or demonstrate how well the model understands and executes the task."
+"Produce a JSON list of objects. Each object should represent a single, distinct property found in the model's response—ensure properties are not redundant or overlapping. Focus on identifying key areas of interest such as capabilities, style, errors, and user experience factors. Properties should be limited to those that could affect user preference or demonstrate how well the model understands and executes the task."
 
 **Now generate goal_instructions specifically for the task described above:**"""
 
@@ -67,23 +69,26 @@ ANALYSIS_PROCESS_GENERATION_TEMPLATE = """You are creating a custom system promp
 **Analysis Method:** {method}
 
 **Your Goal:**
-Generate an "analysis_process" section (3-step process) that:
+Generate an "analysis_process" section (4-step process) that:
 1. **Step 1 (Scan)**: Describes what to read in the trace, mentioning task-specific elements
 2. **Step 2 (Filter)**: Describes what to focus on (high leverage, distinctive, structural behaviors)
 3. **Step 3 (Draft)**: Instructs to write descriptions following the rubric **with emphasis on concrete, concise descriptions with specific examples from the trace**
+4. **Step 4 (Deduplicate)**: Instructs to review the list and merge any redundant properties that describe the same behavior
 
 **Format Requirements:**
 - Return ONLY the analysis_process text
 - Use numbered list format: "1. **Step Name:** Description"
-- 3 steps exactly: Scan, Filter, Draft
+- 4 steps exactly: Scan, Filter, Draft, Deduplicate
 - Each step 1-2 sentences
 - Mention task-specific behaviors in Step 1
 - **CRITICAL**: Step 3 MUST emphasize: "Use 1-2 short sentences (max 20 words each). Include specific examples. Avoid run-on sentences and abstract/philosophical language."
+- **CRITICAL**: Step 4 MUST emphasize: "Review your list for redundant properties. Merge any properties that describe the same underlying behavior with different wording."
 
 **Example for a general task:**
 "1. **Scan the Trace:** Read the user input, the model's internal thoughts (if available), the model's interaction with the user, the system of tools the model has access to, the environment, and the final output.
 2. **Filter:** Ignore generic behaviors (e.g., 'Agent answered correctly'). Focus on behaviors that are **High Leverage** (critical success/failure), **Distinctive** (persona/style), or **Structural** (looping, adherence to format).
-3. **Draft:** Write behavior descriptions in 1-2 short sentences (max 20 words each) following the **Definitions & Rubric** section. Include specific examples from the trace. Avoid run-on sentences with multiple clauses, abstract characterizations, and philosophical language."
+3. **Draft:** Write behavior descriptions in 1-2 short sentences (max 20 words each) following the **Definitions & Rubric** section. Include specific examples from the trace. Avoid run-on sentences with multiple clauses, abstract characterizations, and philosophical language.
+4. **Deduplicate:** Review your list for redundant properties. Merge any properties that describe the same underlying behavior with different wording (e.g., 'uses friendly tone' and 'maintains warm language' should be one property)."
 
 **Now generate an analysis_process specifically for the task described above:**"""
 

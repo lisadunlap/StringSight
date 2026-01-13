@@ -52,6 +52,8 @@ Below are the detailed definitions and rules for each field:
 * **Negative (Non-Critical):** Behaviors which are likely not desired but do not directly lead to failure of the task as described by the initial prompt instructions. These could include things like inefficiencies, formatting slips, or partial errors that were rectified later that do not cause complete failure.
 
 **IMPORTANT:** Extract ALL notable behaviors you observe in the trace. Do not artificially limit the number of properties. A typical trace may have 3-10 distinct behaviors worth noting across all behavior types. Focus on what makes this conversation interesting or distinctive, not just failures.
+
+**CRITICAL: AVOID REDUNDANT PROPERTIES:** Before adding a property, check if it's truly distinct from properties you've already identified. Different phrasings of the same underlying behavior should be consolidated into ONE property. For example, "uses markdown formatting" and "structures response with headers" are often the same behavior and should be one property, not two.
 * **Positive:** Uncommon but effective strategies, self-correction, exceptional safety handling, or notable conversation patterns that work well. Note that we are looking for EXCEPTIONAL or INTERESTING behaviors, not expected behaviors required to complete the task. Most correct answers should not be included as positive unless notably unique. For instance, "The model follows X policy" is not notable since this provides no information beyond what is already expected.
 * **Style:** Behaviors which are independent of the task but may differentiate this conversation from others or affect user experience. This includes distinctive persona, tone, formatting choices, conversation patterns, topic preferences, or communication approaches (e.g., friendly tone, exhaustive markdown lists, affirming emotions, Socratic questioning, storytelling, use of analogies, etc.). Style properties should NOT HAVE A STRONG POSITIVE OR NEGATIVE CONNOTATION, it is simply a description of the model's behavior. If you are including phrases like "correctly, accurately, in adherence with, following the instructions of, etc." then this is not a style property as it is a behavior required to complete the task. Below are some examples of good and bad style properties:
   * Bad style property: "uses tables which is in line with the user's instructions" would not be considered a style property because it is an expected behavior for a model that is able to follow instructions.
@@ -108,7 +110,15 @@ Below are examples of good and bad property descriptions:
 ### CRITICAL CONSTRAINTS
 * **NO HALLUCINATIONS:** Do not infer agent thoughts or intentions based solely on the final output. Only describe observable behaviors. Do not fabricate or exaggerate evidence or quotes.
 * **INTERNAL VS EXTERNAL:** Do not state the agent "said" something if it appeared only in internal thoughts. Use "reasoned" or "thought" for internal traces.
-* **DISTINCT PROPERTIES:** Each property should be unique, not a mix of others. If a behavior fits multiple categories (e.g., is both Negative (critical) and a part could be Negative (non-critical)), list only the property in the category that is more severe or specific (except for cases involving both the cause and correction of an error, where both can be listed separately).
+* **DISTINCT PROPERTIES - NO DUPLICATES:** Each property must describe a genuinely different behavior. Before finalizing your list:
+  1. Review all properties to identify any that describe the same underlying behavior with different wording
+  2. Consolidate redundant properties into a single, well-written property
+  3. Ask yourself: "Could these two properties be merged without losing important information?" If yes, merge them.
+  4. Examples of redundant properties that should be ONE property:
+     - "uses numbered lists" + "structures content with bullet points" → "uses structured lists and bullet points to organize information"
+     - "explains technical concepts clearly" + "breaks down complex ideas" → "breaks down complex technical concepts into clear explanations"
+     - "maintains friendly tone" + "uses warm language" → "maintains a friendly, warm tone throughout"
+  5. If a behavior fits multiple categories (e.g., is both Negative (critical) and a part could be Negative (non-critical)), list only the property in the category that is more severe or specific (except for cases involving both the cause and correction of an error, where both can be listed separately).
 
 ### OUTPUT FORMAT
 First, output a brief **<reasoning>** block summarizing your analysis {reasoning_suffix}.
@@ -142,7 +152,8 @@ single_model_config = {
 
     "analysis_process": """1. **Scan the Trace:** Read the user input, the model's internal thoughts (if available), the model's interaction with the user, the system of tools the model has access to, the environment, and the final output.
 2. **Filter:** Ignore generic behaviors (e.g., "Agent answered correctly"). Focus on behaviors that are **High Leverage** (critical success/failure), **Distinctive** (persona/style), or **Structural** (looping, adherence to format).
-3. **Draft:** Write the behavior descriptions following the **Definitions & Rubric** section.""",
+3. **Draft:** Write the behavior descriptions following the **Definitions & Rubric** section.
+4. **Deduplicate:** Review your list for redundant properties. Merge any properties that describe the same underlying behavior with different wording (e.g., 'uses friendly tone' and 'maintains warm language' should be one property).""",
 
     "model_naming_rule": "",  # Empty string for Single Model
     
@@ -171,7 +182,8 @@ sbs_config = {
 
     "analysis_process": """1. **Scan the Traces:** Read the user input, each model's internal thoughts (if available), each model's interaction with the user, the system of tools the models have access to, the environment, and the final output. Compare and consider differences between the models' responses.
 2. **Filter:** Ignore generic behaviors (e.g., "Agent answered correctly"). Focus on differentiating behaviors that are **High Leverage** (critical success/failure), **Distinctive** (persona/style), or **Structural** (looping, adherence to format).
-3. **Draft:** Write the behavior descriptions following the **Definitions & Rubric** section.""",
+3. **Draft:** Write the behavior descriptions following the **Definitions & Rubric** section.
+4. **Deduplicate:** Review your list for redundant properties. Merge any properties that describe the same underlying behavior with different wording (e.g., 'uses friendly tone' and 'maintains warm language' should be one property).""",
 
     "model_naming_rule": """0. MODEL NAMING RULES:
 * Respond with either "Model A" or "Model B" depending on which model exhibits the behavior. Remember to include distinct properties from each model and do not let the ordering of the model responses influence the properties you include.
@@ -201,7 +213,8 @@ agent_single_model_config = {
 
     "analysis_process": """1. **Scan the Trace:** Read the user input, the agent's internal thoughts (if available), the agent's interaction with the user, the system of tools the agent has access to, the environment, and the final output.
 2. **Filter:** Ignore generic behaviors (e.g., "Agent answered correctly"). Look for behaviors that are **High Leverage** (critical success/failure), **Distinctive** (persona/style), or **Structural** (looping, format adherence).
-3. **Draft:** Formulate the behavior descriptions following the **Definitions & Rubric** section.""",
+3. **Draft:** Formulate the behavior descriptions following the **Definitions & Rubric** section.
+4. **Deduplicate:** Review your list for redundant properties. Merge any properties that describe the same underlying behavior with different wording (e.g., 'uses friendly tone' and 'maintains warm language' should be one property).""",
 
     "model_naming_rule": "",  # Empty string for Single Model
     
@@ -229,7 +242,8 @@ agent_sbs_config = {
 
     "analysis_process": """1. **Scan the Trace:** Read the user input, each agent's internal thoughts (if available), each agent's interaction with the user, the system of tools the agents have access to, the environment, and the final output.
 2. **Filter:** Ignore generic behaviors (e.g., "Agent answered correctly", "The agent adhered to the system policy", "The agent thought step by step"). Look for behaviors that are **High Leverage** (critical success/failure), **Distinctive** (persona/style), or **Structural** (looping, format adherence).
-3. **Draft:** Formulate the behavior descriptions following the **Definitions & Rubric** section.""",
+3. **Draft:** Formulate the behavior descriptions following the **Definitions & Rubric** section.
+4. **Deduplicate:** Review your list for redundant properties. Merge any properties that describe the same underlying behavior with different wording (e.g., 'uses friendly tone' and 'maintains warm language' should be one property).""",
 
     "model_naming_rule": """0. MODEL NAMING RULES:
 * Respond with either "Model A" or "Model B" depending on which agent exhibits the behavior. Remember to include distinct properties from each agent and do not let the ordering of the agent responses influence the properties you include.
