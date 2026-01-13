@@ -22,6 +22,7 @@ def extract_properties_only(
     method: str = "single_model",
     system_prompt: str | None = None,
     task_description: str | None = None,
+    fail_on_empty_properties: bool = True,
     # Data preparation
     score_columns: List[str] | None = None,
     sample_size: int | None = None,
@@ -59,6 +60,8 @@ def extract_properties_only(
         method: "single_model" | "side_by_side"
         system_prompt: Explicit system prompt text or a short prompt name from stringsight.prompts
         task_description: Optional task-aware description (used only if the chosen prompt has {task_description})
+        fail_on_empty_properties: If True, raise a RuntimeError when 0 valid properties remain after validation.
+            If False, return an empty PropertyDataset.properties list.
         score_columns: Optional list of column names containing score metrics to convert to dict format
         sample_size: Optional number of rows to sample from the dataset before processing
         model_a: For side_by_side method with tidy data, specifies first model to select
@@ -150,7 +153,7 @@ def extract_properties_only(
     extractor = get_extractor(**extractor_kwargs)  # type: ignore[arg-type]
     # Do not fail the whole run on parsing errors – collect failures and drop those rows
     parser = LLMJsonParser(fail_fast=False, output_dir=output_dir, **common_cfg)  # type: ignore[arg-type]
-    validator = PropertyValidator(output_dir=output_dir, **common_cfg)  # type: ignore[arg-type]
+    validator = PropertyValidator(output_dir=output_dir, fail_on_empty=fail_on_empty_properties, **common_cfg)  # type: ignore[arg-type]
 
     pipeline = PipelineBuilder(name=f"StringSight-extract-{method}") \
         .extract_properties(extractor) \

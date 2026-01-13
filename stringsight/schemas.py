@@ -31,7 +31,7 @@ class ExtractBatchRequest(BaseModel):
     return_debug: Optional[bool] = False
     sample_size: Optional[int] = None
     use_dynamic_prompts: Optional[bool] = True
-    dynamic_prompt_samples: Optional[int] = 5
+    dynamic_prompt_samples: Optional[int] = 10
 
 class ExtractJobStartRequest(ExtractBatchRequest):
     pass

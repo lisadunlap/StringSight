@@ -20,6 +20,7 @@ async def extract_properties_only_async(
     method: str = "single_model",
     system_prompt: str | None = None,
     task_description: str | None = None,
+    fail_on_empty_properties: bool = True,
     prompt_builder: Callable[[pd.Series, str], str] | None = None,
     model_name: str = "gpt-4.1",
     temperature: float = 0.7,
@@ -52,8 +53,6 @@ async def extract_properties_only_async(
     See extract_properties_only() for full documentation.
     """
     # Just call the sync version's implementation but await the pipeline
-    from ..prompts import get_system_prompt
-    from ..pipeline import Pipeline
     from ..extractors import get_extractor
     from ..postprocess import LLMJsonParser, PropertyValidator
     from ..core.preprocessing import validate_and_prepare_dataframe
@@ -113,7 +112,7 @@ async def extract_properties_only_async(
 
     extractor = get_extractor(**extractor_kwargs)  # type: ignore[arg-type]
     parser = LLMJsonParser(fail_fast=False, **common_cfg)  # type: ignore[arg-type]
-    validator = PropertyValidator(**common_cfg)  # type: ignore[arg-type]
+    validator = PropertyValidator(fail_on_empty=fail_on_empty_properties, **common_cfg)  # type: ignore[arg-type]
 
     if output_dir:
         extractor.output_dir = output_dir  # type: ignore[attr-defined]

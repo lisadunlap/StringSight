@@ -93,8 +93,24 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
                 except Exception as e:
                     logger.error(f"Failed to update progress: {e}")
 
-        system_prompt = get_system_prompt(method, req.system_prompt, req.task_description)
+        # Generate prompts and capture metadata (always generate to get metadata)
+        from stringsight.prompt_generation import generate_prompts
+
         dataset = PropertyDataset.from_dataframe(df, method=method)
+
+        discovery_prompt, custom_clustering_prompts, prompts_metadata = generate_prompts(
+            task_description=req.task_description,
+            dataset=dataset,
+            method=method,
+            use_dynamic_prompts=req.use_dynamic_prompts if req.use_dynamic_prompts is not None else True,
+            dynamic_prompt_samples=req.dynamic_prompt_samples or 5,
+            model=req.model_name or "gpt-4.1",
+            system_prompt_override=req.system_prompt,
+            output_dir=None  # We'll save to output_dir later after determining it
+        )
+
+        # Use the generated discovery_prompt if available, otherwise fall back to get_system_prompt
+        system_prompt = discovery_prompt if discovery_prompt else get_system_prompt(method, req.system_prompt, req.task_description)
 
         extractor = get_extractor(
             model_name=req.model_name or "gpt-4.1",
@@ -124,6 +140,15 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
         storage = get_storage_adapter()
         storage.ensure_directory(output_dir)
         logger.info(f"Results will be saved to: {output_dir}")
+
+        # Save prompts metadata to output directory
+        if prompts_metadata:
+            import json
+            from pathlib import Path
+            metadata_file = Path(output_dir) / "prompts_metadata.json"
+            with open(metadata_file, "w") as f:
+                json.dump(prompts_metadata.dict(), f, indent=2)
+            logger.info(f"Saved prompts metadata to {metadata_file}")
 
         # Run parsing and validation
         parser = LLMJsonParser(fail_fast=False, verbose=False, use_wandb=False, output_dir=output_dir)

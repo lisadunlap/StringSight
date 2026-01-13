@@ -381,6 +381,7 @@ async def extract_single(req: ExtractSingleRequest) -> Dict[str, Any]:
             method=method,
             system_prompt=discovery_prompt if discovery_prompt else req.system_prompt,
             task_description=None,  # task_description already incorporated into discovery_prompt
+            fail_on_empty_properties=False,
             model_name=req.model_name or "gpt-4.1",
             temperature=req.temperature or 0.7,
             top_p=req.top_p or 0.95,
@@ -444,30 +445,29 @@ async def extract_batch(req: ExtractBatchRequest) -> Dict[str, Any]:
             "available": list(df.columns),
         })
 
-    # Generate prompts and capture metadata
-    prompts_metadata = None
-    if req.task_description and req.use_dynamic_prompts:
-        from stringsight.core.data_objects import PropertyDataset
-        from stringsight.prompt_generation import generate_prompts
+    # Generate prompts and capture metadata (always generate to get metadata)
+    from stringsight.core.data_objects import PropertyDataset
+    from stringsight.prompt_generation import generate_prompts
 
-        temp_dataset = PropertyDataset.from_dataframe(df, method=method)
-        discovery_prompt, custom_clustering_prompts, prompts_metadata = generate_prompts(
-            task_description=req.task_description,
-            dataset=temp_dataset,
-            method=method,
-            use_dynamic_prompts=req.use_dynamic_prompts,
-            dynamic_prompt_samples=req.dynamic_prompt_samples or 5,
-            model=req.model_name or "gpt-4.1",
-            system_prompt_override=req.system_prompt,
-            output_dir=req.output_dir
-        )
+    temp_dataset = PropertyDataset.from_dataframe(df, method=method)
+    discovery_prompt, custom_clustering_prompts, prompts_metadata = generate_prompts(
+        task_description=req.task_description,
+        dataset=temp_dataset,
+        method=method,
+        use_dynamic_prompts=req.use_dynamic_prompts if req.use_dynamic_prompts is not None else True,
+        dynamic_prompt_samples=req.dynamic_prompt_samples or 5,
+        model=req.model_name or "gpt-4.1",
+        system_prompt_override=req.system_prompt,
+        output_dir=req.output_dir
+    )
 
     try:
         result = await public_api.extract_properties_only_async(
             df,
             method=method,
-            system_prompt=req.system_prompt,
-            task_description=req.task_description,
+            system_prompt=discovery_prompt if discovery_prompt else req.system_prompt,
+            task_description=None,  # task_description already incorporated into discovery_prompt
+            fail_on_empty_properties=False,
             model_name=req.model_name or "gpt-4.1",
             temperature=req.temperature or 0.7,
             top_p=req.top_p or 0.95,
@@ -578,24 +578,23 @@ async def _run_extract_job_async(job: ExtractJob, req: ExtractJobStartRequest):
         # Create dataset once and reuse
         dataset = PropertyDataset.from_dataframe(df, method=method)
 
-        # Generate prompts and capture metadata
-        prompts_metadata = None
-        if req.task_description and req.use_dynamic_prompts:
-            discovery_prompt, custom_clustering_prompts, prompts_metadata = generate_prompts(
-                task_description=req.task_description,
-                dataset=dataset,
-                method=method,
-                use_dynamic_prompts=req.use_dynamic_prompts,
-                dynamic_prompt_samples=req.dynamic_prompt_samples or 5,
-                model=req.model_name or "gpt-4.1",
-                system_prompt_override=req.system_prompt,
-                output_dir=req.output_dir
-            )
-            # Store prompts metadata in job
-            with _JOBS_LOCK:
-                job.prompts_metadata = prompts_metadata.dict() if prompts_metadata else None
+        # Generate prompts and capture metadata (always generate to get metadata)
+        discovery_prompt, custom_clustering_prompts, prompts_metadata = generate_prompts(
+            task_description=req.task_description,
+            dataset=dataset,
+            method=method,
+            use_dynamic_prompts=req.use_dynamic_prompts if req.use_dynamic_prompts is not None else True,
+            dynamic_prompt_samples=req.dynamic_prompt_samples or 5,
+            model=req.model_name or "gpt-4.1",
+            system_prompt_override=req.system_prompt,
+            output_dir=req.output_dir
+        )
+        # Store prompts metadata in job
+        with _JOBS_LOCK:
+            job.prompts_metadata = prompts_metadata.dict() if prompts_metadata else None
 
-        system_prompt = get_system_prompt(method, req.system_prompt, req.task_description)
+        # Use the generated discovery_prompt if available, otherwise fall back to get_system_prompt
+        system_prompt = discovery_prompt if discovery_prompt else get_system_prompt(method, req.system_prompt, req.task_description)
 
         extractor = get_extractor(
             model_name=req.model_name or "gpt-4.1",

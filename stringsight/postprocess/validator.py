@@ -4,9 +4,6 @@ Property validation stage.
 This stage validates and cleans extracted properties.
 """
 
-from pathlib import Path
-import json
-import pandas as pd
 from typing import Optional, List, Any
 from ..core.stage import PipelineStage
 from ..core.data_objects import PropertyDataset, Property
@@ -26,12 +23,22 @@ class PropertyValidator(LoggingMixin, PipelineStage):
         self,
         output_dir: Optional[str] = None,
         storage: Optional[StorageAdapter] = None,
+        fail_on_empty: bool = True,
         **kwargs
     ):
-        """Initialize the property validator."""
+        """Initialize the property validator.
+
+        Args:
+            output_dir: Optional directory to auto-save stage artefacts.
+            storage: Optional StorageAdapter for writing artefacts.
+            fail_on_empty: If True, raise a RuntimeError when 0 valid properties remain after validation.
+                If False, keep an empty `properties` list and allow the pipeline to continue/return.
+            **kwargs: Forwarded to PipelineStage / LoggingMixin configuration.
+        """
         super().__init__(**kwargs)
         self.output_dir = output_dir
         self.storage = storage or get_storage_adapter()
+        self.fail_on_empty = fail_on_empty
         
     def run(self, data: PropertyDataset, progress_callback: Any = None, **kwargs: Any) -> PropertyDataset:
         """
@@ -67,12 +74,18 @@ class PropertyValidator(LoggingMixin, PipelineStage):
         
         
         # Check for 0 valid properties and provide helpful error message
-        if len(valid_properties) == 0:
+        if len(valid_properties) == 0 and self.fail_on_empty:
             raise RuntimeError(
                 "ERROR: 0 valid properties after validation. "
                 "This typically means: (1) LLM returned empty/invalid responses, "
                 "(2) JSON parsing failures, or (3) All properties filtered during validation. "
                 "Check logs above for details."
+            )
+        if len(valid_properties) == 0 and not self.fail_on_empty:
+            self.log(
+                "WARNING: 0 valid properties after validation. Returning an empty properties list. "
+                "This typically means: (1) LLM returned empty/invalid responses, (2) JSON parsing failures, "
+                "or (3) All properties filtered during validation."
             )
         
         # Auto-save validation results if output_dir is provided

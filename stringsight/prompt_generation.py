@@ -57,8 +57,14 @@ def generate_prompts(
     # Can generate prompts with or without task_description (will infer from conversations if not provided)
     logger.info(f"Prompt generation config: use_dynamic_prompts={use_dynamic_prompts}, system_prompt_override={system_prompt_override is not None}")
 
-    if use_dynamic_prompts and not system_prompt_override:
-        logger.info("Generating dynamic prompts...")
+    # Check if system_prompt_override is a known template alias (not a custom literal prompt)
+    KNOWN_PROMPT_ALIASES = {"default", "agent", "universal", "agent_universal"}
+    is_custom_literal_prompt = system_prompt_override is not None and system_prompt_override not in KNOWN_PROMPT_ALIASES
+
+    # Only skip dynamic generation if there's a custom literal prompt
+    # Template aliases like "default" should still allow dynamic generation
+    if use_dynamic_prompts and not is_custom_literal_prompt:
+        logger.info(f"Generating dynamic prompts (system_prompt_override={system_prompt_override})...")
 
         # Use a default task description if none provided
         task_desc_for_generation = task_description_clean or "Analyze the behavioral patterns and characteristics in these AI model conversations."
@@ -128,6 +134,7 @@ def generate_prompts(
                     clustering_prompts=custom_clustering_prompts,
                     expanded_task_description=result.expanded_task_description
                 )
+                _save_metadata_to_file(output_dir=output_dir, metadata=metadata)
         except Exception as e:
             logger.error(f"Dynamic prompt generation failed: {e}. Using static prompts.")
             discovery_prompt = get_system_prompt(method, system_prompt_override, task_description_clean)
@@ -159,8 +166,36 @@ def generate_prompts(
                 clustering_prompts=None,
                 expanded_task_description=task_description_clean
             )
+            _save_metadata_to_file(output_dir=output_dir, metadata=metadata)
 
     return discovery_prompt, custom_clustering_prompts, metadata
+
+
+def _save_metadata_to_file(
+    output_dir: str,
+    metadata: PromptsMetadata
+) -> None:
+    """Save prompts metadata to JSON file in output directory.
+
+    Args:
+        output_dir: Directory to save metadata to (relative paths resolved relative to results dir).
+        metadata: PromptsMetadata object to save.
+    """
+    import json
+    from stringsight.utils.paths import _get_results_dir
+
+    # Resolve output_dir relative to results directory if it's not absolute
+    output_path = Path(output_dir)
+    if not output_path.is_absolute():
+        results_base = _get_results_dir()
+        output_path = results_base / output_dir
+
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    metadata_file = output_path / "prompts_metadata.json"
+    with open(metadata_file, "w") as f:
+        json.dump(metadata.dict(), f, indent=2)
+    logger.info(f"Saved prompts metadata to {metadata_file}")
 
 
 def _save_prompts_to_file(
@@ -172,12 +207,19 @@ def _save_prompts_to_file(
     """Save generated prompts to text files in output directory.
 
     Args:
-        output_dir: Directory to save prompts to.
+        output_dir: Directory to save prompts to (relative paths resolved relative to results dir).
         discovery_prompt: The discovery/extraction prompt.
         clustering_prompts: Optional dict of clustering prompts.
         expanded_task_description: Optional expanded task description.
     """
+    from stringsight.utils.paths import _get_results_dir
+
+    # Resolve output_dir relative to results directory if it's not absolute
     output_path = Path(output_dir)
+    if not output_path.is_absolute():
+        results_base = _get_results_dir()
+        output_path = results_base / output_dir
+
     output_path.mkdir(parents=True, exist_ok=True)
 
     # Save discovery prompt

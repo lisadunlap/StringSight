@@ -219,9 +219,12 @@ def get_system_prompt(method: str, system_prompt: str | None = None, task_descri
             desc = task_description if task_description is not None else cast(str, default_desc)
             return _format_task_aware(template, desc)
         if task_description is not None:
-            raise ValueError(
-                "A task_description was provided, but the given system_prompt string does not "
-                "contain {task_description}. Please include the placeholder or use an alias ('default'|'agent')."
+            # Match the behavior of prompt templates loaded from this module:
+            # if the prompt doesn't support {task_description}, ignore it rather than erroring.
+            import warnings
+            warnings.warn(
+                "task_description was provided but the given system_prompt string does not contain "
+                "{task_description}. The task_description will be ignored."
             )
         return template
     except Exception as e:

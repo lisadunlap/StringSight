@@ -184,10 +184,31 @@ def get_job_results(
         # Read JSONL file using storage adapter
         properties = storage.read_jsonl(result_file_path)
 
-        return {
+        response = {
             "properties": properties,
             "result_path": job.result_path,
             "count": len(properties)
         }
+
+        # Try to load prompts metadata from saved files
+        prompts_metadata_file = str(full_result_path / "prompts_metadata.json")
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Looking for prompts metadata at: {prompts_metadata_file}")
+
+        if storage.exists(prompts_metadata_file):
+            try:
+                prompts_metadata_content = storage.read_text(prompts_metadata_file)
+                import json
+                prompts_metadata = json.loads(prompts_metadata_content)
+                response["prompts"] = prompts_metadata
+                logger.info(f"Successfully loaded prompts metadata")
+            except Exception as e:
+                # Log but don't fail the request if prompts metadata can't be loaded
+                logger.warning(f"Failed to load prompts metadata: {e}")
+        else:
+            logger.warning(f"Prompts metadata file not found at: {prompts_metadata_file}")
+
+        return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to read results: {str(e)}")
