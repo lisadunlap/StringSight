@@ -331,10 +331,10 @@ def _startup_init_db() -> None:
 # This sets up environment variables for cache and results directories
 _get_cache_dir()  # Call this to auto-configure cache if RENDER_DISK_PATH is set
 
-# GZIP compression disabled - can add significant CPU overhead
-# Uncomment below if network transfer is the bottleneck:
-# from fastapi.middleware.gzip import GZipMiddleware
-# app.add_middleware(GZipMiddleware, minimum_size=10000, compresslevel=1)
+# GZIP compression enabled for improved network performance
+# Uses moderate compression level (5) to balance CPU and transfer speed
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
 
 # CORS configuration - allow all origins for development and production
 app.add_middleware(

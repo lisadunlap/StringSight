@@ -71,7 +71,7 @@ def generate_prompts(
         logger.info(f"Using task description: {task_desc_for_generation[:100]}...")
 
         try:
-            logger.info(f"Attempting dynamic prompt generation with {len(dataset.conversations)} conversations, {dynamic_prompt_samples} samples")
+            logger.info(f"Attempting dynamic prompt generation with {len(dataset.conversations)} total conversations, sampling {min(dynamic_prompt_samples, len(dataset.conversations))} for prompt generation")
             generator = DynamicPromptGenerator(seed=seed)
             result = generator.generate_all_prompts(
                 task_description=task_desc_for_generation,

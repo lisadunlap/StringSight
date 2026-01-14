@@ -506,6 +506,7 @@ def get_conversations(dataset: str, offset: int = 0, limit: int | None = None) -
     """Get conversations with pagination.
 
     Returns only the requested slice, not entire file.
+    Uses caching for improved performance.
 
     Args:
         dataset: Dataset name (folder under final_results/)
@@ -525,15 +526,12 @@ def get_conversations(dataset: str, offset: int = 0, limit: int | None = None) -
     if not conversations_file.exists():
         raise HTTPException(status_code=404, detail=f"Dataset not found: {dataset}")
 
-    conversations = []
-    import json
-    with open(conversations_file, encoding='utf-8', errors='replace') as f:
-        for i, line in enumerate(f):
-            if i < offset:
-                continue
-            if limit is not None and i >= offset + limit:
-                break
-            conversations.append(json.loads(line))
+    # Use cached read for entire file, then slice in memory
+    all_conversations = _get_cached_jsonl(conversations_file)
+
+    # Apply pagination to cached data
+    end_idx = offset + limit if limit is not None else len(all_conversations)
+    conversations = all_conversations[offset:end_idx]
 
     return {
         "data": conversations,
@@ -546,6 +544,8 @@ def get_conversations(dataset: str, offset: int = 0, limit: int | None = None) -
 @router.get("/results/{dataset}/properties")
 def get_properties(dataset: str) -> Dict[str, Any]:
     """Get properties (usually smaller, can load all at once).
+
+    Uses caching for improved performance.
 
     Args:
         dataset: Dataset name (folder under final_results/)
@@ -562,11 +562,8 @@ def get_properties(dataset: str) -> Dict[str, Any]:
     if not properties_file.exists():
         return {"data": []}
 
-    properties = []
-    import json
-    with open(properties_file) as f:
-        for line in f:
-            properties.append(json.loads(line))
+    # Use cached read instead of manual parsing
+    properties = _get_cached_jsonl(properties_file)
 
     return {"data": properties}
 
@@ -574,6 +571,8 @@ def get_properties(dataset: str) -> Dict[str, Any]:
 @router.get("/results/{dataset}/clusters")
 def get_clusters(dataset: str) -> Dict[str, Any]:
     """Get clusters.
+
+    Uses caching for improved performance.
 
     Args:
         dataset: Dataset name (folder under final_results/)
@@ -590,15 +589,12 @@ def get_clusters(dataset: str) -> Dict[str, Any]:
     if not clusters_file.exists():
         return {"data": []}
 
-    import json
+    # Use cached read for both JSONL and JSON files
     if clusters_file.suffix == ".jsonl":
-        clusters = []
-        with open(clusters_file) as f:
-            for line in f:
-                clusters.append(json.loads(line))
+        clusters = _get_cached_jsonl(clusters_file)
     else:
-        with open(clusters_file) as f:
-            clusters = json.load(f)
+        # For JSON files, use the cached JSON reader
+        clusters = _read_json_safe(clusters_file)
 
     return {"data": clusters}
 
@@ -606,6 +602,8 @@ def get_clusters(dataset: str) -> Dict[str, Any]:
 @router.get("/results/{dataset}/metrics")
 def get_metrics(dataset: str) -> Dict[str, Any]:
     """Get all metrics files.
+
+    Uses caching for improved performance.
 
     Args:
         dataset: Dataset name (folder under final_results/)
@@ -616,17 +614,59 @@ def get_metrics(dataset: str) -> Dict[str, Any]:
     final_results_dir = Path("final_results") / dataset
     metrics = {}
 
-    import json
     for metric_type in ["model_cluster_scores_df", "cluster_scores_df", "model_scores_df"]:
         metric_file = final_results_dir / f"{metric_type}.jsonl"
         if metric_file.exists():
-            data = []
-            with open(metric_file) as f:
-                for line in f:
-                    data.append(json.loads(line))
-            metrics[metric_type] = data
+            # Use cached read for metrics files
+            metrics[metric_type] = _get_cached_jsonl(metric_file)
 
     return metrics
+
+
+@router.get("/results/{dataset}/all")
+def get_all_dataset_data(dataset: str, conversations_limit: int = 1000) -> Dict[str, Any]:
+    """Get all dataset data in a single request (combined endpoint).
+
+    This is a performance optimization that reduces network round trips by combining
+    conversations, properties, clusters, and metrics into a single response.
+    Uses caching for all data sources.
+
+    Args:
+        dataset: Dataset name (folder under final_results/)
+        conversations_limit: Maximum number of conversations to return (default: 1000)
+
+    Returns:
+        Dict with conversations, properties, clusters, metrics, and metadata
+    """
+    # Use the cached individual endpoint functions
+    conversations_result = get_conversations(dataset, offset=0, limit=conversations_limit)
+    properties_result = get_properties(dataset)
+    clusters_result = get_clusters(dataset)
+    metrics_result = get_metrics(dataset)
+
+    # Calculate total conversations for metadata
+    final_results_dir = Path("final_results") / dataset
+    conversations_file = final_results_dir / "clustered_results_lightweight.jsonl"
+    if not conversations_file.exists():
+        conversations_file = final_results_dir / "conversations.jsonl"
+
+    total_conversations = 0
+    if conversations_file.exists():
+        with open(conversations_file, encoding='utf-8', errors='replace') as f:
+            total_conversations = sum(1 for _ in f)
+
+    return {
+        "conversations": conversations_result["data"],
+        "properties": properties_result["data"],
+        "clusters": clusters_result["data"],
+        "metrics": {
+            "model_cluster_scores_df": metrics_result.get("model_cluster_scores_df", []),
+            "cluster_scores_df": metrics_result.get("cluster_scores_df", []),
+            "model_scores_df": metrics_result.get("model_scores_df", [])
+        },
+        "total_conversations": total_conversations,
+        "has_more": conversations_result["has_more"]
+    }
 
 
 @router.get("/results/{dataset}/summary")
