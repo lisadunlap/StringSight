@@ -10,7 +10,7 @@ sys.path.append(os.getcwd())
 
 from stringsight.config import settings
 from stringsight.database import Base
-from stringsight.models import User, Job  # Import models to register them
+from stringsight.db_models import User, Job  # Import models to register them
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

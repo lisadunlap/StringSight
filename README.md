@@ -177,6 +177,24 @@ clustered_df, model_stats = label(
 )
 ```
 
+### Extract-Only (No Clustering)
+
+If you only want extracted properties (extraction → JSON parsing → validation) without clustering/metrics:
+
+```python
+from stringsight import extract_properties_only
+
+dataset = extract_properties_only(
+    df,
+    method="single_model",
+    model_name="gpt-4.1-mini",
+    output_dir="results/extract_only",
+    # If True (default), StringSight raises if 0 properties remain after validation.
+    # If False, it returns an empty list of properties instead.
+    fail_on_empty_properties=False,
+)
+```
+
 ## Output
 
 **Output dataframe columns:**
@@ -238,3 +256,12 @@ See the [documentation](https://lisadunlap.github.io/StringSight/) for:
 ## Contributing
 
 PRs very welcome, especially if I forgot to include something important in the readme. Questions or issues? [Open an issue on GitHub](https://github.com/lisadunlap/stringsight/issues)
+
+### Tests
+
+Some lightweight development tests live in `tests/` and can be run directly, e.g.:
+
+```bash
+python tests/test_prompts_metadata_unit.py
+python tests/test_airline_demo_prompt_generation.py
+```

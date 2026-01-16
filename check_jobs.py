@@ -2,7 +2,7 @@
 """Quick script to check recent jobs in the database."""
 
 from stringsight.database import SessionLocal
-from stringsight.models.job import Job
+from stringsight.db_models.job import Job
 from datetime import datetime
 
 db = SessionLocal()
