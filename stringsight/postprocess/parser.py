@@ -47,10 +47,12 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
 
     def _parse_single_property(self, index: int, prop: Property, total_props: int) -> Dict[str, Any]:
         """Parse a single property response. Returns dict with results and errors."""
-        result = {
+        parsed_properties: List[Property] = []
+        errors: List[Dict[str, Any]] = []
+        result: Dict[str, Any] = {
             'index': index,
-            'parsed_properties': [],
-            'errors': [],
+            'parsed_properties': parsed_properties,
+            'errors': errors,
             'parse_failed': False,
             'empty_response': False
         }
@@ -63,7 +65,7 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
         if parsed_json is None:
             result['parse_failed'] = True
             error_details = self._analyze_json_parsing_error(prop.raw_response)
-            result['errors'].append({
+            errors.append({
                 'property_id': prop.id,
                 'question_id': prop.question_id,
                 'model': prop.model,
@@ -84,7 +86,7 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
         else:
             result['parse_failed'] = True
             error_details = f"Parsed JSON has unsupported type: {type(parsed_json)}. Expected dict, list, or dict with 'properties' key."
-            result['errors'].append({
+            errors.append({
                 'property_id': prop.id,
                 'question_id': prop.question_id,
                 'model': prop.model,
@@ -98,7 +100,7 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
 
         # Process property dicts
         if not prop_dicts or (isinstance(prop_dicts, list) and len(prop_dicts) == 0):
-            result['errors'].append({
+            errors.append({
                 'property_id': prop.id,
                 'question_id': prop.question_id,
                 'model': prop.model,
@@ -123,7 +125,7 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
                 contains_errors=prop_dict.get("contains_errors"),
                 raw_response=prop.raw_response,
             )
-            result['parsed_properties'].append(new_prop)
+            parsed_properties.append(new_prop)
 
         return result
 

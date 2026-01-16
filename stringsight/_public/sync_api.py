@@ -391,6 +391,11 @@ def explain(
         from ..prompts.expansion.trace_based import expand_task_description
         from ..formatters.traces import format_single_trace_from_row, format_side_by_side_trace_from_row
 
+        if task_description is None:
+            raise ValueError(
+                "task_description must be provided when prompt_expansion=True and use_dynamic_prompts=False."
+            )
+
         if verbose:
             logger.info("[DEPRECATED] Using old prompt_expansion. Consider use_dynamic_prompts instead.")
             logger.info("Expanding task description using example traces...")

@@ -12,7 +12,7 @@ This module is isolated from the Gradio app. It can be run independently:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal
+from typing import Any, Dict, List, Literal, cast
 import asyncio
 import io
 import os
@@ -561,8 +561,10 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
 
         # Create minimal conversations that match the properties
         conversations: List[ConversationRecord] = []
-        all_models = set()
-        property_keys = {(prop.question_id, prop.model) for prop in properties}
+        all_models: set[str] = set()
+        property_keys: set[tuple[str, str]] = {
+            (prop.question_id, cast(str, prop.model)) for prop in properties
+        }
 
         logger.info(f"Found {len(property_keys)} unique (question_id, model) pairs from {len(properties)} properties")
 
@@ -695,9 +697,11 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
                         meta["winner"] = matching_row["score"]["winner"]
 
                     # Create SxS conversation record
+                    model_a_str = model_a if isinstance(model_a, str) else str(model_a)
+                    model_b_str = model_b if isinstance(model_b, str) else str(model_b)
                     conv = ConversationRecord(
                         question_id=qid,
-                        model=[model_a, model_b],
+                        model=[model_a_str, model_b_str],
                         prompt=matching_row.get("prompt", ""),
                         responses=[matching_row.get("model_a_response", ""), matching_row.get("model_b_response", "")],
                         scores=[score_a, score_b],

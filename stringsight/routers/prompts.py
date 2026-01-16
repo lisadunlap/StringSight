@@ -155,6 +155,11 @@ async def generate_prompts_endpoint(req: GeneratePromptsRequest) -> Dict[str, An
         logger.info(f"Prompt generation completed in {generation_time:.2f}s")
 
         # Return metadata
+        if prompts_metadata is None:
+            raise HTTPException(
+                status_code=500,
+                detail="Prompt generation succeeded but returned no metadata."
+            )
         return {
             "prompts": prompts_metadata.dict(),
             "generation_time_seconds": generation_time

@@ -4,10 +4,9 @@ Discovery prompt generation using meta-prompting.
 This module generates custom discovery prompt sections tailored to specific tasks.
 """
 
-import json
 import litellm
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, cast
 from concurrent.futures import ThreadPoolExecutor
 from ...core.caching import UnifiedCache, CacheKeyBuilder
 
@@ -49,10 +48,7 @@ class DiscoveryPromptGenerator:
         # Check cache
         cached = self.cache.get_completion(cache_key)
         if cached is not None:
-            try:
-                return json.loads(cached)
-            except json.JSONDecodeError:
-                logger.warning("Invalid JSON in cache, regenerating...")
+            return cast(Dict[str, str], cached)
 
         # Generate custom sections in parallel
         try:
@@ -88,7 +84,7 @@ class DiscoveryPromptGenerator:
         # Keep: json_schema, model_naming_rule, reasoning_suffix from base
 
         # Cache result
-        self.cache.set_completion(cache_key, json.dumps(custom_config))
+        self.cache.set_completion(cache_key, custom_config)
         return custom_config
 
     def _generate_intro_task(
@@ -210,7 +206,7 @@ class DiscoveryPromptGenerator:
         expanded_description: str,
         method: str,
         model: str
-    ) -> str:
+    ) -> CacheKeyBuilder:
         """Build cache key for discovery prompt generation.
 
         Args:
@@ -219,7 +215,7 @@ class DiscoveryPromptGenerator:
             model: LLM model.
 
         Returns:
-            Cache key string.
+            CacheKeyBuilder for use with UnifiedCache.
         """
         from .meta_prompts import (
             INTRO_TASK_GENERATION_TEMPLATE,
@@ -244,5 +240,4 @@ class DiscoveryPromptGenerator:
                 "analysis_process": ANALYSIS_PROCESS_GENERATION_TEMPLATE,
             }).get_key(),
         }
-        builder = CacheKeyBuilder(cache_data)
-        return builder.get_key()
+        return CacheKeyBuilder(cache_data)

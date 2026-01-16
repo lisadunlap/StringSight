@@ -7,7 +7,7 @@ of conversations from the dataset.
 
 import random
 import tiktoken
-from typing import List, Dict, Any
+from typing import List, Dict, Any, cast
 from ...core.data_objects import ConversationRecord
 from ...core.caching import UnifiedCache, CacheKeyBuilder
 from ..expansion.trace_based import expand_task_description
@@ -60,7 +60,7 @@ class TaskExpander:
         # Check cache
         cached = self.cache.get_completion(cache_key)
         if cached is not None:
-            return cached
+            return cast(str, cached["expanded_task_description"])
 
         # Convert to trace format and truncate
         traces = []
@@ -79,7 +79,7 @@ class TaskExpander:
         )
 
         # Cache result
-        self.cache.set_completion(cache_key, expanded)
+        self.cache.set_completion(cache_key, {"expanded_task_description": expanded})
         return expanded
 
     def _sample_conversations(
@@ -218,7 +218,7 @@ class TaskExpander:
         task_description: str,
         sample_ids: List[str],
         model: str
-    ) -> str:
+    ) -> CacheKeyBuilder:
         """Build cache key for task expansion.
 
         Args:
@@ -227,7 +227,7 @@ class TaskExpander:
             model: LLM model used for expansion.
 
         Returns:
-            Cache key string.
+            CacheKeyBuilder for use with UnifiedCache.
         """
         cache_data = {
             "type": "task_expansion",
@@ -237,5 +237,4 @@ class TaskExpander:
             "max_tokens_per_sample": self.max_tokens,
             "version": "1.0",
         }
-        builder = CacheKeyBuilder(cache_data)
-        return builder.get_key()
+        return CacheKeyBuilder(cache_data)

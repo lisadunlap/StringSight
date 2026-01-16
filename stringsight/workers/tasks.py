@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, cast
 from datetime import datetime
 from pathlib import Path
 import pandas as pd
@@ -384,8 +384,10 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
         # Phase 2: Create conversations (10%)
         update_progress(0.10)
         conversations: List[ConversationRecord] = []
-        all_models = set()
-        property_keys = {(prop.question_id, prop.model) for prop in properties}
+        all_models: set[str] = set()
+        property_keys: set[tuple[str, str]] = {
+            (prop.question_id, cast(str, prop.model)) for prop in properties
+        }
         
         for question_id, model in property_keys:
             all_models.add(model)
@@ -477,9 +479,11 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
                     elif "score" in matching_row and isinstance(matching_row["score"], dict) and "winner" in matching_row["score"]:
                         meta["winner"] = matching_row["score"]["winner"]
                     
+                    model_a_str = model_a if isinstance(model_a, str) else str(model_a)
+                    model_b_str = model_b if isinstance(model_b, str) else str(model_b)
                     conv = ConversationRecord(
                         question_id=qid,
-                        model=[model_a, model_b],
+                        model=[model_a_str, model_b_str],
                         prompt=matching_row.get("prompt", ""),
                         responses=[matching_row.get("model_a_response", ""), matching_row.get("model_b_response", "")],
                         scores=[score_a, score_b],
