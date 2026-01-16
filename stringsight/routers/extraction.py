@@ -257,11 +257,11 @@ async def label_run(req: LabelRequest) -> Dict[str, Any]:
     properties = []
 
     # Define core output columns that should be displayed in the table
-    core_columns = {
+    core_columns = [
         "id", "question_id", "category", "property_description", "reason", "evidence", "model",
         "cluster_id", "cluster_label"
-    }
-    
+    ]
+
     # Vectorized conversion: filter to core columns and convert to dict records
     filtered_df = clustered_df[core_columns].copy()
 
