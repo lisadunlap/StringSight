@@ -5,10 +5,15 @@ Endpoints for listing, retrieving, and configuring system prompts.
 """
 
 from typing import Dict, List, Any
+import time
+import pandas as pd
 
 from fastapi import APIRouter, HTTPException
 
-from stringsight.schemas import LabelPromptRequest
+from stringsight.schemas import LabelPromptRequest, GeneratePromptsRequest
+from stringsight.formatters import detect_method
+from stringsight.core.data_objects import PropertyDataset
+from stringsight.prompt_generation import generate_prompts as _generate_prompts
 from stringsight.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -92,3 +97,72 @@ def label_prompt(req: LabelPromptRequest) -> Dict[str, Any]:
     )
 
     return {"text": system_prompt}
+
+
+@router.post("/generate")
+async def generate_prompts_endpoint(req: GeneratePromptsRequest) -> Dict[str, Any]:
+    """
+    Generate dynamic prompts without running extraction.
+
+    This endpoint:
+    1. Samples conversations from provided rows
+    2. Expands task description using samples
+    3. Generates discovery + clustering prompts
+    4. Verifies prompts via test extraction
+    5. Returns all prompts + metadata
+
+    Returns:
+        Dictionary containing:
+        - prompts: PromptsMetadata with all generated prompts
+        - generation_time_seconds: Time taken to generate prompts
+    """
+    t_start = time.perf_counter()
+
+    # Build DataFrame from rows
+    df = pd.DataFrame(req.rows)
+
+    if len(df) == 0:
+        raise HTTPException(status_code=400, detail="No rows provided for prompt generation")
+
+    # Detect method
+    method = req.method or detect_method(list(df.columns))
+    if method is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Unable to detect dataset method from columns. Please specify method explicitly."
+        )
+
+    logger.info(f"Generating prompts for {len(df)} rows using method: {method}")
+
+    try:
+        # Create dataset from dataframe
+        dataset = PropertyDataset.from_dataframe(df, method=method)
+
+        # Generate prompts (discovery + clustering)
+        discovery_prompt, custom_clustering_prompts, prompts_metadata = _generate_prompts(
+            task_description=req.task_description,
+            dataset=dataset,
+            method=method,
+            use_dynamic_prompts=True,
+            dynamic_prompt_samples=req.num_samples or 5,
+            model=req.model or "gpt-4.1",
+            system_prompt_override=None,
+            output_dir=req.output_dir,
+            seed=req.seed or 42
+        )
+
+        generation_time = time.perf_counter() - t_start
+        logger.info(f"Prompt generation completed in {generation_time:.2f}s")
+
+        # Return metadata
+        return {
+            "prompts": prompts_metadata.dict(),
+            "generation_time_seconds": generation_time
+        }
+
+    except ValueError as e:
+        logger.error(f"Validation error during prompt generation: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("Unexpected error during prompt generation")
+        raise HTTPException(status_code=500, detail=f"Prompt generation failed: {e}")

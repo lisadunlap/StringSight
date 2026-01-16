@@ -6,21 +6,21 @@ These prompts are used for clustering extracted properties and deduplicating sim
 
 def get_clustering_prompt_with_context(task_description: str | None = None) -> str:
     """Get clustering prompt with optional task description context.
-    
+
     Args:
         task_description: Optional task description to provide context.
-    
+
     Returns:
         Clustering prompt string with task context if provided.
     """
     base_prompt = """You are an expert machine learning engineer tasked with summarizing LLM response behaviors. Given a list of properties seen in LLM responses that belong to the same cluster, create a clear description (1-3 sentences) that accurately describes most or all properties in the cluster. This should be a specific behavior of a model response, not a category of behaviors. Think: if a user saw this property, would they be able to understand the model behavior and gain valuable insight about the models specific behavior on a task?
 
 To improve readability, provide a 2-5 word summary of the behavior in bold before the description. Format: **[Summary]**: [Description]. If the behavior is abstract or complex, you MUST provide a short, concrete example within the description to ensure it is clearly understood (e.g. "...such as repeating the same search query"). Avoid vague phrases like "fails to adapt" or "inefficiently" without specifying *how*."""
-    
+
     if task_description:
         context = f"\n\n**Task Context:** The properties in this cluster were extracted from responses to the following task:\n{task_description}\n\nUse this context to ensure your cluster description is relevant and specific to this task."
         return base_prompt + context
-    
+
     return base_prompt
 
 clustering_systems_prompt = f"""You are an expert machine learning engineer tasked with summarizing LLM response behaviors. Given a list of properties seen in LLM responses that belong to the same cluster, create a clear description (1-3 sentences) that accurately describes most or all properties in the cluster. This should be a specific behavior of a model response, not a category of behaviors. Think: if a user saw this property, would they be able to understand the model behavior and gain valuable insight about the models specific behavior on a task?

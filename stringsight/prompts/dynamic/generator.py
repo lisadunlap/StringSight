@@ -59,7 +59,9 @@ class DynamicPromptGenerator:
         method: str,
         num_samples: int = 5,
         model: str = "gpt-4.1",
-        max_reflection_attempts: int = 3
+        max_reflection_attempts: int = 3,
+        skip_verification: bool = True,
+        customize_clustering: bool = True
     ) -> DynamicPromptResult:
         """Generate all custom prompts for the pipeline.
 
@@ -70,6 +72,8 @@ class DynamicPromptGenerator:
             num_samples: Number of conversations to sample for expansion.
             model: LLM model for meta-prompting.
             max_reflection_attempts: Maximum number of reflection attempts to fix failed prompts (default: 3).
+            skip_verification: If True, skip verification and use expanded task with base template (default: True).
+            customize_clustering: If True, customize clustering prompts for the task (default: True).
 
         Returns:
             DynamicPromptResult with all generated prompts.
@@ -78,7 +82,7 @@ class DynamicPromptGenerator:
         random.seed(self.seed)
 
         # Step 1: Expand task description
-        logger.info("Step 1/4: Expanding task description...")
+        logger.info("Step 1: Expanding task description...")
         expanded_description = self.task_expander.expand(
             task_description=task_description,
             conversations=conversations,
@@ -87,8 +91,7 @@ class DynamicPromptGenerator:
         )
         logger.info(f"Task description expanded ({len(expanded_description)} chars)")
 
-        # Step 2: Generate discovery prompt
-        logger.info("Step 2/4: Generating custom discovery prompt...")
+        # Get base config for the method
         from ..extraction.universal import (
             single_model_config,
             sbs_config,
@@ -106,100 +109,126 @@ class DynamicPromptGenerator:
 
         base_config = config_map.get(method, single_model_config)
 
-        custom_config = self.discovery_generator.generate(
-            expanded_task_description=expanded_description,
-            method=method,
-            base_config=base_config,
-            model=model
-        )
-
-        # Format into full prompt
-        discovery_prompt = format_universal_prompt(
-            task_description=expanded_description,
-            config=custom_config
-        )
-        logger.info(f"Discovery prompt generated ({len(discovery_prompt)} chars)")
-
-        # Step 3: Verify prompt with reflection loop
-        logger.info("Step 3/4: Verifying prompt produces correct JSON...")
-        sample_conv = self._select_verification_sample(conversations)
-
-        verification_passed = False
-        current_prompt = discovery_prompt
-        reflection_attempts = 0
-
-        for attempt in range(max_reflection_attempts + 1):
-            logger.info(f"Verification attempt {attempt + 1}/{max_reflection_attempts + 1}")
-
-            # Verify current prompt
-            result = self.prompt_verifier.verify(
-                custom_prompt=current_prompt,
-                sample_conversation=sample_conv,
+        if skip_verification:
+            # Simple path: Just use expanded task with base template (no verification needed)
+            logger.info("Step 2: Using base template with expanded task (skipping custom generation and verification)...")
+            discovery_prompt = format_universal_prompt(
+                task_description=expanded_description,
+                config=base_config
+            )
+            verification_passed = True  # No verification performed, assume valid
+            reflection_attempts = 0
+            logger.info(f"Discovery prompt created ({len(discovery_prompt)} chars)")
+        else:
+            # Complex path: Generate custom prompt and verify (old behavior)
+            logger.info("Step 2: Generating custom discovery prompt...")
+            custom_config = self.discovery_generator.generate(
+                expanded_task_description=expanded_description,
                 method=method,
+                base_config=base_config,
                 model=model
             )
 
-            if result.passed:
-                logger.info(f"Verification passed on attempt {attempt + 1}!")
-                verification_passed = True
-                discovery_prompt = current_prompt
-                break
-            else:
-                logger.warning(
-                    f"Verification failed on attempt {attempt + 1}: "
-                    f"{result.error_type} - {result.error_details}"
-                )
+            # Format into full prompt
+            discovery_prompt = format_universal_prompt(
+                task_description=expanded_description,
+                config=custom_config
+            )
+            logger.info(f"Discovery prompt generated ({len(discovery_prompt)} chars)")
 
-                # If this was the last attempt, fall back to static
-                if attempt >= max_reflection_attempts:
-                    logger.warning(
-                        f"All {max_reflection_attempts} reflection attempts exhausted. "
-                        "Falling back to static prompt."
-                    )
-                    discovery_prompt = format_universal_prompt(
-                        task_description=expanded_description,
-                        config=base_config
-                    )
-                    break
+            # Step 3: Verify prompt with reflection loop
+            logger.info("Step 3: Verifying prompt produces correct JSON...")
+            sample_conv = self._select_verification_sample(conversations)
 
-                # Reflect and fix the prompt
-                logger.info("Running LLM reflection to fix prompt...")
-                reflection_attempts += 1
-                current_prompt = self.prompt_reflector.reflect_and_fix(
-                    original_prompt=current_prompt,
-                    verification_result=result,
-                    expanded_task_description=expanded_description,
+            verification_passed = False
+            current_prompt = discovery_prompt
+            reflection_attempts = 0
+
+            for attempt in range(max_reflection_attempts + 1):
+                logger.info(f"Verification attempt {attempt + 1}/{max_reflection_attempts + 1}")
+
+                # Verify current prompt
+                result = self.prompt_verifier.verify(
+                    custom_prompt=current_prompt,
+                    sample_conversation=sample_conv,
                     method=method,
                     model=model
                 )
 
-        # Step 4: Clustering customization (parallelized)
-        logger.info("Step 4/4: Customizing clustering prompts in parallel...")
+                if result.passed:
+                    logger.info(f"Verification passed on attempt {attempt + 1}!")
+                    verification_passed = True
+                    discovery_prompt = current_prompt
+                    break
+                else:
+                    logger.warning(
+                        f"Verification failed on attempt {attempt + 1}: "
+                        f"{result.error_type} - {result.error_details}"
+                    )
 
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            # Submit all three clustering prompts in parallel
-            future_clustering = executor.submit(
-                self.clustering_customizer.customize_clustering_prompt,
-                task_description=expanded_description,
-                model=model
-            )
-            future_dedup = executor.submit(
-                self.clustering_customizer.customize_deduplication_prompt,
-                task_description=expanded_description,
-                model=model
-            )
-            future_outlier = executor.submit(
-                self.clustering_customizer.customize_outlier_prompt,
-                task_description=expanded_description,
-                model=model
-            )
+                    # If this was the last attempt, fall back to static
+                    if attempt >= max_reflection_attempts:
+                        logger.warning(
+                            f"All {max_reflection_attempts} reflection attempts exhausted. "
+                            "Falling back to static prompt."
+                        )
+                        discovery_prompt = format_universal_prompt(
+                            task_description=expanded_description,
+                            config=base_config
+                        )
+                        break
 
-            # Collect results
-            clustering_prompt = future_clustering.result()
-            dedup_prompt = future_dedup.result()
-            outlier_prompt = future_outlier.result()
+                    # Reflect and fix the prompt
+                    logger.info("Running LLM reflection to fix prompt...")
+                    reflection_attempts += 1
+                    current_prompt = self.prompt_reflector.reflect_and_fix(
+                        original_prompt=current_prompt,
+                        verification_result=result,
+                        expanded_task_description=expanded_description,
+                        method=method,
+                        model=model
+                    )
 
-        logger.info("Clustering prompts customized (parallel execution)")
+        # Clustering customization (optional)
+        if customize_clustering:
+            step_num = "Step 3" if skip_verification else "Step 4"
+            logger.info(f"{step_num}: Customizing clustering prompts in parallel...")
+
+            with ThreadPoolExecutor(max_workers=3) as executor:
+                # Submit all three clustering prompts in parallel
+                future_clustering = executor.submit(
+                    self.clustering_customizer.customize_clustering_prompt,
+                    task_description=expanded_description,
+                    model=model
+                )
+                future_dedup = executor.submit(
+                    self.clustering_customizer.customize_deduplication_prompt,
+                    task_description=expanded_description,
+                    model=model
+                )
+                future_outlier = executor.submit(
+                    self.clustering_customizer.customize_outlier_prompt,
+                    task_description=expanded_description,
+                    model=model
+                )
+
+                # Collect results
+                clustering_prompt = future_clustering.result()
+                dedup_prompt = future_dedup.result()
+                outlier_prompt = future_outlier.result()
+
+            logger.info("Clustering prompts customized (parallel execution)")
+        else:
+            # Use default clustering prompts
+            logger.info("Using default clustering prompts (customization skipped)")
+            from ..clustering.prompts import (
+                clustering_systems_prompt,
+                deduplication_clustering_systems_prompt,
+                outlier_clustering_systems_prompt
+            )
+            clustering_prompt = clustering_systems_prompt
+            dedup_prompt = deduplication_clustering_systems_prompt
+            outlier_prompt = outlier_clustering_systems_prompt
 
         return DynamicPromptResult(
             discovery_prompt=discovery_prompt,

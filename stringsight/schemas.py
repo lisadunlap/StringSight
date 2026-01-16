@@ -32,6 +32,7 @@ class ExtractBatchRequest(BaseModel):
     sample_size: Optional[int] = None
     use_dynamic_prompts: Optional[bool] = True
     dynamic_prompt_samples: Optional[int] = 10
+    custom_clustering_prompts: Optional[Dict[str, str]] = None  # {clustering, deduplication, outlier}
 
 class ExtractJobStartRequest(ExtractBatchRequest):
     pass
@@ -175,6 +176,17 @@ class ExtractSingleRequest(BaseModel):
     return_debug: Optional[bool] = False
     use_dynamic_prompts: Optional[bool] = True
     dynamic_prompt_samples: Optional[int] = 5
+
+
+class GeneratePromptsRequest(BaseModel):
+    """Request for generating dynamic prompts without extraction."""
+    rows: List[Dict[str, Any]]
+    method: Optional[Literal["single_model", "side_by_side"]] = None
+    task_description: Optional[str] = None
+    num_samples: Optional[int] = 5
+    model: Optional[str] = "gpt-4.1"
+    output_dir: Optional[str] = None
+    seed: Optional[int] = 42
 
 
 class DFRows(BaseModel):
