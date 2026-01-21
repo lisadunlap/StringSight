@@ -4,6 +4,7 @@ misc/*.jsonl filter=lfs diff=lfs merge=lfs -text
 cluster_results/* ilter=lfs diff=lfs merge=lfs -text
 helm_capabilities/* filter=lfs diff=lfs merge=lfs -text
 processed_helm/* filter=lfs diff=lfs merge=lfs -text
+airline_data_demo.jsonl !filter !diff !merge text
 data/airline_data_demo.jsonl !filter !diff !merge text
 data/taubench/airline_data_demo.jsonl !filter !diff !merge text
 data/** filter=lfs diff=lfs merge=lfs -text
