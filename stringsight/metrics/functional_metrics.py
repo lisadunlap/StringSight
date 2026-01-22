@@ -229,8 +229,24 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
             return data
 
         # Extract cluster names and models, ensuring no NaN values
-        cluster_names = [c for c in df["cluster"].unique() if pd.notna(c)]
+        # Also filter out special clusters like "No properties" that shouldn't be in metrics
+        cluster_names = [
+            c for c in df["cluster"].unique()
+            if pd.notna(c) and str(c).strip() not in ["", "No properties"]
+        ]
         model_names = df["model"].unique()
+
+        if len(cluster_names) == 0:
+            self.log("No valid clusters found after filtering; saving empty metrics.")
+            if self.output_dir:
+                self._save_results({}, {}, {})
+
+            data.model_stats = {
+                "model_cluster_scores": pd.DataFrame(),
+                "cluster_scores": pd.DataFrame(),
+                "model_scores": pd.DataFrame()
+            }
+            return data
 
         self.log(f"Computing metrics for {len(model_names)} models and {len(cluster_names)} clusters")
 
@@ -293,8 +309,18 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         if not data.clusters:
             return pd.DataFrame()
 
-        # Create a property_id -> Property object lookup
-        property_lookup = {prop.id: prop for prop in data.properties}
+        # Create a property_id -> Property object lookup, filtering out invalid properties
+        # Only include properties with non-empty property_description
+        valid_properties = [
+            prop for prop in data.properties
+            if prop.property_description and prop.property_description.strip()
+        ]
+
+        invalid_count = len(data.properties) - len(valid_properties)
+        if invalid_count > 0:
+            self.log(f"Filtered out {invalid_count} invalid properties (empty descriptions) from metrics calculation")
+
+        property_lookup = {prop.id: prop for prop in valid_properties}
 
         # Build properties dataframe from clusters, preserving model info via property lookups
         cluster_rows = []
@@ -304,6 +330,10 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
                 cluster.property_descriptions,
                 cluster.question_ids
             ):
+                # Skip invalid property descriptions
+                if not prop_desc or not str(prop_desc).strip() or prop_desc == "No properties":
+                    continue
+
                 # Look up the full property object to get model info
                 prop = property_lookup.get(prop_id)
                 if prop:
@@ -316,15 +346,9 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
                         "cluster_metadata": cluster.meta,
                     })
                 else:
-                    # Fallback if property not found (shouldn't happen)
-                    cluster_rows.append({
-                        "property_id": prop_id,
-                        "property_description": prop_desc,
-                        "question_id": question_id,
-                        "model": "unknown",
-                        "cluster": cluster.label,
-                        "cluster_metadata": cluster.meta,
-                    })
+                    # Skip properties not in the valid property lookup
+                    # (they were filtered out due to empty descriptions)
+                    continue
 
         properties = pd.DataFrame(cluster_rows)
         if properties.empty:

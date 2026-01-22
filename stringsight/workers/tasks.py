@@ -53,13 +53,20 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
 
         # Reconstruct request object
         req = ExtractJobStartRequest(**req_data)
-        
+
         df = pd.DataFrame(req.rows)
+
+        logger.info(f"extract_properties_job called with sample_size={req.sample_size}, total rows={len(df)}")
 
         # Apply sample_size if specified
         if req.sample_size and req.sample_size < len(df):
             df = df.sample(n=req.sample_size, random_state=42)
-            logger.info(f"Sampled {req.sample_size} rows from {len(req.rows)} total rows")
+            logger.info(f"✓ Sampled {req.sample_size} rows from {len(req.rows)} total rows")
+        else:
+            if req.sample_size:
+                logger.info(f"Sample size {req.sample_size} >= total rows {len(df)}, using all rows")
+            else:
+                logger.info(f"No sample_size specified, using all {len(df)} rows")
 
         method = req.method or detect_method(list(df.columns))
         if method is None:
@@ -91,7 +98,7 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
                             session.commit()
                     last_update = now
                 except Exception as e:
-                    logger.error(f"Failed to update progress: {e}")
+                    logger.error(f"Failed to update job {job_uuid} progress: {e}", exc_info=True)
 
         # Generate prompts and capture metadata (always generate to get metadata)
         from stringsight.prompt_generation import generate_prompts
@@ -174,7 +181,7 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
                 job.error_message = str(e)  # type: ignore[assignment]
                 db.commit()
         except Exception as db_e:
-            logger.error(f"Failed to update job error state: {db_e}")
+            logger.error(f"Failed to update job {job_id} error state: {db_e}", exc_info=True)
     finally:
         db.close()
 
@@ -266,7 +273,7 @@ def _run_pipeline_job(job_id: str, req_data: Dict[str, Any]) -> None:
                         current_job.progress = progress  # type: ignore[assignment]
                         session.commit()
             except Exception as e:
-                logger.error(f"Failed to update progress: {e}")
+                logger.error(f"Failed to update job {job_uuid} progress: {e}", exc_info=True)
 
         explain(df, **explain_kwargs, progress_callback=update_progress)  # type: ignore[arg-type]
 
@@ -285,7 +292,7 @@ def _run_pipeline_job(job_id: str, req_data: Dict[str, Any]) -> None:
                 job.error_message = str(e)  # type: ignore[assignment]
                 db.commit()
         except Exception as db_e:
-            logger.error(f"Failed to update job error state: {db_e}")
+            logger.error(f"Failed to update job {job_id} error state: {db_e}", exc_info=True)
     finally:
         db.close()
 
@@ -349,7 +356,7 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
                         current_job.progress = progress  # type: ignore[assignment]
                         session.commit()
             except Exception as e:
-                logger.error(f"Failed to update progress: {e}")
+                logger.error(f"Failed to update job {job_uuid} progress: {e}", exc_info=True)
         
         # Phase 1: Convert properties (5%)
         update_progress(0.05)
@@ -374,8 +381,8 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
                     meta=p.get("meta", {})
                 )
                 properties.append(prop)
-            except Exception as e:
-                logger.warning(f"Skipping invalid property: {e}")
+            except (KeyError, TypeError, ValueError) as e:
+                logger.warning(f"Skipping invalid property (missing/invalid fields): {e}")
                 continue
         
         if not properties:
@@ -572,8 +579,8 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
             with open(conversation_path, 'w') as f:
                 for conv_dict in formatted_conversations_list:
                     f.write(json.dumps(conv_dict, default=str) + '\n')
-        except Exception as e:
-            logger.warning(f"Failed to save conversation.jsonl: {e}")
+        except (IOError, OSError) as e:
+            logger.warning(f"Failed to save conversation.jsonl to {results_dir}: {e}", exc_info=True)
         
         # Save clusters
         clusters_data = []
@@ -634,7 +641,7 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
                 job.error_message = str(e)  # type: ignore[assignment]
                 db.commit()
         except Exception as db_e:
-            logger.error(f"Failed to update job error state: {db_e}")
+            logger.error(f"Failed to update job {job_id} error state: {db_e}", exc_info=True)
     finally:
         db.close()
 

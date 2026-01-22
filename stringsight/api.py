@@ -17,11 +17,13 @@ import asyncio
 import io
 import os
 import time
+from collections import OrderedDict
 
 import pandas as pd
 from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Query, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pathlib import Path
 
@@ -52,11 +54,14 @@ logger = get_logger(__name__)
 from stringsight.utils.paths import _get_persistent_data_dir, _get_results_dir, _get_cache_dir
 
 # -------------------------------------------------------------------------
-# Simple in-memory cache for parsed JSONL data with TTL
+# Bounded LRU cache for parsed JSONL data with TTL
 # -------------------------------------------------------------------------
-_JSONL_CACHE: Dict[str, tuple[List[Dict[str, Any]], datetime]] = {}
+_MAX_CACHE_ENTRIES = 10  # Maximum number of files to cache
+_MAX_CACHE_SIZE_MB = 100  # Maximum total cache size in MB
 _CACHE_TTL = timedelta(minutes=15)  # Cache for 15 minutes
+_JSONL_CACHE: OrderedDict[str, tuple[List[Dict[str, Any]], datetime, int]] = OrderedDict()  # key -> (data, timestamp, size_bytes)
 _CACHE_LOCK = threading.Lock()
+_cache_stats = {"hits": 0, "misses": 0, "evictions": 0, "total_size_mb": 0.0}
 
 def _get_file_hash(path: Path) -> str:
     """Get a hash of file path and modification time for cache key."""
@@ -65,10 +70,15 @@ def _get_file_hash(path: Path) -> str:
     return hashlib.md5(key_str.encode()).hexdigest()
 
 def _get_cached_jsonl(path: Path, nrows: int | None = None) -> List[Dict[str, Any]]:
-    """Read JSONL file with caching. Cache key includes file mtime to auto-invalidate on changes.
+    """Read JSONL file with bounded LRU caching. Cache key includes file mtime to auto-invalidate on changes.
 
     Only caches full file reads (nrows=None) to avoid cache bloat. For partial reads,
     reads directly from disk.
+
+    Cache is bounded by:
+    - Maximum 10 files
+    - Maximum 100MB total size
+    - 15-minute TTL
     """
     # Only cache full file reads to avoid memory bloat
     if nrows is not None:
@@ -79,24 +89,46 @@ def _get_cached_jsonl(path: Path, nrows: int | None = None) -> List[Dict[str, An
 
     with _CACHE_LOCK:
         if cache_key in _JSONL_CACHE:
-            cached_data, cached_time = _JSONL_CACHE[cache_key]
+            cached_data, cached_time, cached_size = _JSONL_CACHE[cache_key]
             # Check if cache is still valid
             if datetime.now() - cached_time < _CACHE_TTL:
+                # Move to end (mark as recently used)
+                _JSONL_CACHE.move_to_end(cache_key)
+                _cache_stats["hits"] += 1
                 logger.debug(f"Cache hit for {path.name}")
                 return cached_data
             else:
                 # Remove expired entry
                 del _JSONL_CACHE[cache_key]
+                _cache_stats["total_size_mb"] -= cached_size / (1024 * 1024)
                 logger.debug(f"Cache expired for {path.name}")
 
     # Cache miss - read from disk
-    logger.debug(f"Cache miss for {path.name}, reading from disk")
+    _cache_stats["misses"] += 1
+    logger.debug(f"Cache miss for {path.name}, reading from disk (hits: {_cache_stats['hits']}, misses: {_cache_stats['misses']})")
     data = _read_jsonl_as_list(path, nrows)
 
     # Store in cache (only if full file read)
     if nrows is None:
+        import sys
+        data_size = sys.getsizeof(data)
+        data_size_mb = data_size / (1024 * 1024)
+
         with _CACHE_LOCK:
-            _JSONL_CACHE[cache_key] = (data, datetime.now())
+            # Evict entries if needed to stay under limits
+            while len(_JSONL_CACHE) >= _MAX_CACHE_ENTRIES or _cache_stats["total_size_mb"] + data_size_mb > _MAX_CACHE_SIZE_MB:
+                if not _JSONL_CACHE:
+                    break
+                # Remove oldest entry (FIFO eviction)
+                evicted_key, (_, _, evicted_size) = _JSONL_CACHE.popitem(last=False)
+                _cache_stats["total_size_mb"] -= evicted_size / (1024 * 1024)
+                _cache_stats["evictions"] += 1
+                logger.debug(f"Evicted cache entry (total evictions: {_cache_stats['evictions']})")
+
+            # Add new entry
+            _JSONL_CACHE[cache_key] = (data, datetime.now(), data_size)
+            _cache_stats["total_size_mb"] += data_size_mb
+            logger.debug(f"Cached {path.name} ({data_size_mb:.2f}MB, total cache: {_cache_stats['total_size_mb']:.2f}MB)")
 
     return data
 
@@ -130,7 +162,7 @@ def _resolve_within_base(user_path: str) -> Path:
     target = (base / target).resolve() if not target.is_absolute() else target.resolve()
     try:
         target.relative_to(base)
-    except Exception:
+    except ValueError:
         raise HTTPException(status_code=400, detail="Path is outside the allowed base directory")
     if not target.exists():
         raise HTTPException(status_code=404, detail=f"Path not found: {target}")
@@ -371,6 +403,12 @@ app.include_router(validation.router)
 app.include_router(extraction.router)
 app.include_router(clustering.router)
 
+# Mount final_results directory as static files for direct file access
+final_results_path = Path("final_results")
+if final_results_path.exists():
+    app.mount("/final_results", StaticFiles(directory=str(final_results_path)), name="final_results")
+    logger.info(f"Mounted /final_results from {final_results_path.absolute()}")
+
 # NOTE:
 # All of the primary API endpoints are implemented in `stringsight/routers/*` and
 # are registered above via `app.include_router(...)`.
@@ -410,7 +448,7 @@ def _run_cluster_job(job: ClusterJob, req: ClusterRunRequest):
     try:
         asyncio.run(_run_cluster_job_async(job, req))
     except Exception as e:
-        logger.error(f"Error in background cluster job: {e}")
+        logger.error(f"Error in background cluster job {job.id}: {e}", exc_info=True)
         with _CLUSTER_JOBS_LOCK:
             job.state = "error"
             job.error = str(e)
@@ -449,11 +487,13 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
             if hasattr(_llm_utils, "_default_llm_utils"):
                 _llm_utils._default_llm_utils = None  # type: ignore
         except Exception:
+            # Intentionally silent - cache clearing is best-effort
             pass
         try:
             if hasattr(_cu, "_cache"):
                 _cu._cache = None  # type: ignore
         except Exception:
+            # Intentionally silent - cache clearing is best-effort
             pass
 
         # Preprocess operationalRows to handle score_columns conversion
@@ -545,8 +585,8 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
                     meta=p.get("meta", {})
                 )
                 properties.append(prop)
-            except Exception as e:
-                logger.warning(f"Skipping invalid property: {e}")
+            except (KeyError, TypeError, ValueError) as e:
+                logger.warning(f"Skipping invalid property (missing/invalid fields): {e}")
                 continue
 
         if not properties:

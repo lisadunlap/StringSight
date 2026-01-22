@@ -131,8 +131,14 @@ class HDBSCANClusterer(BaseClusterer):
         # `to_dataframe(type="properties")` may include conversation rows without any extracted
         # properties (i.e., missing/NaN `column_name`). Those rows cannot be clustered and can
         # also coerce cluster id dtypes to float downstream, which breaks group metadata mapping.
+        # Also filter out empty strings to ensure only valid properties are clustered.
         if column_name in df.columns:
+            initial_count = len(df)
             df = df[df[column_name].notna()].copy()
+            df = df[df[column_name].astype(str).str.strip() != ""].copy()
+            filtered_count = initial_count - len(df)
+            if filtered_count > 0:
+                self.log(f"Filtered out {filtered_count} properties with empty or missing descriptions before clustering")
         
         if getattr(self, "verbose", False):
             logger.debug(f"DataFrame shape after to_dataframe: {df.shape}")
@@ -251,7 +257,8 @@ class HDBSCANClusterer(BaseClusterer):
                     if progress_callback:
                         try:
                             progress_callback((i + 1) / total_groups)
-                        except Exception:
+                        except Exception as e:
+                            logger.debug(f"Progress callback failed: {e}")
                             pass
                 clustered_df = pd.concat(clustered_parts, ignore_index=True)
         else:

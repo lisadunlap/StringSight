@@ -65,7 +65,7 @@ class PromptReflector:
             logger.info("Reflection completed. Generated corrected prompt.")
             return corrected_prompt
         except Exception as e:
-            logger.error(f"Reflection failed with exception: {e}. Returning original prompt.")
+            logger.error(f"Reflection failed with exception: {e}. Returning original prompt.", exc_info=True)
             # If reflection itself fails, return original prompt
             return original_prompt
 

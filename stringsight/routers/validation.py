@@ -120,6 +120,54 @@ def _load_dataframe_from_path(path: str) -> pd.DataFrame:
         raise HTTPException(status_code=400, detail="Unsupported file type. Use .csv or .jsonl")
 
 
+def _filter_invalid_cluster_properties(clusters: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Filter out invalid property descriptions from cluster data.
+
+    Removes entries with empty or 'No properties' descriptions from cluster property lists.
+    Updates cluster size to reflect the filtered count.
+    """
+    filtered_clusters = []
+    for cluster in clusters:
+        if not isinstance(cluster, dict):
+            continue
+
+        # Get the lists (they should all have the same length)
+        property_ids = cluster.get("property_ids", [])
+        property_descriptions = cluster.get("property_descriptions", [])
+        question_ids = cluster.get("question_ids", [])
+
+        # Filter out invalid entries
+        filtered_data = [
+            (pid, pdesc, qid)
+            for pid, pdesc, qid in zip(property_ids, property_descriptions, question_ids)
+            if pdesc and str(pdesc).strip() and pdesc != "No properties"
+        ]
+
+        # Only include cluster if it has valid properties
+        if filtered_data:
+            filtered_pids, filtered_pdescs, filtered_qids = zip(*filtered_data)
+
+            # Calculate unique conversations from filtered question_ids
+            unique_conversations = len(set(filtered_qids))
+
+            cluster_copy = cluster.copy()
+            cluster_copy["property_ids"] = list(filtered_pids)
+            cluster_copy["property_descriptions"] = list(filtered_pdescs)
+            cluster_copy["question_ids"] = list(filtered_qids)
+            cluster_copy["size"] = len(filtered_data)
+
+            # Update cluster metadata with correct unique conversation count
+            if "meta" not in cluster_copy:
+                cluster_copy["meta"] = {}
+            if not isinstance(cluster_copy["meta"], dict):
+                cluster_copy["meta"] = {}
+            cluster_copy["meta"]["total_unique_conversations"] = unique_conversations
+
+            filtered_clusters.append(cluster_copy)
+
+    return filtered_clusters
+
+
 def _resolve_df_and_method(
     file: UploadFile | None,
     payload: RowsPayload | None,
@@ -207,7 +255,8 @@ def conversations(
     method_str = cast(Literal["single_model", "side_by_side"], method if isinstance(method, str) else (method.value if hasattr(method, 'value') else "single_model"))
     try:
         df = explode_score_columns(df, method_str)
-    except Exception:
+    except (ValueError, KeyError) as e:
+        logger.debug(f"Could not explode score columns: {e}")
         pass
 
     traces = format_conversations(df, method_str)
@@ -247,7 +296,8 @@ def read_path(req: ReadRequest) -> Dict[str, Any]:
     # Optionally flatten scores
     try:
         df = explode_score_columns(df, method)
-    except Exception:
+    except (ValueError, KeyError) as e:
+        logger.debug(f"Could not explode score columns: {e}")
         pass
 
     out_df = df.head(req.limit) if isinstance(req.limit, int) and req.limit > 0 else df
@@ -388,7 +438,16 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
     if props_file.exists():
         try:
             properties = _read_jsonl_as_list(props_file, nrows=req.max_properties)
-            logger.info(f"Loaded {len(properties)} properties")
+            # Filter out properties with empty descriptions
+            initial_count = len(properties)
+            properties = [
+                p for p in properties
+                if p.get("property_description") and str(p.get("property_description")).strip()
+            ]
+            filtered_count = initial_count - len(properties)
+            if filtered_count > 0:
+                logger.info(f"Filtered out {filtered_count} properties with empty descriptions")
+            logger.info(f"Loaded {len(properties)} valid properties")
         except Exception as e:
             logger.warning(f"Failed to load properties: {e}")
 
@@ -399,12 +458,16 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
     if clusters_file_jsonl.exists():
         try:
             clusters = _read_jsonl_as_list(clusters_file_jsonl)
+            # Filter out invalid property descriptions from clusters
+            clusters = _filter_invalid_cluster_properties(clusters)
             logger.info(f"Loaded {len(clusters)} clusters from jsonl")
         except Exception as e:
             logger.warning(f"Failed to load clusters from jsonl: {e}")
     elif clusters_file_json.exists():
         try:
             clusters = _read_json_safe(clusters_file_json)
+            # Filter out invalid property descriptions from clusters
+            clusters = _filter_invalid_cluster_properties(clusters)
             logger.info(f"Loaded {len(clusters)} clusters from json")
         except Exception as e:
             logger.warning(f"Failed to load clusters from json: {e}")
@@ -429,6 +492,11 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
                         conversations = c[start_idx:end_idx]
 
                     if isinstance(p_data, list):
+                        # Filter out properties with empty descriptions
+                        p_data = [
+                            p for p in p_data
+                            if p.get("property_description") and str(p.get("property_description")).strip()
+                        ]
                         properties_total = len(p_data)
                         start_idx = (req.properties_page - 1) * req.properties_per_page
                         end_idx = start_idx + req.properties_per_page
@@ -437,8 +505,10 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
                         properties = p_data[start_idx:end_idx]
 
                     if isinstance(cl, list):
-                        clusters = cl
-                except Exception:
+                        # Filter out invalid property descriptions from clusters
+                        clusters = _filter_invalid_cluster_properties(cl)
+                except (ValueError, TypeError, KeyError):
+                    # Best effort - continue if cluster filtering fails
                     pass
 
     # Load clusters from full_dataset.json if not loaded yet
@@ -450,7 +520,8 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
                 if isinstance(payload, dict):
                     cl = payload.get("clusters")
                     if isinstance(cl, list):
-                        clusters = cl
+                        # Filter out invalid property descriptions from clusters
+                        clusters = _filter_invalid_cluster_properties(cl)
             except Exception:
                 pass
 
@@ -565,6 +636,12 @@ def get_properties(dataset: str) -> Dict[str, Any]:
     # Use cached read instead of manual parsing
     properties = _get_cached_jsonl(properties_file)
 
+    # Filter out properties with empty descriptions
+    properties = [
+        p for p in properties
+        if p.get("property_description") and str(p.get("property_description")).strip()
+    ]
+
     return {"data": properties}
 
 
@@ -595,6 +672,9 @@ def get_clusters(dataset: str) -> Dict[str, Any]:
     else:
         # For JSON files, use the cached JSON reader
         clusters = _read_json_safe(clusters_file)
+
+    # Filter out invalid property descriptions from clusters
+    clusters = _filter_invalid_cluster_properties(clusters)
 
     return {"data": clusters}
 

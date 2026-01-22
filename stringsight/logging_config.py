@@ -5,26 +5,38 @@ This module provides a centralized logging configuration that can be controlled
 via environment variables:
 - STRINGSIGHT_LOG_LEVEL: Set logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 - STRINGSIGHT_LOG_FORMAT: Custom log format (optional)
+- STRINGSIGHT_JSON_LOGS: Enable JSON structured logging (true/false)
+
+Default format includes timestamp, level, module name, and message:
+    [2024-01-15 10:30:45] INFO [module.name] Message here
 
 Usage:
     from stringsight.logging_config import get_logger
-    
+
     logger = get_logger(__name__)
     logger.debug("Debug message")
     logger.info("Info message")
     logger.warning("Warning message")
-    logger.error("Error message")
+    logger.error("Error message", exc_info=True)  # Include stack trace
+
+    # Add extra context fields
+    logger.error("Job failed", exc_info=True, extra={"job_id": job_id})
 """
 
 import logging
 import os
 import sys
-from typing import Optional
+import json
+from typing import Optional, Any, Dict
 
 
-# Default log format - simple format without timestamp/level for cleaner output
-DEFAULT_LOG_FORMAT = "%(message)s"
+# Default log format - includes timestamp, level, module name, and message
+# Format: [2024-01-15 10:30:45] INFO [module.name] Message here
+DEFAULT_LOG_FORMAT = "[%(asctime)s] %(levelname)s [%(name)s] %(message)s"
 DEFAULT_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+# Simple format option (for backwards compatibility, set via env var)
+SIMPLE_LOG_FORMAT = "%(message)s"
 
 
 def _get_log_level() -> int:
@@ -36,6 +48,38 @@ def _get_log_level() -> int:
 def _get_log_format() -> str:
     """Get the log format from environment variable or use default."""
     return os.environ.get("STRINGSIGHT_LOG_FORMAT", DEFAULT_LOG_FORMAT)
+
+
+def _use_json_logs() -> bool:
+    """Check if JSON logging is enabled via environment variable."""
+    json_logs_env = os.environ.get("STRINGSIGHT_JSON_LOGS", "false").lower()
+    return json_logs_env in ("true", "1", "yes")
+
+
+class JSONFormatter(logging.Formatter):
+    """JSON formatter for structured logging in production."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Format log record as JSON."""
+        log_data: Dict[str, Any] = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+
+        # Add exception info if present
+        if record.exc_info:
+            log_data["exception"] = self.formatException(record.exc_info)
+
+        # Add extra fields if present
+        if hasattr(record, "job_id"):
+            log_data["job_id"] = record.job_id
+        if hasattr(record, "stage"):
+            log_data["stage"] = record.stage
+
+        return json.dumps(log_data)
+
 
 
 def configure_logging(
@@ -59,15 +103,29 @@ def configure_logging(
     
     if date_format is None:
         date_format = DEFAULT_DATE_FORMAT
-    
+
+    # Check if JSON logging is enabled
+    use_json = _use_json_logs()
+
     # Configure the root logger
-    logging.basicConfig(
-        level=level,
-        format=format_string,
-        datefmt=date_format,
-        stream=sys.stdout,
-        force=True  # Override any existing configuration
-    )
+    if use_json:
+        # Use JSON formatter for structured logging
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(JSONFormatter(datefmt=date_format))
+        logging.basicConfig(
+            level=level,
+            handlers=[handler],
+            force=True
+        )
+    else:
+        # Use standard text formatter
+        logging.basicConfig(
+            level=level,
+            format=format_string,
+            datefmt=date_format,
+            stream=sys.stdout,
+            force=True  # Override any existing configuration
+        )
     
     # Suppress noisy third-party library logs
     logging.getLogger("LiteLLM").setLevel(logging.WARNING)

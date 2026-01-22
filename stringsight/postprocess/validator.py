@@ -136,7 +136,14 @@ class PropertyValidator(LoggingMixin, PipelineStage):
         self.log(f"  • Validation stats: {stats_path}")
     
     def _is_valid_property(self, prop: Property) -> bool:
-        """Check if a property is valid."""
+        """Check if a property is valid.
+
+        A property is considered invalid if:
+        1. property_description is None, empty, or only whitespace
+        2. behavior_type is specified but not in the allowed set
+
+        Invalid properties will be excluded from clustering and metrics calculations.
+        """
         # Basic validation - property description should exist and not be empty
         if not (prop.property_description and prop.property_description.strip()):
             return False

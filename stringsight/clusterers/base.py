@@ -291,12 +291,26 @@ Do not include any other text in your response."""
 
         Group rows by cluster id, extract labels and collect
         `question_id`, `{column_name}` and `id` values for each cluster.
+
+        Filters out rows where property_description is empty or NaN to ensure
+        only valid properties are included in clusters.
         """
         label_col = f"{column_name}_cluster_label"
         id_col = f"{column_name}_cluster_id"
 
+        # Filter out invalid properties (empty or NaN property descriptions)
+        if column_name in df.columns:
+            valid_mask = df[column_name].notna() & (df[column_name].astype(str).str.strip() != "")
+            df_filtered = df[valid_mask].copy()
+
+            invalid_count = len(df) - len(df_filtered)
+            if invalid_count > 0:
+                self.log(f"Filtered out {invalid_count} properties with empty descriptions from clustering")
+        else:
+            df_filtered = df
+
         clusters: List[Cluster] = []
-        for cid, group in df.groupby(id_col):
+        for cid, group in df_filtered.groupby(id_col):
             cid_group = group[group[id_col] == cid]
             label = str(cid_group[label_col].iloc[0])
 

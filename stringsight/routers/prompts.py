@@ -166,7 +166,7 @@ async def generate_prompts_endpoint(req: GeneratePromptsRequest) -> Dict[str, An
         }
 
     except ValueError as e:
-        logger.error(f"Validation error during prompt generation: {e}")
+        logger.error(f"Validation error during prompt generation: {e}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("Unexpected error during prompt generation")

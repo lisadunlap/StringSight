@@ -98,7 +98,8 @@ def _enrich_properties_with_row_index(
             if key in idx_map:
                 p['row_index'] = idx_map[key]
 
-    except Exception:
+    except (KeyError, TypeError):
+        # Best effort - if row_index mapping fails, continue without it
         pass
 
     return properties
@@ -427,10 +428,17 @@ async def extract_batch(req: ExtractBatchRequest) -> Dict[str, Any]:
     """Run extraction→parsing→validation for all rows and return properties table."""
     df = pd.DataFrame(req.rows)
 
+    logger.info(f"extract_batch called with sample_size={req.sample_size}, total rows={len(df)}")
+
     # Apply sample_size if specified
     if req.sample_size and req.sample_size < len(df):
         df = df.sample(n=req.sample_size, random_state=42)
-        logger.info(f"Sampled {req.sample_size} rows from {len(req.rows)} total rows")
+        logger.info(f"✓ Sampled {req.sample_size} rows from {len(req.rows)} total rows")
+    else:
+        if req.sample_size:
+            logger.info(f"Sample size {req.sample_size} >= total rows {len(df)}, using all rows")
+        else:
+            logger.info(f"No sample_size specified, using all {len(df)} rows")
 
     method = req.method or detect_method(list(df.columns))
     if method is None:
@@ -527,7 +535,7 @@ def _run_extract_job(job: ExtractJob, req: ExtractJobStartRequest):
     try:
         asyncio.run(_run_extract_job_async(job, req))
     except Exception as e:
-        logger.error(f"Error in background extract job: {e}")
+        logger.error(f"Error in background extract job {job.id}: {e}", exc_info=True)
         job.state = "error"
         job.error = str(e)
 

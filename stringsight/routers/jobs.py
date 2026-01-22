@@ -184,6 +184,17 @@ def get_job_results(
         # Read JSONL file using storage adapter
         properties = storage.read_jsonl(result_file_path)
 
+        # Filter out properties with empty descriptions (safety check)
+        initial_count = len(properties)
+        properties = [
+            p for p in properties
+            if p.get("property_description") and str(p.get("property_description")).strip()
+        ]
+        if len(properties) < initial_count:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Filtered out {initial_count - len(properties)} properties with empty descriptions")
+
         response = {
             "properties": properties,
             "result_path": job.result_path,
