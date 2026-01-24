@@ -34,6 +34,16 @@ def _create_engine(database_url: str) -> Engine:
             connect_args={"check_same_thread": False},
         )
 
+    # For PostgreSQL, use connection pooling to reduce cold start time
+    if database_url.startswith("postgresql://"):
+        return create_engine(
+            database_url,
+            pool_size=5,           # Keep 5 connections alive
+            max_overflow=10,       # Allow up to 10 additional connections during spikes
+            pool_pre_ping=True,    # Verify connections before use (prevents stale connections)
+            pool_recycle=3600,     # Recycle connections after 1 hour
+        )
+
     return create_engine(database_url)
 
 
