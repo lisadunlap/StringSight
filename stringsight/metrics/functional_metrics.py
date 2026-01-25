@@ -252,22 +252,29 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
 
         # Core metrics computation
         model_cluster_scores = self._compute_model_cluster_scores(df, cluster_names, model_names)
-        model_cluster_scores = self._compute_salience(model_cluster_scores)
+        from .salience import compute_salience
+        model_cluster_scores = compute_salience(model_cluster_scores)
         
         cluster_scores = self._compute_cluster_scores(df, cluster_names, model_names)
         model_scores = self._compute_model_scores(df, cluster_names, model_names)
 
         # Add bootstrap analysis if enabled and sample count > 0
         if self.compute_bootstrap and self.bootstrap_samples > 0:
+            from .bootstrap import BootstrapAnalyzer
+
             self.log(f"Adding bootstrap confidence intervals with {self.bootstrap_samples} samples...")
-            model_cluster_scores, cluster_scores, model_scores = self._add_bootstrap_analysis(
+            analyzer = BootstrapAnalyzer(samples=self.bootstrap_samples, seed=self.bootstrap_seed)
+            metric_keys = self._infer_metric_keys(df)
+            model_cluster_scores, cluster_scores, model_scores = analyzer.add_bootstrap_analysis(
                 df,
                 model_cluster_scores,
                 cluster_scores,
                 model_scores,
                 cluster_names=cluster_names,
                 model_names=list(model_names),
+                metric_keys=metric_keys,
                 progress_callback=progress_callback,
+                log_fn=self.log,
             )
 
         # Save results
@@ -562,29 +569,7 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
                 keys.update(scores.keys())
         return sorted(keys)
 
-    def _bootstrap_salience_from_proportions(
-        self, proportions: "Any", *, n_models: int
-    ) -> "Any":
-        """Compute per-model proportion deltas (salience) from proportions.
-
-        This is the bootstrap analogue of `_compute_salience()`, but operates on a dense
-        array instead of nested dicts.
-
-        Args:
-            proportions: Array of shape (n_models, n_clusters) with proportions in [0, 1].
-            n_models: Number of models (first dimension).
-
-        Returns:
-            Array of shape (n_models, n_clusters) with `proportion_delta`.
-        """
-        import numpy as np
-
-        if n_models <= 1:
-            return np.zeros_like(proportions, dtype=float)
-
-        totals = np.sum(proportions, axis=0, keepdims=True)
-        avg_others = (totals - proportions) / float(n_models - 1)
-        return proportions - avg_others
+    # Bootstrap methods moved to bootstrap.py module
 
     @staticmethod
     def _compute_weighted_means_1d(
@@ -699,10 +684,20 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
 
     def _compute_cluster_scores(self, df: pd.DataFrame, cluster_names: List[str], model_names: List[str], *, include_metadata: bool = True) -> Dict[str, Dict[str, Any]]:
         """Compute metrics for each cluster across all models."""
-        return {
-            cluster: self.compute_cluster_metrics(df, [cluster], list(model_names), include_metadata=include_metadata)
-            for cluster in cluster_names
-        }
+        cluster_scores = {}
+        for cluster in cluster_names:
+            cluster_df = df[df["cluster"] == cluster]
+            # Compute unique conversation count (deduplicate on conversation_id only)
+            unique_conversations = cluster_df["conversation_id"].nunique()
+
+            # Get standard metrics across all models
+            metrics = self.compute_cluster_metrics(df, [cluster], list(model_names), include_metadata=include_metadata)
+
+            # Add unique conversation count
+            metrics["total_unique_conversations"] = unique_conversations
+            cluster_scores[cluster] = metrics
+
+        return cluster_scores
 
     def _compute_model_scores(self, df: pd.DataFrame, cluster_names: List[str], model_names: List[str], *, include_metadata: bool = True) -> Dict[str, Dict[str, Any]]:
         """Compute metrics for each model across all clusters."""

@@ -147,6 +147,7 @@ def flatten_cluster_scores(cluster_scores: Dict[str, Dict[str, Any]]) -> pd.Data
             "cluster": cluster_name,
             "size": metrics.get("size", 0),
             "proportion": metrics.get("proportion", 0.0),
+            "total_unique_conversations": metrics.get("total_unique_conversations", 0),
             "metadata": metrics.get("metadata", {}),
             "examples": metrics.get("examples", [])
         }
