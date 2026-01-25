@@ -112,10 +112,31 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
 
         # Create Property objects
         for prop_dict in prop_dicts:
+            # Map model name from LLM response (e.g., "Model A") to actual model name
+            # For side-by-side comparisons, prop.model is [model_a, model_b]
+            if isinstance(prop.model, list):
+                llm_model_name = prop_dict.get("model", "")
+                mapped_model = model_name_pass(llm_model_name, prop.model[0], prop.model[1])
+
+                # Skip properties where model mapping failed
+                if mapped_model == "unknown":
+                    errors.append({
+                        'property_id': prop.id,
+                        'question_id': prop.question_id,
+                        'model': prop.model,
+                        'llm_model_name': llm_model_name,
+                        'error_type': 'UNKNOWN_MODEL_MAPPING',
+                        'error_message': f'Could not map LLM model name "{llm_model_name}" to actual model. Expected "Model A" or "Model B".',
+                        'index': index
+                    })
+                    continue
+            else:
+                mapped_model = prop.model
+
             new_prop = Property(
                 id=str(uuid.uuid4()),
                 question_id=prop.question_id,
-                model=prop.model,
+                model=mapped_model,
                 property_description=prop_dict.get("property_description"),
                 reason=prop_dict.get("reason"),
                 evidence=prop_dict.get("evidence"),

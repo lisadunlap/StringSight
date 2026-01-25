@@ -61,9 +61,17 @@ from .hdbscan import HDBSCANClusterer
 from .dummy_clusterer import DummyClusterer
 from .base import BaseClusterer
 
+# Import utility modules (commonly used functions)
+from . import embeddings
+from . import llm_clustering
+from . import persistence
+
 __all__ = [
     "get_clusterer",
     "HDBSCANClusterer",
     "DummyClusterer",
     "BaseClusterer",
+    "embeddings",
+    "llm_clustering",
+    "persistence",
 ]

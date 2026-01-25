@@ -22,12 +22,18 @@ __all__: list[str] = [
     "SingleModelMetrics",
     "FunctionalMetrics",
     "get_metrics",
+    "bootstrap",
+    "salience",
 ]
 
 # Lazy import to keep import time low
 SideBySideMetrics = _imp("stringsight.metrics.side_by_side").SideBySideMetrics
 SingleModelMetrics = _imp("stringsight.metrics.single_model").SingleModelMetrics
 FunctionalMetrics = _imp("stringsight.metrics.functional_metrics").FunctionalMetrics
+
+# Import utility modules
+from . import bootstrap
+from . import salience
 
 
 def get_metrics(method: str, **kwargs) -> "PipelineStage":

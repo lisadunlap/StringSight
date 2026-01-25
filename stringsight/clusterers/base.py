@@ -257,7 +257,7 @@ Do not include any other text in your response."""
         if not self.output_dir:
             return {}
 
-        from .clustering_utils import save_clustered_results
+        from .persistence import save_clustered_results
 
         base_filename = os.path.basename(self.output_dir.rstrip("/"))
         config = self.get_config()

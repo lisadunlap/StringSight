@@ -437,57 +437,112 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
         
         # Handle side-by-side if needed
         if req.method == "side_by_side":
+            logger.info(f"[CLUSTER_DEBUG] Processing side_by_side with {len(properties)} properties and {len(req.operationalRows)} operational rows")
+
+            # Sample check - does the first operational row have winner?
+            if req.operationalRows and len(req.operationalRows) > 0:
+                first_row = req.operationalRows[0]
+                logger.info(f"[CLUSTER_DEBUG] First operational row keys: {list(first_row.keys())}")
+                logger.info(f"[CLUSTER_DEBUG] First operational row winner: {first_row.get('winner')}")
+                logger.info(f"[CLUSTER_DEBUG] First operational row model_a: {first_row.get('model_a')}")
+                logger.info(f"[CLUSTER_DEBUG] First operational row model_b: {first_row.get('model_b')}")
+
             properties_by_qid: Dict[str, List[Property]] = {}
             for prop in properties:
                 if prop.question_id not in properties_by_qid:
                     properties_by_qid[prop.question_id] = []
                 properties_by_qid[prop.question_id].append(prop)
-            
+
+            logger.info(f"[CLUSTER_DEBUG] Grouped properties into {len(properties_by_qid)} unique question_ids")
+            logger.info(f"[CLUSTER_DEBUG] Sample property question_ids: {list(properties_by_qid.keys())[:5]}")
+
             operational_rows_map = {}
             for row in req.operationalRows:
                 row_qid = str(row.get("question_id", ""))
+                # Also try using __index as fallback identifier
+                if not row_qid or row_qid == 'None':
+                    row_qid = str(row.get("__index", ""))
+
                 operational_rows_map[row_qid] = row
                 if '-' in row_qid:
                     base_id = row_qid.split('-')[0]
                     if base_id not in operational_rows_map:
                         operational_rows_map[base_id] = row
-            
+
             sxs_conversations = []
             for qid, props in properties_by_qid.items():
+                # Try multiple strategies to find matching row
                 matching_row = operational_rows_map.get(qid)
                 if not matching_row and '-' in qid:
                     matching_row = operational_rows_map.get(qid.split('-')[0])
-                
+                # Try fuzzy match by checking if any operational row's question_id contains this qid
+                if not matching_row:
+                    for op_qid, op_row in operational_rows_map.items():
+                        if qid in op_qid or op_qid in qid:
+                            matching_row = op_row
+                            break
+
                 if matching_row:
                     model_a = matching_row.get("model_a")
                     model_b = matching_row.get("model_b")
-                    
+
+                    # Get model names from properties if not in operational row
                     if not model_a or not model_b:
                         unique_models = list(set(p.model for p in props))
                         if len(unique_models) >= 2:
                             model_a = unique_models[0]
                             model_b = unique_models[1]
+                        elif len(unique_models) == 1:
+                            # All properties from same model - check if we can infer the other model
+                            model_a = unique_models[0]
+                            # Try to get model_b from operational row
+                            if matching_row.get("model_b") and matching_row.get("model_b") != model_a:
+                                model_b = matching_row.get("model_b")
+                            elif matching_row.get("model_a") and matching_row.get("model_a") != model_a:
+                                model_b = matching_row.get("model_a")
+                            else:
+                                model_b = "unknown_model"
                         else:
-                            model_a = "model_a"
-                            model_b = "model_b"
-                    
-                    score_a = matching_row.get("score_a", {})
-                    score_b = matching_row.get("score_b", {})
-                    
+                            model_a = matching_row.get("model_a", "model_a")
+                            model_b = matching_row.get("model_b", "model_b")
+
+                    score_a = matching_row.get("score_a")
+                    score_b = matching_row.get("score_b")
+
+                    # Handle different score formats
+                    if score_a is None:
+                        score_a = {}
+                    if score_b is None:
+                        score_b = {}
+
+                    # If both scores empty, check for combined score or winner-only format
                     if not score_a and not score_b:
-                        combined_score = matching_row.get("score") or matching_row.get("scores") or {}
+                        combined_score = matching_row.get("score") or matching_row.get("scores")
                         if combined_score:
-                            score_a = combined_score
-                            score_b = combined_score
-                    
+                            if isinstance(combined_score, dict):
+                                # Could be {'winner': 'model_name'} format - will be handled by ConversationRecord
+                                score_a = combined_score
+                                score_b = combined_score
+
+                    # Build meta with winner
                     meta = {}
-                    if "winner" in matching_row:
-                        meta["winner"] = matching_row["winner"]
-                    elif "score" in matching_row and isinstance(matching_row["score"], dict) and "winner" in matching_row["score"]:
-                        meta["winner"] = matching_row["score"]["winner"]
-                    
-                    model_a_str = model_a if isinstance(model_a, str) else str(model_a)
-                    model_b_str = model_b if isinstance(model_b, str) else str(model_b)
+                    winner = matching_row.get("winner")
+                    if not winner and isinstance(matching_row.get("score"), dict):
+                        winner = matching_row.get("score", {}).get("winner")
+                    if winner:
+                        meta["winner"] = winner
+
+                    # Add all other metadata
+                    for k, v in matching_row.items():
+                        if k not in ['question_id', '__index', 'prompt', 'model_a', 'model_b',
+                                     'model_a_response', 'model_b_response', 'score', 'score_a', 'score_b', 'winner']:
+                            meta[k] = v
+
+                    model_a_str = str(model_a) if model_a else "model_a"
+                    model_b_str = str(model_b) if model_b else "model_b"
+
+                    logger.info(f"[CLUSTER_DEBUG] Creating conversation for qid={qid}: models=({model_a_str}, {model_b_str}), winner={meta.get('winner')}, scores=({score_a}, {score_b})")
+
                     conv = ConversationRecord(
                         question_id=qid,
                         model=[model_a_str, model_b_str],
@@ -497,9 +552,13 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
                         meta=meta
                     )
                     sxs_conversations.append(conv)
-            
+                else:
+                    logger.warning(f"Could not find matching operational row for question_id={qid}")
+
             if sxs_conversations:
                 conversations = sxs_conversations
+            else:
+                logger.error("No side-by-side conversations could be reconstructed from properties and operational rows")
         
         # Create dataset
         dataset = PropertyDataset(
@@ -604,7 +663,35 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
         with open(properties_path, 'w') as f:
             for p in req.properties:
                 f.write(json.dumps(p, default=str) + '\n')
-        
+
+        # Save metrics DataFrames if available
+        if hasattr(clustered_dataset, 'model_stats') and clustered_dataset.model_stats:
+            import pandas as pd
+
+            # Save model_cluster_scores
+            if 'model_cluster_scores' in clustered_dataset.model_stats:
+                mcs_df = clustered_dataset.model_stats['model_cluster_scores']
+                if isinstance(mcs_df, pd.DataFrame) and not mcs_df.empty:
+                    mcs_path = results_dir / "model_cluster_scores_df.jsonl"
+                    mcs_df.to_json(mcs_path, orient='records', lines=True)
+                    logger.info(f"Saved model_cluster_scores_df.jsonl ({len(mcs_df)} rows)")
+
+            # Save cluster_scores
+            if 'cluster_scores' in clustered_dataset.model_stats:
+                cs_df = clustered_dataset.model_stats['cluster_scores']
+                if isinstance(cs_df, pd.DataFrame) and not cs_df.empty:
+                    cs_path = results_dir / "cluster_scores_df.jsonl"
+                    cs_df.to_json(cs_path, orient='records', lines=True)
+                    logger.info(f"Saved cluster_scores_df.jsonl ({len(cs_df)} rows)")
+
+            # Save model_scores
+            if 'model_scores' in clustered_dataset.model_stats:
+                ms_df = clustered_dataset.model_stats['model_scores']
+                if isinstance(ms_df, pd.DataFrame) and not ms_df.empty:
+                    ms_path = results_dir / "model_scores_df.jsonl"
+                    ms_df.to_json(ms_path, orient='records', lines=True)
+                    logger.info(f"Saved model_scores_df.jsonl ({len(ms_df)} rows)")
+
         # Save summary
         summary_path = results_dir / "summary.txt"
         with open(summary_path, 'w') as f:

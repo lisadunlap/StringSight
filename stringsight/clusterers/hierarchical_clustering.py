@@ -32,11 +32,10 @@ from typing import Optional, Dict, Union, List, Any
 from sklearn.cluster import AgglomerativeClustering, MiniBatchKMeans
 from sklearn.feature_extraction.text import CountVectorizer
 
-# Try relative import first, fall back to absolute import
-from .clustering_utils import llm_coarse_cluster_with_centers, _get_embeddings, _setup_embeddings, save_clustered_results, initialize_wandb, load_precomputed_embeddings
-
-# Import the new modular functions
-from .clustering_utils import generate_coarse_labels, assign_fine_to_coarse
+# Import from new modular files
+from .embeddings import _get_embeddings, _setup_embeddings
+from .llm_clustering import llm_coarse_cluster_with_centers, generate_coarse_labels, assign_fine_to_coarse
+from .persistence import save_clustered_results, initialize_wandb, load_precomputed_embeddings
 
 # Import the unified config
 from .config import ClusterConfig

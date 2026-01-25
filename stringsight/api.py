@@ -409,6 +409,69 @@ if final_results_path.exists():
     app.mount("/final_results", StaticFiles(directory=str(final_results_path)), name="final_results")
     logger.info(f"Mounted /final_results from {final_results_path.absolute()}")
 
+# -------------------------------------------------------------------------
+# Frontend serving (auto-enabled if frontend_dist exists)
+# -------------------------------------------------------------------------
+def find_frontend_dist() -> Path | None:
+    """Find the frontend dist directory in the package installation."""
+    # Try inside the stringsight package (installed location)
+    import stringsight
+    package_dir = Path(stringsight.__file__).parent
+    dist_path = package_dir / "frontend_dist"
+
+    if dist_path.exists() and (dist_path / "index.html").exists():
+        return dist_path
+
+    # Try relative to current working directory (for development)
+    cwd_dist = Path.cwd() / "stringsight" / "frontend_dist"
+    if cwd_dist.exists() and (cwd_dist / "index.html").exists():
+        return cwd_dist
+
+    return None
+
+# Auto-detect and mount frontend if available
+frontend_dist = find_frontend_dist()
+if frontend_dist:
+    from fastapi import Request
+    from fastapi.responses import FileResponse
+    from starlette.exceptions import HTTPException as StarletteHTTPException
+
+    # Mount assets directory for static files (JS, CSS, etc.)
+    assets_path = frontend_dist / "assets"
+    if assets_path.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_path)), name="assets")
+        logger.info(f"Mounted frontend assets from {assets_path}")
+
+    # Root route to serve index.html
+    @app.get("/")
+    async def serve_frontend_root():
+        """Serve the frontend application root."""
+        return FileResponse(frontend_dist / "index.html")
+
+    # Exception handler for SPA routing (serve index.html for 404s on non-API routes)
+    @app.exception_handler(StarletteHTTPException)
+    async def spa_exception_handler(request: Request, exc: StarletteHTTPException):
+        """Handle 404s by serving index.html for frontend SPA routing."""
+        # If it's a 404 and not an API route, serve the SPA
+        if exc.status_code == 404 and not request.url.path.startswith("/api"):
+            # Check if it's a static file in the frontend dist
+            file_path = frontend_dist / request.url.path.lstrip("/")
+            if file_path.is_file():
+                return FileResponse(file_path)
+            # Otherwise serve index.html for SPA routing
+            return FileResponse(frontend_dist / "index.html")
+
+        # For API routes or other errors, return JSON error
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail}
+        )
+
+    logger.info(f"Frontend auto-mounted from {frontend_dist}")
+else:
+    logger.info("Frontend not found - API-only mode")
+
 # NOTE:
 # All of the primary API endpoints are implemented in `stringsight/routers/*` and
 # are registered above via `app.include_router(...)`.
@@ -475,12 +538,12 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
 
         # Force-drop any pre-initialized global LMDB caches
         from stringsight.core import llm_utils as _llm_utils
-        from stringsight.clusterers import clustering_utils as _cu
+        from stringsight.clusterers import embeddings as _embed
         from stringsight.core.caching import UnifiedCache
 
         _orig_default_cache: UnifiedCache | None = getattr(_llm_utils, "_default_cache", None)
         _orig_default_llm_utils = getattr(_llm_utils, "_default_llm_utils", None)
-        _orig_embed_cache = getattr(_cu, "_cache", None)
+        _orig_embed_cache = getattr(_embed, "_cache", None)
         try:
             if hasattr(_llm_utils, "_default_cache"):
                 _llm_utils._default_cache = None  # type: ignore
@@ -490,8 +553,8 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
             # Intentionally silent - cache clearing is best-effort
             pass
         try:
-            if hasattr(_cu, "_cache"):
-                _cu._cache = None  # type: ignore
+            if hasattr(_embed, "_cache"):
+                _embed._cache = None  # type: ignore
         except Exception:
             # Intentionally silent - cache clearing is best-effort
             pass
@@ -949,7 +1012,13 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
         enriched = []
         total_conversations = {}
         for model in all_models:
-            model_convs = [c for c in conversations if c.model == model]
+            # Handle both single model strings and model arrays (for side-by-side)
+            if isinstance(conversations[0].model, list) if conversations else False:
+                # Side-by-side: check if model is in the array
+                model_convs = [c for c in conversations if model in c.model]
+            else:
+                # Single model: direct comparison
+                model_convs = [c for c in conversations if c.model == model]
             total_conversations[model] = len(model_convs)
 
         total_unique_conversations = len({c.question_id for c in conversations})

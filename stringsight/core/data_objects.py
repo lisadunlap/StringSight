@@ -97,17 +97,22 @@ class ConversationRecord:
                 winner = self.scores.get('winner')
             elif 'winner' in self.meta:
                 winner = self.meta.get('winner')
-                
+
             # If we have a winner but no explicit per-model scores list, generate it
             # Also handle case where scores is a list of empty dicts [{}, {}] which can happen from_dataframe
+            # Also handle case where scores = {'winner': 'model_name'} (needs conversion to numeric)
             is_effectively_empty = False
             if not self.scores:
                 is_effectively_empty = True
             elif isinstance(self.scores, list):
                 # Check if all elements are empty dicts or None
                 is_effectively_empty = all(not s for s in self.scores)
-            elif isinstance(self.scores, dict) and not self.scores:
-                 is_effectively_empty = True
+            elif isinstance(self.scores, dict):
+                if not self.scores:
+                    is_effectively_empty = True
+                elif 'winner' in self.scores and isinstance(self.scores.get('winner'), str):
+                    # scores = {'winner': 'model_name'} needs conversion to numeric
+                    is_effectively_empty = True
 
             if winner is not None and is_effectively_empty:
                 # Calculate scores (+1 winner, -1 loser, 0 tie)
@@ -320,11 +325,19 @@ class PropertyDataset:
                     # Format: score_a, score_b columns
                     scores_a = parse_score_field(row.get('score_a', {}))
                     scores_b = parse_score_field(row.get('score_b', {}))
+                elif 'score' in row and isinstance(row.get('score'), dict):
+                    # Format: single 'score' dict (e.g., {'winner': 'model_name'})
+                    # This will be converted to per-model scores in __post_init__
+                    score_dict = row.get('score')
+                    scores = score_dict  # Pass as dict, will be converted in __post_init__
                 else:
                     # No score data found
                     scores_a, scores_b = {}, {}
-                
-                scores = [scores_a, scores_b]
+                    scores = [scores_a, scores_b]
+
+                # Only set scores to list format if we handled score_a/score_b
+                if 'score_a' in row and 'score_b' in row:
+                    scores = [scores_a, scores_b]
                 
                 # Store winner and other metadata
                 meta_with_winner = {k: v for k, v in row.items() 
