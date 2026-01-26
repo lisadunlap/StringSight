@@ -7,74 +7,99 @@
 datasets:
   # All datasets now use fast paginated API endpoints
 
-  telecom:
-    name: "TauBench v2 - Telecom"
-    description: "Telecom customer service agent"
-     # cdn_url: "http://localhost:8000/final_results/telecom"
-    files: []
-    method: "single_model"
-    created_at: "2026-01-02"
+  # telecom:
+  #   name: "TauBench v2 - Telecom"
+  #   description: "Telecom customer service agent"
+  #   # cdn_url: "https://sons-uploaded-learn-man.trycloudflare.com/final_results/telecom"
+  #   files: []
+  #   method: "single_model"
+  #   created_at: "2026-01-02"
 
   airline:
-    name: "TauBench v2 - Airline"
+    category: "Customer Service & Dialog"
+    name: "TauBench v2 – Airline"
     description: "Airline customer service benchmark"
-    # cdn_url: "http://localhost:8000/final_results/airline"
+    # cdn_url: "https://sons-uploaded-learn-man.trycloudflare.com/final_results/airline"
     files: []
     method: "single_model"
     created_at: "2026-01-03"
   
   retail:
-    name: "TauBench v2 - Retail"
+    category: "Customer Service & Dialog"
+    name: "TauBench v2 – Retail"
     description: "Retail customer service benchmark"
-    # cdn_url: "http://localhost:8000/final_results/retail"
+    # cdn_url: "https://sons-uploaded-learn-man.trycloudflare.com/final_results/retail"
     files: []
     method: "single_model"
     created_at: "2026-01-03"
 
-  swe_smith_tool_trajectories:
-    name: "SWEBench Smith Tools"
+  swe_smith_tool:
+    category: "Coding"
+    name: "SWEBench Smith (Tools)"
     description: "SWEBench Smith dataset with tools"
-    # Uses /api/results/swe_smith_tool_trajectories/* endpoints
+    # cdn_url: "https://sons-uploaded-learn-man.trycloudflare.com/final_results/swe_smith_tool"
     files: []
     method: "single_model"
     created_at: "2026-01-02"
 
-  swe_smith_ticks_trajectories:
-    name: "SWEBench Smith Ticks"
+  swe_smith_ticks:
+    category: "Coding"
+    name: "SWEBench Smith (Ticks)"
     description: "SWEBench Smith dataset with ticks"
-    # Uses /api/results/swe_smith_ticks_trajectories/* endpoints
+    # cdn_url: "https://sons-uploaded-learn-man.trycloudflare.com/final_results/swe_smith_ticks"
     files: []
     method: "single_model"
     created_at: "2025-12-30"
 
-  medication_qa_2026-01-02:
+  swe_smith_xml:
+    category: "Coding"
+    name: "SWEBench Smith (XML)"
+    description: "SWEBench Smith dataset with XML"
+    # cdn_url: "https://sons-uploaded-learn-man.trycloudflare.com/final_results/swe_smith_xml"
+    files: []
+    method: "single_model"
+    created_at: "2025-12-30"
+
+  medication_qa:
+    category: "QA & Medical"
     name: "Medication QA"
     description: "Answering questions about medications"
-    # Uses /api/results/medication_qa_2026-01-02/* endpoints
+    # cdn_url: "https://sons-uploaded-learn-man.trycloudflare.com/final_results/medication_qa"
     files: []
     method: "single_model"
     created_at: "2026-01-02"
 
-  aci_bench_2026-01-03:
+  aci_bench:
+    category: "QA & Medical"
     name: "ACI Bench"
     description: "Summarizing doctor patient conversations"
-    # Uses /api/results/aci_bench_2026-01-03/* endpoints
+    # cdn_url: "https://sons-uploaded-learn-man.trycloudflare.com/final_results/aci_bench"
+    files: []
+    method: "single_model"
+    created_at: "2026-01-03"
+
+  # omni_math:
+  #   name: "Omni Math"
+  #   description: "Olympiad-level math problems"
+  #   # cdn_url: "https://sons-uploaded-learn-man.trycloudflare.com/final_results/omni_math"
+  #   files: []
+  #   method: "single_model"
+  #   created_at: "2026-01-03"
+
+  call_center:
+    category: "Customer Service & Dialog"
+    name: "Call Center"
+    description: "Summarizing IT customer service calls"
+    # cdn_url: "https://sons-uploaded-learn-man.trycloudflare.com/final_results/call_center"
     files: []
     method: "single_model"
     created_at: "2026-01-03"
 
   drunk_at_a_party:
+    category: "Fun"
     name: "Drunk at a Party"
     description: "Asking two LLM's to keep a conversation going while drunk at a party"
-    # cdn_url: "http://localhost:8000/final_results/drunk_at_a_party"
-    files: []
-    method: "single_model"
-    created_at: "2026-01-03"
-
-  omni_math_sample_100:
-    name: "Omni Math"
-    description: "Olympiad-level math problems"
-    # cdn_url: "http://localhost:8000/final_results/omni_math_sample_100"
+    # cdn_url: "https://sons-uploaded-learn-man.trycloudflare.com/final_results/drunk_at_a_party"
     files: []
     method: "single_model"
     created_at: "2026-01-03"

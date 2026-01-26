@@ -49,8 +49,8 @@ from stringsight import explain
 df = pd.read_json("your_data.jsonl", lines=True)
 
 # Or download the demo dataset
-# !wget https://raw.githubusercontent.com/lisadunlap/StringSight/main/airline_data_demo.jsonl
-# df = pd.read_json("airline_data_demo.jsonl", lines=True)
+# !wget https://raw.githubusercontent.com/lisadunlap/StringSight/main/data/airline_data_demo.jsonl
+# df = pd.read_json("data/airline_data_demo.jsonl", lines=True)
 ```
 
 ### Understanding the Data Format

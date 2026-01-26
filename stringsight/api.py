@@ -391,10 +391,10 @@ from stringsight.routers import (
     clustering,
 )
 
-# Include existing jobs router
-app.include_router(jobs_router)
+# Include existing jobs router (with /api prefix to match frontend's /api/api/v1/jobs pattern)
+app.include_router(jobs_router, prefix="/api")
 
-# Include all refactored routers
+# Include all refactored routers (no prefix - they're accessed via /api/{endpoint} from frontend)
 app.include_router(health.router)
 app.include_router(dataframe.router)
 app.include_router(prompts.router)

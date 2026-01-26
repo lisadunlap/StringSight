@@ -34,8 +34,8 @@ COPY --from=builder /install /usr/local
 
 # Copy ONLY application code (not test data, not docs, not demos)
 COPY stringsight/ ./stringsight/
-COPY alembic/ ./alembic/
-COPY alembic.ini .
+COPY infrastructure/database/alembic/ ./alembic/
+COPY infrastructure/database/alembic.ini .
 COPY requirements.txt ./requirements.txt
 COPY pyproject.toml .
 COPY check_jobs.py .
@@ -45,7 +45,7 @@ COPY scripts/ ./scripts/
 RUN useradd -m appuser && chown -R appuser:appuser /app
 
 # Copy entrypoint script
-COPY docker/docker-entrypoint.sh /usr/local/bin/
+COPY infrastructure/docker/docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENTRYPOINT ["docker-entrypoint.sh"]

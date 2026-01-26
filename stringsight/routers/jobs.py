@@ -16,7 +16,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/jobs", tags=["jobs"])
+router = APIRouter(prefix="/v1/jobs", tags=["jobs"])
 
 @router.post("/pipeline")
 async def start_pipeline_job(

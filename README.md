@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/stringsight_github.png" alt="StringSight logo" width="600">
+  <img src="docs/assets/stringsight_github.png" alt="StringSight logo" width="600">
 </p>
 
 <p align="center">
@@ -59,7 +59,7 @@ stringsight stop
 
 The UI will be available at [http://localhost:5180](http://localhost:5180).
 
-For tutorials and examples, see [starter_notebook.ipynb](starter_notebook.ipynb) or [Google Colab](https://colab.research.google.com/drive/1XBQqDqTK6-9wopqRB51j8cPfnTS5Wjqh?usp=drive_link).
+For tutorials and examples, see [notebooks/starter_notebook.ipynb](notebooks/starter_notebook.ipynb) or [Google Colab](https://colab.research.google.com/drive/1XBQqDqTK6-9wopqRB51j8cPfnTS5Wjqh?usp=drive_link).
 
 ### Install from source
 
@@ -251,7 +251,8 @@ See the [documentation](https://lisadunlap.github.io/StringSight/) for:
 
 - **Full Documentation**: [https://lisadunlap.github.io/StringSight/](https://lisadunlap.github.io/StringSight/)
 - **DEMO Website**: [https://stringsight.com](https://stringsight.com)
-- **Tutorial Notebook**: [starter_notebook.ipynb](starter_notebook.ipynb)
+- **Tutorial Notebook**: [notebooks/starter_notebook.ipynb](notebooks/starter_notebook.ipynb)
+- **Local Documentation**: [docs/](docs/) - Development docs, API reference, testing guide, and more
   
 ## Contributing
 

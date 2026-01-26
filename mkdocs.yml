@@ -26,8 +26,8 @@ theme:
       toggle:
         icon: material/brightness-7
         name: Switch to light mode
-  logo: assets/stringsight_logo.png
-  favicon: assets/stringsight_logo.png
+  logo: docs/assets/stringsight_logo.png
+  favicon: docs/assets/stringsight_logo.png
   font:
     text: Roboto
     code: Roboto Mono
