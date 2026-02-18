@@ -26,7 +26,7 @@ class FixedAxesLabeler(OpenAIExtractor):
         model: str = "gpt-4.1-mini",
         temperature: float = 0.0,
         top_p: float = 1.0,
-        max_tokens: int = 2048,
+        max_tokens: int = 16000,
         max_workers: int = DEFAULT_MAX_WORKERS,
         cache_dir: str = ".cache/stringsight",
         prompt_builder: Optional[Callable] = None,

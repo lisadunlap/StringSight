@@ -1,9 +1,10 @@
 data_path: data/taubench/retail_data.jsonl
-output_dir: results/taubench_retail
+output_dir: results/taubench_retail_annotator_gemini-2-5-pro
 method: single_model
 min_cluster_size: 5
-extraction_model: gpt-5
-summary_model: gpt-5
+extraction_model: gemini/gemini-2.5-pro
+summary_model: gemini/gemini-2.5-pro
+cluster_assignment_model: gemini/gemini-2.5-flash
 embedding_model: text-embedding-3-large
 max_workers: 16
 groupby_column: behavior_type

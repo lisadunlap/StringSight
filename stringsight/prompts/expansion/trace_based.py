@@ -55,7 +55,7 @@ class TraceBasedExpander(PromptExpander):
         model: str = "gpt-4.1",
         num_traces: int = 5,
         temperature: float = 0.0,
-        max_tokens: int = 2000,
+        max_tokens: int = 2048,
         seed: int = 42,
     ):
         """Initialize the trace-based expander.
@@ -185,7 +185,7 @@ def expand_task_description(
     model: str = "gpt-4.1",
     num_traces: int = 5,
     temperature: float = 0.0,
-    max_tokens: int = 2000,
+    max_tokens: int = 2048,
     seed: int = 42,
 ) -> str:
     """Convenience function to expand a task description using traces.
@@ -196,7 +196,7 @@ def expand_task_description(
         model: LLM model to use for expansion (default: "gpt-4.1").
         num_traces: Number of traces to sample for expansion (default: 5).
         temperature: Temperature for LLM generation (default: 0.0 for determinism).
-        max_tokens: Maximum tokens for expansion response (default: 2000).
+        max_tokens: Maximum tokens for expansion response (default: 2048).
         seed: Random seed for deterministic sampling (default: 42).
 
     Returns:

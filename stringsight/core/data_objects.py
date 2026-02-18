@@ -148,6 +148,7 @@ class Property:
     reason: str | None = None
     evidence: str | None = None
     behavior_type: str | None = None # Positive|Negative (non-critical)|Negative (critical)|Style
+    role: str | None = None # Role/component this property describes (e.g., "user", "assistant", "tool", or custom roles)
 
     # Raw LLM response (captured by extractor before parsing)
     raw_response: str | None = None

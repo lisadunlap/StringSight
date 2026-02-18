@@ -454,6 +454,9 @@ if frontend_dist:
         """Handle 404s by serving index.html for frontend SPA routing."""
         # If it's a 404 and not an API route, serve the SPA
         if exc.status_code == 404 and not request.url.path.startswith("/api"):
+            # frontend_dist is guaranteed to be non-None here since this handler
+            # is only registered when frontend_dist is not None
+            assert frontend_dist is not None
             # Check if it's a static file in the frontend dist
             file_path = frontend_dist / request.url.path.lstrip("/")
             if file_path.is_file():
@@ -642,6 +645,7 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
                     reason=p.get("reason"),
                     evidence=p.get("evidence"),
                     behavior_type=p.get("behavior_type"),
+                    role=p.get("role"),
                     raw_response=p.get("raw_response"),
                     contains_errors=p.get("contains_errors"),
                     unexpected_behavior=p.get("unexpected_behavior"),
@@ -671,37 +675,81 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
 
         logger.info(f"Found {len(property_keys)} unique (question_id, model) pairs from {len(properties)} properties")
 
+        # Build a map of (question_id, model) -> original row data from property meta
+        row_data_map = {}
+        props_with_meta = 0
+        props_with_original_row = 0
+        props_with_scores = 0
+
+        for prop in properties:
+            key = (prop.question_id, cast(str, prop.model))
+
+            # Debug: check meta structure
+            if hasattr(prop, 'meta'):
+                props_with_meta += 1
+
+            # Check if property has original_row stored in meta
+            if hasattr(prop, 'meta') and isinstance(prop.meta, dict) and 'original_row' in prop.meta:
+                props_with_original_row += 1
+                row_data = prop.meta['original_row']
+                row_data_map[key] = row_data
+
+                # Check if original_row has scores
+                if 'score' in row_data or 'scores' in row_data:
+                    props_with_scores += 1
+
+        logger.info(f"🔍 Clustering: Property meta analysis:")
+        logger.info(f"   - Total properties: {len(properties)}")
+        logger.info(f"   - Properties with meta: {props_with_meta}")
+        logger.info(f"   - Properties with original_row: {props_with_original_row}")
+        logger.info(f"   - Properties with scores in original_row: {props_with_scores}")
+
+        if props_with_original_row > 0:
+            # Sample one property with original_row
+            sample_prop = next((p for p in properties if hasattr(p, 'meta') and 'original_row' in p.meta), None)
+            if sample_prop:
+                sample_row = sample_prop.meta['original_row']
+                logger.info(f"   - Sample original_row keys: {list(sample_row.keys())}")
+                if 'score' in sample_row or 'scores' in sample_row:
+                    score_data = sample_row.get('score') or sample_row.get('scores')
+                    logger.info(f"   - Sample score data: {score_data}")
+
         # Create exactly one conversation per unique (question_id, model) pair
         matches_found = 0
         for question_id, model in property_keys:
             all_models.add(model)
 
-            # Find matching operational row for this conversation
-            matching_row = None
-            for row in req.operationalRows:
-                row_qid = str(row.get("question_id", ""))
-                row_model = str(row.get("model", ""))
+            # First try to get row data from property meta (fastest and most accurate)
+            matching_row = row_data_map.get((question_id, model))
+            if matching_row:
+                matches_found += 1
+            else:
+                # Fallback: Find matching operational row for this conversation
+                for row in req.operationalRows:
+                    row_qid = str(row.get("question_id", ""))
+                    row_model = str(row.get("model", ""))
 
-                # Try exact match first
-                if row_qid == question_id and row_model == model:
-                    matching_row = row
-                    matches_found += 1
-                    break
+                    # Try exact match first
+                    if row_qid == question_id and row_model == model:
+                        matching_row = row
+                        matches_found += 1
+                        break
 
-                # If no exact match, try matching on base question_id (strip suffix after '-')
-                row_qid_base = row_qid.split('-')[0] if '-' in row_qid else row_qid
-                question_id_base = question_id.split('-')[0] if '-' in question_id else question_id
+                    # If no exact match, try matching on base question_id (strip suffix after '-')
+                    row_qid_base = row_qid.split('-')[0] if '-' in row_qid else row_qid
+                    question_id_base = question_id.split('-')[0] if '-' in question_id else question_id
 
-                if (row_qid_base == question_id or row_qid == question_id_base) and row_model == model:
-                    matching_row = row
-                    matches_found += 1
-                    break
+                    if (row_qid_base == question_id or row_qid == question_id_base) and row_model == model:
+                        matching_row = row
+                        matches_found += 1
+                        break
 
             # Create minimal conversation (use empty data if no matching row found)
             if matching_row:
                 scores = matching_row.get("score") or matching_row.get("scores") or {}
             else:
                 scores = {}
+                logger.warning(f"No matching row found for property (question_id={question_id}, model={model}). Metrics will be empty for this conversation.")
 
             # Try both 'model_response' and 'responses' for compatibility
             response_value = ""
@@ -835,6 +883,24 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
         min_cluster_size = params.minClusterSize if params and params.minClusterSize else 3
         embedding_model = params.embeddingModel if params else "text-embedding-3-small"
         groupby_column = None if params.groupBy == "none" else params.groupBy
+
+        # Force role grouping when role-based extraction metadata is present.
+        # HDBSCANClusterer will then combine role + behavior_type internally.
+        has_role_metadata = any(
+            isinstance(prop.role, str) and prop.role.strip()
+            for prop in properties
+        )
+        has_behavior_type_metadata = any(
+            isinstance(prop.behavior_type, str) and prop.behavior_type.strip()
+            for prop in properties
+        )
+        if has_role_metadata and has_behavior_type_metadata:
+            if groupby_column != "role":
+                logger.info(
+                    "Overriding groupby_column=%s to 'role' because properties include role and behavior_type metadata",
+                    groupby_column,
+                )
+            groupby_column = "role"
 
         with _CLUSTER_JOBS_LOCK:
             job.progress = 0.35
@@ -983,6 +1049,25 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
         logger.info(f"✓ Metrics computed: {len(model_cluster_scores_array)} model_cluster_scores, "
                    f"{len(cluster_scores_array)} cluster_scores, {len(model_scores_array)} model_scores")
 
+        # Debug: check if metrics have quality data
+        if model_cluster_scores_array:
+            sample_metric = model_cluster_scores_array[0]
+            quality_keys = [k for k in sample_metric.keys() if k.startswith('quality_')]
+            logger.info(f"   - Sample model_cluster_score keys: {list(sample_metric.keys())[:10]}...")
+            logger.info(f"   - Quality metric keys found: {quality_keys[:5]}...")
+        else:
+            logger.warning("   ⚠️ model_cluster_scores_array is EMPTY!")
+
+        if model_scores_array:
+            sample = model_scores_array[0]
+            logger.info(f"   - Sample model_score: {sample.get('model', 'no model')}, size={sample.get('size', 0)}")
+        else:
+            logger.warning("   ⚠️ model_scores_array is EMPTY!")
+
+        # Metrics narrative insights are temporarily disabled.
+        metrics_insights = None
+        logger.info("✓ Metrics insights generation is disabled")
+
         # Save metrics if output_dir specified
         if req.output_dir and results_dir_name:
             results_dir = _get_results_dir() / results_dir_name
@@ -1033,6 +1118,7 @@ async def _run_cluster_job_async(job: ClusterJob, req: ClusterRunRequest):
             "total_conversations_by_model": total_conversations,
             "total_unique_conversations": total_unique_conversations,
             "results_dir": results_dir_name,
+            "metrics_insights": metrics_insights,
             "metrics": {
                 "model_cluster_scores": model_cluster_scores_array,
                 "cluster_scores": cluster_scores_array,

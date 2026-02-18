@@ -45,6 +45,70 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
         self.storage = storage or get_storage_adapter()
         self.max_workers = kwargs.get('max_workers', 8)
 
+    @staticmethod
+    def _infer_role_from_behavior_type(behavior_type: Any) -> str | None:
+        """Infer role bucket from behavior_type when role is omitted.
+
+        Args:
+            behavior_type: Raw behavior type from parsed property JSON.
+
+        Returns:
+            str | None:
+                - `"user"` for user taxonomy (`phrasing`, `domain`, `skills_required`)
+                - `"non_user"` for non-user taxonomy labels
+                - `None` when behavior_type is missing/empty
+        """
+        if behavior_type is None:
+            return None
+
+        behavior_token = str(behavior_type).strip().lower()
+        if behavior_token == "":
+            return None
+
+        # Normalize separators so label variants still map correctly.
+        behavior_token_normalized = (
+            behavior_token
+            .replace("-", "_")
+            .replace(" ", "_")
+        )
+
+        user_behavior_types = {
+            "phrasing",
+            "domain",
+            "problem_domain",
+            "skills_required",
+            # Legacy / dynamic user labels.
+            "clear_input",
+            "problematic_input",
+            "ambiguous_request",
+        }
+        if behavior_token_normalized in user_behavior_types:
+            return "user"
+        return "non_user"
+
+    @staticmethod
+    def _normalize_user_behavior_type(behavior_type: Any) -> str | None:
+        """Normalize user behavior_type to canonical capitalized form for storage.
+
+        Args:
+            behavior_type: Raw behavior type from parsed property JSON.
+
+        Returns:
+            str | None: Canonical form ("Phrasing", "Problem Domain", "Skills Required")
+                or None when not a user type or empty.
+        """
+        if behavior_type is None:
+            return None
+        token = str(behavior_type).strip().lower().replace("-", "_").replace(" ", "_")
+        mapping = {
+            "phrasing": "Phrasing",
+            "domain": "Problem Domain",
+            "problem_domain": "Problem Domain",
+            "skills_required": "Skills Required",
+            "skillsrequired": "Skills Required",
+        }
+        return mapping.get(token)
+
     def _parse_single_property(self, index: int, prop: Property, total_props: int) -> Dict[str, Any]:
         """Parse a single property response. Returns dict with results and errors."""
         parsed_properties: List[Property] = []
@@ -112,26 +176,54 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
 
         # Create Property objects
         for prop_dict in prop_dicts:
+            # Determine role first so side-by-side model mapping can use it.
+            role_from_llm = prop_dict.get("role")
+            role_from_prop = getattr(prop, 'role', None)
+            final_role = role_from_llm or role_from_prop
+            if final_role is None:
+                bt = prop_dict.get("behavior_type") or prop_dict.get("behaviorType")
+                final_role = self._infer_role_from_behavior_type(bt)
+
             # Map model name from LLM response (e.g., "Model A") to actual model name
             # For side-by-side comparisons, prop.model is [model_a, model_b]
             if isinstance(prop.model, list):
                 llm_model_name = prop_dict.get("model", "")
                 mapped_model = model_name_pass(llm_model_name, prop.model[0], prop.model[1])
 
-                # Skip properties where model mapping failed
+                # In role-bucket extraction, user/non_user properties may not include
+                # per-model labels ("Model A"/"Model B"). Keep them by anchoring to
+                # model_a so they are not dropped before clustering.
                 if mapped_model == "unknown":
-                    errors.append({
-                        'property_id': prop.id,
-                        'question_id': prop.question_id,
-                        'model': prop.model,
-                        'llm_model_name': llm_model_name,
-                        'error_type': 'UNKNOWN_MODEL_MAPPING',
-                        'error_message': f'Could not map LLM model name "{llm_model_name}" to actual model. Expected "Model A" or "Model B".',
-                        'index': index
-                    })
-                    continue
+                    if isinstance(final_role, str) and final_role in {"user", "non_user"}:
+                        mapped_model = prop.model[0]
+                    else:
+                        errors.append({
+                            'property_id': prop.id,
+                            'question_id': prop.question_id,
+                            'model': prop.model,
+                            'llm_model_name': llm_model_name,
+                            'error_type': 'UNKNOWN_MODEL_MAPPING',
+                            'error_message': f'Could not map LLM model name "{llm_model_name}" to actual model. Expected "Model A" or "Model B".',
+                            'index': index
+                        })
+                        continue
             else:
                 mapped_model = prop.model
+
+            # Debug logging for role assignment
+            if index == 0:  # Only log for first property to avoid spam
+                self.log(f"🔍 Role assignment debug:")
+                self.log(f"   - role from LLM response: {role_from_llm}")
+                self.log(f"   - role from original property: {role_from_prop}")
+                self.log(f"   - final role value: {final_role}")
+
+            # Support both snake_case and camelCase; some LLMs return "behaviorType"
+            behavior_type = prop_dict.get("behavior_type") or prop_dict.get("behaviorType")
+            # Normalize user behavior types to canonical capitalized form
+            if final_role == "user":
+                canonical = LLMJsonParser._normalize_user_behavior_type(behavior_type)
+                if canonical:
+                    behavior_type = canonical
 
             new_prop = Property(
                 id=str(uuid.uuid4()),
@@ -141,7 +233,10 @@ class LLMJsonParser(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin, P
                 reason=prop_dict.get("reason"),
                 evidence=prop_dict.get("evidence"),
                 category=prop_dict.get("category"),
-                behavior_type=prop_dict.get("behavior_type"),
+                behavior_type=behavior_type,
+                # Preserve role from original property (set during multi-pass extraction)
+                # or extract from LLM response if present
+                role=final_role,
                 unexpected_behavior=prop_dict.get("unexpected_behavior"),
                 contains_errors=prop_dict.get("contains_errors"),
                 raw_response=prop.raw_response,

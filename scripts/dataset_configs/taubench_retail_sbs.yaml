@@ -1,8 +1,11 @@
 data_path: data/taubench/retail_data.jsonl
-output_dir: results/taubench_retail_sbs
+output_dir: results/taubench_retail_sbs_annotator_anthropic-claude-sonnet-4-20250514
 method: side_by_side
-model_a: gpt-4.1
+model_a: gpt-4o
 model_b: claude-sonnet-35
+extraction_model: anthropic/claude-sonnet-4-20250514
+summary_model: anthropic/claude-sonnet-4-20250514
+cluster_assignment_model: gemini/gemini-2.5-flash
 min_cluster_size: 5
 embedding_model: text-embedding-3-large
 max_workers: 16

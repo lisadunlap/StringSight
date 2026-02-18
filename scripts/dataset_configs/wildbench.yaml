@@ -3,6 +3,9 @@ output_dir: results/wildbench_grok_4_0709_grok_3_beta_sample
 method: side_by_side
 min_cluster_size: 8
 embedding_model: text-embedding-3-large
+extraction_model: gemini/gemini-2.5-pro
+summary_model: gemini/gemini-2.5-pro
+cluster_assignment_model: openai/gpt-5-nano
 max_workers: 16
 groupby_column: behavior_type
 assign_outliers: false

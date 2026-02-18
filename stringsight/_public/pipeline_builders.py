@@ -35,6 +35,8 @@ def build_default_pipeline(
     metrics_cache_dir: str | None = None,
     output_dir: str | None = "./results",
     custom_clustering_prompts: Dict[str, str] | None = None,
+    extract_by_role: list[str] | None = None,
+    use_dynamic_prompts: bool = False,
     **kwargs
 ) -> Pipeline:
     """
@@ -81,6 +83,8 @@ def build_default_pipeline(
         'max_tokens': max_tokens,
         'max_workers': max_workers,
         'include_scores_in_prompt': include_scores_in_prompt,
+        'extract_by_role': extract_by_role,
+        'use_dynamic_prompts': use_dynamic_prompts,
         'output_dir': extraction_output,
         **common_config
     }
@@ -120,12 +124,17 @@ def build_default_pipeline(
         'output_dir': clustering_output,
         **common_config
     }
-    # Default to stratified clustering by behavior_type unless overridden by caller
-    if not kwargs or 'groupby_column' not in kwargs:
+    # Auto-configure clustering strategy based on extraction mode
+    if extract_by_role:
+        # If role extraction is enabled, ALWAYS cluster by role (override any groupby_column in kwargs)
+        clusterer_kwargs['groupby_column'] = 'role'
+    elif not kwargs or 'groupby_column' not in kwargs:
+        # Default to stratified clustering by behavior_type
         clusterer_kwargs['groupby_column'] = 'behavior_type'
-    # Forward any additional clusterer-specific kwargs (e.g., groupby_column)
+    # Forward any additional clusterer-specific kwargs (EXCEPT groupby_column when extract_by_role is set)
     if kwargs:
-        clusterer_kwargs.update(kwargs)
+        kwargs_to_forward = {k: v for k, v in kwargs.items() if not (extract_by_role and k == 'groupby_column')}
+        clusterer_kwargs.update(kwargs_to_forward)
 
     # Ensure LLM concurrency for clustering calls follows extraction max_workers by default
     # unless explicitly overridden by caller via kwargs

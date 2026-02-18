@@ -145,7 +145,7 @@ class ClusteringPromptCustomizer:
                     {"role": "user", "content": customization_prompt}
                 ],
                 temperature=0.0,
-                max_tokens=2000
+                max_tokens=2048
             )
 
             customized_prompt = response.choices[0].message.content.strip()

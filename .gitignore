@@ -5,6 +5,12 @@ benchmark/
 helm/
 tests/outputs/
 
+# Test outputs
+test_output*/
+final_results/
+tau2/
+taxonomies/
+
 # Vercel deployment
 vercel.json
 .vercelignore
@@ -23,6 +29,24 @@ playground.ipynb
 # Generated output files
 *.html
 model_cluster_proportion_plot.html
+
+# Database and logs
+*.db
+*.log
+timing_debug.log
+
+# Large data files
+*.json
+!package.json
+!tsconfig.json
+model_behavior_data.csv
+
+# AWS artifacts
+aws/
+awscliv2.zip
+
+# Temporary scripts
+misc/
 
 # Temporary/test files
 test_conversation_parsing.js
@@ -82,4 +106,5 @@ docker-compose.override.yml
 frontend/node_modules/
 frontend/dist/
 frontend/.env
-stringsight/frontend_dist/
+stringsight/frontend_dist/Caddyfile
+deploy-caddy-config.sh

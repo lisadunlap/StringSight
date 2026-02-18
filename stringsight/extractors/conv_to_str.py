@@ -298,6 +298,116 @@ def conv_to_str(conv: Any) -> str:
     )
 
 
+def conv_to_str_by_role(conv: Any, role: str, include_turn_numbers: bool = True) -> str:
+    """
+    Convert an OAI conversation object to a string, filtering by specific role.
+    
+    This extracts only messages from the specified role, useful for role-specific
+    property extraction (e.g., analyzing only user inputs or only assistant responses).
+    
+    Args:
+        conv: OAI conversation object (list of message dicts)
+        role: Role filter token. Supported values:
+            - Exact roles such as "user", "assistant", "tool", "system", or custom roles
+            - "non_user" to include all messages where message role is not "user"
+        include_turn_numbers: If True, includes turn numbers for multi-turn context
+        
+    Returns:
+        String containing only messages from the specified role, wrapped in markers.
+        
+    Examples:
+        >>> conv = [{"role": "user", "content": "Hi"}, {"role": "assistant", "content": "Hello"}]
+        >>> conv_to_str_by_role(conv, "user")
+        "## BEGINNING OF CONVERSATION TO ANAZLYZE\\n\\n**user (turn 1):**\\nHi\\n## END..."
+    """
+    def _format_message_content(msg: Dict[str, Any]) -> str:
+        """Format the content and any associated tool calls for a single message."""
+        content = msg.get("content", "")
+        content_str = convert_content_to_str(content)
+
+        tool_calls_val = msg.get("tool_calls", None)
+        tool_calls_str = ""
+        if tool_calls_val is not None and tool_calls_val != []:
+            tool_calls_str = convert_tool_calls_to_str(tool_calls_val)
+
+        if tool_calls_str:
+            if content_str:
+                return f"{content_str}\n\nTool calls:\n{tool_calls_str}"
+            return tool_calls_str
+        return content_str
+
+    # Handle non-list conversations
+    if not isinstance(conv, list):
+        body = str(conv)
+        return (
+            f"## BEGINNING OF {role.upper()} MESSAGES TO ANALYZE\n"
+            f"{body}\n"
+            f"## END OF {role.upper()} MESSAGES TO ANALYZE"
+        )
+
+    # Filter messages by role
+    ret = []
+    turn_number = 0
+    role_lower = role.lower()
+    
+    for msg in conv:
+        # Handle non-dict messages
+        if not isinstance(msg, dict):
+            continue
+            
+        # Get message role
+        msg_role = str(msg.get("role", "unknown"))
+        msg_role_lower = msg_role.lower()
+        
+        # Skip messages that do not match the target role filter
+        if role_lower == "non_user":
+            if msg_role_lower == "user":
+                continue
+        elif msg_role_lower != role_lower:
+            continue
+            
+        turn_number += 1
+        
+        # Special handling for tool messages
+        if msg_role == "tool":
+            name = msg.get("name", "<unnamed_tool>")
+            body = _format_message_content(msg)
+            if include_turn_numbers:
+                ret.append(f"**output of tool {name} (turn {turn_number})**\n{body}")
+            else:
+                ret.append(f"**output of tool {name}**\n{body}")
+        else:
+            # Regular message formatting
+            body = _format_message_content(msg)
+            
+            # Include turn number and name/id if present
+            role_label = f"**{msg_role}"
+            if include_turn_numbers:
+                role_label += f" (turn {turn_number})"
+            if "name" in msg:
+                name = str(msg["name"])
+                if "id" in msg:
+                    msg_id = str(msg["id"])
+                    role_label += f" {name} (id: {msg_id})"
+                else:
+                    role_label += f" {name}"
+            role_label += ":**"
+            
+            ret.append(f"\n{role_label}\n{body}")
+    
+    # If no messages found for this role, return a note
+    if not ret:
+        body = f"(No messages found with role '{role}')"
+    else:
+        body = "\n\n".join(ret)
+    
+    return (
+        f"## BEGINNING OF {role.upper()} MESSAGES TO ANALYZE\n"
+        f"{body}\n"
+        f"## END OF {role.upper()} MESSAGES TO ANALYZE"
+    )
+
+
 def simple_to_oai_format(prompt: str, response: str) -> list:
     """
     Convert a simple prompt-response pair to OAI format.

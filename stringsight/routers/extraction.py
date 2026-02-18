@@ -260,11 +260,13 @@ async def label_run(req: LabelRequest) -> Dict[str, Any]:
     # Define core output columns that should be displayed in the table
     core_columns = [
         "id", "question_id", "category", "property_description", "reason", "evidence", "model",
-        "cluster_id", "cluster_label"
+        "role", "cluster_id", "cluster_label"
     ]
 
-    # Vectorized conversion: filter to core columns and convert to dict records
-    filtered_df = clustered_df[core_columns].copy()
+    # Vectorized conversion: filter to core columns that exist and convert to dict records
+    # Only select columns that actually exist in the DataFrame
+    existing_core_columns = [col for col in core_columns if col in clustered_df.columns]
+    filtered_df = clustered_df[existing_core_columns].copy()
 
     # Replace NaN with None for JSON serialization
     filtered_df = filtered_df.where(pd.notna(filtered_df), None)
@@ -392,6 +394,8 @@ async def extract_single(req: ExtractSingleRequest) -> Dict[str, Any]:
             use_wandb=req.use_wandb or False,
             output_dir=req.output_dir,
             return_debug=req.return_debug or False,
+            extract_by_role=req.extract_by_role if hasattr(req, 'extract_by_role') else None,
+            use_dynamic_role_prompts=req.use_dynamic_role_prompts if hasattr(req, 'use_dynamic_role_prompts') else False,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -405,7 +409,32 @@ async def extract_single(req: ExtractSingleRequest) -> Dict[str, Any]:
         dataset, failures = result, []
 
     # Return parsed properties for this single row
-    props = [p.to_dict() for p in dataset.properties]
+    # Attach the original row data to each property so clustering can reconstruct conversations with scores
+    props = []
+    for p in dataset.properties:
+        p_dict = p.to_dict()
+        # Store the original row data in meta.original_row for easy conversation reconstruction
+        if not p_dict.get('meta'):
+            p_dict['meta'] = {}
+        p_dict['meta']['original_row'] = req.row
+        props.append(p_dict)
+
+    # Debug logging
+    logger.info(f"✅ Extraction: Added original_row to {len(props)} properties")
+    if props:
+        has_scores = 'score' in req.row or 'scores' in req.row
+        logger.info(f"   - Original row has scores: {has_scores}")
+        if has_scores:
+            scores = req.row.get('score') or req.row.get('scores')
+            logger.info(f"   - Score keys: {list(scores.keys()) if isinstance(scores, dict) else 'not a dict'}")
+
+        # Check if properties have role field populated
+        roles_in_props = [p.get('role') for p in props]
+        unique_roles = set(r for r in roles_in_props if r is not None)
+        logger.info(f"   - Properties with role field: {sum(1 for r in roles_in_props if r is not None)}/{len(props)}")
+        if unique_roles:
+            logger.info(f"   - Unique roles found: {unique_roles}")
+
     response = {
         "properties": props,
         "counts": {"properties": len(props)},
@@ -429,6 +458,8 @@ async def extract_batch(req: ExtractBatchRequest) -> Dict[str, Any]:
     df = pd.DataFrame(req.rows)
 
     logger.info(f"extract_batch called with sample_size={req.sample_size}, total rows={len(df)}")
+    logger.info(f"🔍 extract_by_role parameter: {req.extract_by_role}")
+    logger.info(f"🔍 use_dynamic_role_prompts parameter: {req.use_dynamic_role_prompts}")
 
     # Apply sample_size if specified
     if req.sample_size and req.sample_size < len(df):
@@ -485,6 +516,8 @@ async def extract_batch(req: ExtractBatchRequest) -> Dict[str, Any]:
             use_wandb=req.use_wandb or False,
             output_dir=req.output_dir,
             return_debug=req.return_debug or False,
+            extract_by_role=req.extract_by_role if hasattr(req, 'extract_by_role') else None,
+            use_dynamic_role_prompts=req.use_dynamic_role_prompts if hasattr(req, 'use_dynamic_role_prompts') else False,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -614,6 +647,8 @@ async def _run_extract_job_async(job: ExtractJob, req: ExtractJobStartRequest):
             include_scores_in_prompt=False if req.include_scores_in_prompt is None else req.include_scores_in_prompt,
             verbose=False,
             use_wandb=False,
+            extract_by_role=req.extract_by_role,  # Pass role extraction parameter
+            use_dynamic_prompts=req.use_dynamic_role_prompts or False,  # Pass dynamic role prompts parameter
         )
 
         # Run extraction with progress callback
@@ -796,6 +831,8 @@ async def extract_stream(req: ExtractBatchRequest):
             include_scores_in_prompt=req.include_scores_in_prompt or False,
             verbose=False,
             use_wandb=False,
+            extract_by_role=req.extract_by_role,  # Pass role extraction parameter
+            use_dynamic_prompts=req.use_dynamic_role_prompts or False,  # Pass dynamic role prompts parameter
         )
 
         # Extract properties (this runs in parallel internally)

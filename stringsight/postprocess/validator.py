@@ -140,7 +140,7 @@ class PropertyValidator(LoggingMixin, PipelineStage):
 
         A property is considered invalid if:
         1. property_description is None, empty, or only whitespace
-        2. behavior_type is specified but not in the allowed set
+        2. behavior_type is specified but not in the allowed set for non-user roles
 
         Invalid properties will be excluded from clustering and metrics calculations.
         """
@@ -148,17 +148,93 @@ class PropertyValidator(LoggingMixin, PipelineStage):
         if not (prop.property_description and prop.property_description.strip()):
             return False
 
-        # Validate behavior_type if present AND non-empty
+        # Validate behavior_type if present AND non-empty.
         # Note: For fixed-taxonomy labeling (FixedAxesLabeler), behavior_type is not used
-        # and will be None or empty, which is perfectly valid
+        # and will be None or empty, which is valid.
+        #
+        # User-role extraction can emit richer/free-form behavior labels depending
+        # on prompt mode. Preserve those labels instead of dropping properties.
         if prop.behavior_type and prop.behavior_type.strip():
-            allowed_types = {
-                "Positive",
-                "Negative (critical)",
-                "Negative (non-critical)",
-                "Style"
-            }
-            if prop.behavior_type not in allowed_types:
-                return False
+            role_token = str(prop.role).strip().lower() if prop.role else ""
 
-        return True 
+            # When role is empty, infer from behavior_type to avoid filtering user
+            # properties (Phrasing, Domain, Skills Required) that lack explicit role.
+            if not role_token and self._is_user_behavior_type(prop.behavior_type):
+                role_token = "user"
+
+            if role_token != "user":
+                behavior_type = prop.behavior_type.strip()
+                allowed_types = self._allowed_behavior_types_for_role(role_token)
+                if behavior_type not in allowed_types:
+                    return False
+
+        return True
+
+    @staticmethod
+    def _is_user_behavior_type(behavior_type: str) -> bool:
+        """Return True if behavior_type indicates a user-role property.
+
+        Args:
+            behavior_type: Raw behavior type from parsed property.
+
+        Returns:
+            bool: True when the behavior type is from user-prompt taxonomy
+                (phrasing, domain, skills_required, or legacy labels).
+        """
+        token = str(behavior_type).strip().lower().replace("-", "_").replace(" ", "_")
+        user_types = {
+            "phrasing",
+            "domain",
+            "problem_domain",
+            "skills_required",
+            "clear_input",
+            "problematic_input",
+            "ambiguous_request",
+        }
+        return token in user_types
+
+    @staticmethod
+    def _allowed_behavior_types_for_role(role_token: str) -> set[str]:
+        """Return allowed behavior_type labels by role bucket.
+
+        Args:
+            role_token: Lowercased role label for a property. Expected values are
+                typically `user`, `non_user`, `tool`, `system`, or role labels that
+                map to non-user behavior semantics.
+
+        Returns:
+            set[str]: Allowed behavior_type labels.
+                - For `user`: unrestricted (validated upstream by extraction prompts)
+                - For tool/system/non_user: includes role-specific types from prompts
+        """
+        if role_token == "user":
+            return set()
+
+        # Base assistant/non-user taxonomy
+        base_types = {
+            "Positive",
+            "Negative (critical)",
+            "Negative (non-critical)",
+            "Style",
+        }
+
+        # Role-specific additions from role_analysis prompts
+        if role_token == "tool":
+            return base_types | {
+                "Tool Error",
+                "Tool Success",
+                "Tool Pattern",
+                "Tool Integration",
+            }
+        if role_token == "system":
+            return base_types | {
+                "System Constraint",
+                "System Instruction",
+                "System Pattern",
+            }
+
+        # non_user, assistant, and any other non-user role
+        return base_types | {
+            "Tool Pattern",
+            "System Pattern",
+        }

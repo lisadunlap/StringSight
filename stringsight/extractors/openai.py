@@ -40,6 +40,8 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         max_tokens: int = 16000,
         max_workers: int = DEFAULT_MAX_WORKERS,
         include_scores_in_prompt: bool = False,
+        extract_by_role: Optional[List[str]] = None,
+        use_dynamic_prompts: bool = False,
         **kwargs
     ):
         """
@@ -54,11 +56,16 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
             max_tokens: Max tokens for LLM
             max_workers: Max parallel workers for API calls
             include_scores_in_prompt: Whether to include scores in prompts
+            extract_by_role: Optional list of roles to extract separately (e.g., ["user", "assistant"])
+            use_dynamic_prompts: If True, use dynamic discovery for role-specific prompts
             **kwargs: Additional configuration
 
         Note:
             Caching is handled automatically by UnifiedCache singleton.
             Configure cache via STRINGSIGHT_* environment variables.
+            
+            When extract_by_role is provided, the extractor runs separate extraction
+            passes for each role, using role-specific prompts and filtering conversations.
         """
         super().__init__(**kwargs)
         self.model = model
@@ -75,6 +82,9 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
         self.max_workers = max_workers
         # Control whether to include numeric scores/winner context in prompts
         self.include_scores_in_prompt = include_scores_in_prompt
+        # Role-based extraction parameters
+        self.extract_by_role = extract_by_role
+        self.use_dynamic_prompts = use_dynamic_prompts
         # Note: Caching is handled by parallel_completions via UnifiedCache singleton
 
     async def run(self, data: PropertyDataset, progress_callback: Any = None, **kwargs: Any) -> PropertyDataset:
@@ -96,6 +106,12 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
             self.log("No conversations found – skipping extraction")
             return data
 
+        # If extract_by_role is specified, run multi-pass extraction
+        if self.extract_by_role is not None:
+            self.log(f"Running multi-pass extraction for roles: {self.extract_by_role}")
+            return await self._run_multi_pass_extraction(data, progress_callback, **kwargs)
+
+        # Otherwise, run standard single-pass extraction
         self.log(f"Extracting properties from {n_conv} conversations using {self.model}")
 
 
@@ -458,4 +474,158 @@ class OpenAIExtractor(LoggingMixin, TimingMixin, ErrorHandlingMixin, WandbMixin,
             self.log_wandb(extraction_metrics, is_summary=True)
 
         except Exception as e:
-            self.log(f"Failed to log extraction to wandb: {e}", level="warning")        
+            self.log(f"Failed to log extraction to wandb: {e}", level="warning")
+    
+    async def _run_multi_pass_extraction(
+        self, 
+        data: PropertyDataset, 
+        progress_callback: Any = None, 
+        **kwargs: Any
+    ) -> PropertyDataset:
+        """
+        Run extraction separately for each role.
+        
+        Args:
+            data: PropertyDataset with conversations to extract from
+            progress_callback: Optional callback for progress updates
+            
+        Returns:
+            PropertyDataset with properties from all roles combined
+        """
+        all_properties: List[Property] = []
+        normalized_roles: List[str] = self._normalize_extract_roles(self.extract_by_role)
+
+        for role_idx, role in enumerate(normalized_roles):
+            self.log(f"Extracting properties for role '{role}' ({role_idx + 1}/{len(normalized_roles)})")
+            
+            # Get role-specific system prompt
+            role_prompt = self._get_role_prompt(role, data)
+            
+            # Build prompts using role-specific filtering
+            user_messages: List[Union[str, List[Dict[str, Any]]]] = []
+            for conv in data.conversations:
+                prompt = self._build_role_specific_prompt(conv, role)
+                user_messages.append(prompt)
+            
+            # Call LLM for this role
+            raw_responses = await parallel_completions_async(
+                user_messages,
+                model=self.model,
+                system_prompt=role_prompt,
+                max_workers=self.max_workers,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                max_tokens=self.max_tokens,
+                show_progress=True,
+                progress_desc=f"Extracting {role} properties",
+                progress_callback=progress_callback
+            )
+            
+            # Wrap responses in Property objects with role tag
+            skipped_count = 0
+            for conv, raw in zip(data.conversations, raw_responses):
+                if raw is None:
+                    skipped_count += 1
+                    continue
+                
+                prop = Property(
+                    id=str(uuid.uuid4()),
+                    question_id=conv.question_id,
+                    model=conv.model,
+                    raw_response=raw,
+                    role=role  # Tag with role
+                )
+                all_properties.append(prop)
+            
+            if skipped_count > 0:
+                self.log(f"Skipped {skipped_count} conversations for role '{role}' due to failed LLM calls", level="warning")
+            
+            role_property_count = sum(1 for p in all_properties if p.role == role)
+            self.log(f"Received {role_property_count} properties for role '{role}'")
+        
+        self.log(f"Total properties extracted across all roles: {len(all_properties)}")
+        
+        # Return dataset with all properties from all roles
+        return PropertyDataset(
+            conversations=data.conversations,
+            all_models=data.all_models,
+            properties=all_properties,
+            clusters=data.clusters,
+            model_stats=data.model_stats,
+        )
+
+    @staticmethod
+    def _normalize_extract_roles(extract_by_role: List[str] | None) -> List[str]:
+        """Normalize requested role labels into strict extraction buckets.
+
+        Args:
+            extract_by_role: Requested extraction role labels from API payload.
+                Expected format:
+                - `None` or empty list: no role-specific extraction passes
+                - `List[str]` with any role names (for example `["user", "assistant"]`,
+                  `["assistant", "tool"]`, or `["non_user"]`)
+
+        Returns:
+            List[str]: Ordered extraction buckets constrained to:
+                - `"user"` if any user role was requested
+                - `"non_user"` if any non-user role was requested
+
+            Output is deterministic and de-duplicated:
+                - `"user"` appears first when present
+                - `"non_user"` appears second when present
+        """
+        if extract_by_role is None:
+            return []
+
+        normalized_tokens: List[str] = []
+        for role in extract_by_role:
+            role_token = str(role).strip().lower()
+            if len(role_token) == 0:
+                continue
+            normalized_tokens.append(role_token)
+
+        has_user = "user" in normalized_tokens
+        has_non_user = any(role != "user" for role in normalized_tokens)
+
+        normalized: List[str] = []
+        if has_user:
+            normalized.append("user")
+        if has_non_user:
+            normalized.append("non_user")
+        return normalized
+    
+    def _get_role_prompt(self, role: str, data: PropertyDataset) -> str:
+        """Get the appropriate system prompt for a specific role."""
+        if self.use_dynamic_prompts:
+            # Use dynamic discovery
+            from ..prompts.dynamic.discovery_generator import DiscoveryPromptGenerator
+            from ..core.caching import UnifiedCache
+            
+            generator = DiscoveryPromptGenerator(UnifiedCache())
+            # Get sample conversations for discovery
+            sample_convs = [conv.responses for conv in data.conversations[:10] if hasattr(conv, 'responses')]
+            
+            role_prompt = generator.generate_role_specific(
+                role=role,
+                expanded_task_description="Extract behavioral properties from conversations",
+                sample_conversations=sample_convs,
+                model=self.model
+            )
+            return role_prompt
+        else:
+            # Use template-based prompt
+            from ..prompts.extraction.role_analysis import get_role_analysis_prompt
+            return get_role_analysis_prompt(role, task_description="")
+    
+    def _build_role_specific_prompt(self, conversation, role: str) -> Union[str, List[Dict[str, Any]]]:
+        """Build prompt focusing on specific role messages."""
+        from .conv_to_str import conv_to_str_by_role
+        
+        # Convert conversation to string, filtering by role
+        if isinstance(conversation.responses, list):
+            response = conv_to_str_by_role(conversation.responses, role)
+        else:
+            # Fallback for non-list responses
+            response = str(conversation.responses)
+        
+        return response

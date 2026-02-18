@@ -102,7 +102,7 @@ def generate_coarse_labels(
             {"role": "system", "content": systems_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        "max_completion_tokens": 2000,
+        "max_completion_tokens": 2048,
     }
 
     if verbose:

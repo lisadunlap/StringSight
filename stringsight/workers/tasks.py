@@ -57,6 +57,8 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
         df = pd.DataFrame(req.rows)
 
         logger.info(f"extract_properties_job called with sample_size={req.sample_size}, total rows={len(df)}")
+        logger.info(f"🔍 extract_by_role parameter: {req.extract_by_role}")
+        logger.info(f"🔍 use_dynamic_role_prompts parameter: {req.use_dynamic_role_prompts}")
 
         # Apply sample_size if specified
         if req.sample_size and req.sample_size < len(df):
@@ -129,6 +131,8 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
             include_scores_in_prompt=False if req.include_scores_in_prompt is None else req.include_scores_in_prompt,
             verbose=False,
             use_wandb=False,
+            extract_by_role=req.extract_by_role,  # Pass role extraction parameter
+            use_dynamic_prompts=req.use_dynamic_role_prompts or False,  # Pass dynamic role prompts parameter
         )
 
         # Run extraction with progress callback
@@ -163,6 +167,15 @@ async def _run_extract_job_async(job_id: str, req_data: Dict[str, Any]):
 
         validator = PropertyValidator(verbose=False, use_wandb=False, output_dir=output_dir)
         result = validator.run(parsed_dataset)
+
+        # Save properties to JSONL file (expected by frontend)
+        import json
+        from pathlib import Path
+        properties_file = Path(output_dir) / "validated_properties.jsonl"
+        with open(properties_file, "w") as f:
+            for prop in result.properties:
+                f.write(json.dumps(prop.to_dict()) + "\n")
+        logger.info(f"Saved {len(result.properties)} properties to {properties_file}")
         
         # Update job with success
         # Refresh job object
@@ -375,6 +388,7 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
                     reason=p.get("reason"),
                     evidence=p.get("evidence"),
                     behavior_type=p.get("behavior_type"),
+                    role=p.get("role"),
                     raw_response=p.get("raw_response"),
                     contains_errors=p.get("contains_errors"),
                     unexpected_behavior=p.get("unexpected_behavior"),
@@ -572,6 +586,24 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
         # Phase 3: Run clustering (60%)
         update_progress(0.15)
         groupby_column = None if req.params.groupBy == "none" else req.params.groupBy
+
+        # Force role grouping when role-based extraction metadata is present.
+        # HDBSCANClusterer will then combine role + behavior_type internally.
+        has_role_metadata = any(
+            isinstance(prop.role, str) and prop.role.strip()
+            for prop in properties
+        )
+        has_behavior_type_metadata = any(
+            isinstance(prop.behavior_type, str) and prop.behavior_type.strip()
+            for prop in properties
+        )
+        if has_role_metadata and has_behavior_type_metadata:
+            if groupby_column != "role":
+                logger.info(
+                    "Overriding groupby_column=%s to 'role' because properties include role and behavior_type metadata",
+                    groupby_column,
+                )
+            groupby_column = "role"
         
         clusterer = get_clusterer(
             method="hdbscan",
@@ -704,7 +736,7 @@ async def _run_cluster_job_async(job_id: str, req_data: Dict[str, Any]):
             f.write(f"Clustering parameters:\n")
             f.write(f"  - Min cluster size: {req.params.minClusterSize}\n")
             f.write(f"  - Embedding model: {req.params.embeddingModel}\n")
-            f.write(f"  - Group by: {req.params.groupBy}\n")
+            f.write(f"  - Group by: {groupby_column}\n")
         
         # Update job completion
         update_progress(1.0)

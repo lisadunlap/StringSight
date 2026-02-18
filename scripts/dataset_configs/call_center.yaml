@@ -1,5 +1,7 @@
 data_path: data/call_center.jsonl
-output_dir: results/call_center_new-2
+output_dir: results/call_center_annotator_claude-sonnet-4-20250514
+extraction_model: ok
+summary_model: anthropic/claude-sonnet-4-20250514
 method: single_model
 min_cluster_size: 8
 embedding_model: text-embedding-3-large

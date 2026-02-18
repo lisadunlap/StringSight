@@ -1,23 +1,51 @@
 data_path: data/helm_capabilities/omni_math.jsonl
-output_dir: results/omni_math_top_models
+output_dir: results/omni_math_top_models_annotator_gemini-3-pro-preview
 method: single_model
 min_cluster_size: 8
+extraction_model: gemini/gemini-2.5-pro
+summary_model: gemini/gemini-2.5-pro
+cluster_assignment_model: gemini/gemini-2.5-flash
 embedding_model: text-embedding-3-large
-max_workers: 16
+max_workers: 4
+sample_size: 100
 groupby_column: behavior_type
 assign_outliers: false
 models:
   - deepseek-ai/deepseek-r1-0528
   - xai/grok-4-0709
   - google/gemini-2.5-pro-preview-03-25
+  - openai/o3-2025-04-16
   - qwen/qwen3-235b-a22b-fp8-tput
   - anthropic/claude-sonnet-4-20250514
+  
 task_description: |
-  This task is answering Olympiad level math questions.
+  This task involves evaluating model responses to Olympiad-level math questions. Your goal is to extract and describe interesting or notable behavioral properties found in model answers. For each response, look beyond surface-level correctness and focus on detailed, concrete behaviors that reveal how the model approaches and solves mathematical problems. In particular, consider the following types of properties and provide detailed observations and evidence when they are present:
 
-  When looking for interesting properties of responses, consider the following (note these are not exhaustive):
-  1. Factuality: correctness about math concepts, formulas, and problem-solving
-  2. Problem approach: how the model approaches the problem, what plans it makes, what theorems or lemmas it uses, etc
-  3. Errors: errors in reasoning, interpretation of the problem, computation, logical inconsistencies, etc
-  4. Layout: the structure of the response, formatting, notation
-  5. Reasoning: how the model reasons about each step of the problem, how it checks its work, etc
+  1. **Factuality:** Does the model accurately recall or apply mathematical concepts, facts, formulas, or theorems? Look for both subtle and explicit mistakes or impressive displays of rigor—e.g., precise definitions, correct citations of named theorems (such as the pigeonhole principle or AM-GM inequality), or misunderstanding basic concepts. Is the model able to distinguish between standard and non-standard terminology?
+
+  2. **Problem Approach and Planning:** How does the model break down and approach the problem? Does it state a clear plan, identify what kind of math is relevant, or properly select useful methods (e.g., direct computation, symmetry arguments, casework, induction, invariant analysis, constructing auxiliaries, drawing diagrams, or looking for patterns)? Does it attempt multiple strategies or blindly proceed with a single (possibly incorrect) method? Does it discuss why a particular theorem or technique applies, or does it simply state facts without justification?
+
+  3. **Errors and Mistakes:** Identify any errors in the answer, including:
+     - Logical flaws in the solution or argument
+     - Misreading or misinterpreting the problem statement
+     - Arithmetic mistakes (e.g., calculation errors, sign errors)
+     - Invalid assumptions or neglected cases in case analysis
+     - Overly general or overly specific conclusions
+     - Internal contradictions or unjustified leaps
+     - Stopping prematurely or continuing unnecessarily after reaching a solution
+
+     Note whether the model recognizes, self-corrects, or doubles down on errors.
+
+  4. **Reasoning Quality and Explanations:** Does the model explain its steps clearly, showing its reasoning chain? Does it articulate why each step is being done—e.g., "Because the problem says all variables are positive, we can apply AM-GM"? Does it check or verify intermediate results, or review its own approach for plausibility? How well does the model handle uncertainty, ambiguity, or missing information?
+
+  5. **Use of Mathematical Language, Notation, and Layout:** Observe how the response is presented.
+     - Does the model use precise and proper mathematical notation (LaTeX, inline equations, variable definitions)?
+     - Are steps organized logically (order of operations, labeling cases, use of bullet points, or numbering)?
+     - Are diagrams, tables, or explanatory remarks used appropriately?
+     - Are extraneous, chatty, or non-mathematical comments present that might distract or clarify?
+
+  6. **Creativity and Novelty:** Does the model demonstrate nontrivial insight, creative approaches, or uncommon but valid strategies? Does it make surprising leaps or connections, or introduce unexpected but relevant concepts?
+
+  7. **Confidence and Uncertainty:** Does the model express confidence or uncertainty when the answer is ambiguous, incomplete, or difficult? Does it hedge its claims or present answers as definitive?
+
+  8. **Other Notable Behaviors:** Note any other behaviors that stand out, such as refusal to answer, meta-reasoning about the limitations of the model, capability for multi-step reasoning, or attempts to generalize beyond the original question.

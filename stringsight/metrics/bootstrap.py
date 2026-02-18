@@ -30,9 +30,8 @@ class BootstrapAnalyzer:
         self.samples = samples
         self.seed = seed
 
-    @staticmethod
     def _bootstrap_salience_from_proportions(
-        proportions: "Any", *, n_models: int
+        self, proportions: "Any", *, n_models: int
     ) -> "Any":
         """Compute per-model proportion deltas (salience) from proportions.
 
@@ -53,8 +52,8 @@ class BootstrapAnalyzer:
         avg_others = (totals - proportions) / float(n_models - 1)
         return proportions - avg_others
 
-    @staticmethod
     def _compute_weighted_means_1d(
+        self,
         *,
         group_idx: "Any",
         n_groups: int,
@@ -92,8 +91,8 @@ class BootstrapAnalyzer:
             means[:, j] = np.divide(num, den, out=np.full_like(num, np.nan, dtype=float), where=den > 0)
         return means
 
-    @staticmethod
     def _compute_weighted_means_2d(
+        self,
         *,
         row_idx: "Any",
         col_idx: "Any",
@@ -108,7 +107,7 @@ class BootstrapAnalyzer:
 
         flat = row_idx * n_cols + col_idx
         n_groups = n_rows * n_cols
-        means_flat = BootstrapAnalyzer._compute_weighted_means_1d(
+        means_flat = self._compute_weighted_means_1d(
             group_idx=flat,
             n_groups=n_groups,
             weights=weights,

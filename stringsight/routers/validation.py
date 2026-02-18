@@ -418,6 +418,11 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
     if p.exists():
         model_scores = _get_cached_jsonl(p)
 
+    metrics_insights: Dict[str, Any] | None = None
+    insights_path = results_dir / "metrics_insights.json"
+    if insights_path.exists():
+        metrics_insights = _read_json_safe(insights_path)
+
     # Load conversations and properties
     conversations: List[Dict[str, Any]] = []
     properties: List[Dict[str, Any]] = []
@@ -532,6 +537,7 @@ def results_load(req: ResultsLoadRequest) -> Dict[str, Any]:
             "cluster_scores": cluster_scores or [],
             "model_scores": model_scores or []
         },
+        "metrics_insights": metrics_insights,
         "conversations": conversations,
         "properties": properties,
         "clusters": clusters,
@@ -689,7 +695,8 @@ def get_metrics(dataset: str) -> Dict[str, Any]:
         dataset: Dataset name (folder under final_results/)
 
     Returns:
-        Dict with metrics data for model_cluster_scores_df, cluster_scores_df, and model_scores_df
+        Dict with metrics data for model_cluster_scores_df, cluster_scores_df,
+        model_scores_df, and optional metrics_insights.
     """
     final_results_dir = Path("final_results") / dataset
     metrics = {}
@@ -699,6 +706,10 @@ def get_metrics(dataset: str) -> Dict[str, Any]:
         if metric_file.exists():
             # Use cached read for metrics files
             metrics[metric_type] = _get_cached_jsonl(metric_file)
+
+    insights_file = final_results_dir / "metrics_insights.json"
+    if insights_file.exists():
+        metrics["metrics_insights"] = _read_json_safe(insights_file)
 
     return metrics
 
@@ -742,7 +753,8 @@ def get_all_dataset_data(dataset: str, conversations_limit: int = 1000) -> Dict[
         "metrics": {
             "model_cluster_scores_df": metrics_result.get("model_cluster_scores_df", []),
             "cluster_scores_df": metrics_result.get("cluster_scores_df", []),
-            "model_scores_df": metrics_result.get("model_scores_df", [])
+            "model_scores_df": metrics_result.get("model_scores_df", []),
+            "metrics_insights": metrics_result.get("metrics_insights"),
         },
         "total_conversations": total_conversations,
         "has_more": conversations_result["has_more"]

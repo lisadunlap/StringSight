@@ -115,6 +115,25 @@ class HDBSCANClusterer(BaseClusterer):
             wandb_project=wandb_project,
         )
 
+    @staticmethod
+    def _normalize_role_bucket(role_value: Any) -> str:
+        """Map any role label into the supported clustering buckets.
+
+        Args:
+            role_value: Raw role value from a property row. Expected to be a role
+                label string such as `user`, `assistant`, `tool`, `system`, or a
+                custom label.
+
+        Returns:
+            str: Bucket label used for role stratification:
+                - `user` when the input role is `user` (case-insensitive)
+                - `non_user` for every other role label
+        """
+        role_token = str(role_value).strip().lower()
+        if role_token == "user":
+            return "user"
+        return "non_user"
+
 
     async def cluster(self, data: PropertyDataset, column_name: str, progress_callback=None) -> pd.DataFrame:
         """Cluster the dataset.
@@ -157,6 +176,21 @@ class HDBSCANClusterer(BaseClusterer):
 
         group_col = getattr(self.config, "groupby_column", None)
         cluster_positive = getattr(self.config, "cluster_positive", True)
+
+        # Handle combined role + behavior_type grouping
+        # If we have both role and behavior_type columns, create a combined grouping column
+        combined_grouping = False
+        self.log(f"Checking combined grouping: group_col={group_col}, has_role={'role' in df.columns}, has_behavior={'behavior_type' in df.columns}")
+        if group_col == "role" and "role" in df.columns and "behavior_type" in df.columns:
+            # Normalize role into strict buckets before combined stratification.
+            df["role"] = df["role"].apply(self._normalize_role_bucket)
+            # Create combined column: role_behaviortype (e.g., "user_phrasing", "non_user_Style")
+            df["role_behavior_type"] = df["role"].astype(str) + "_" + df["behavior_type"].astype(str)
+            group_col = "role_behavior_type"
+            combined_grouping = True
+            unique_combinations = df["role_behavior_type"].nunique()
+            self.log(f"✓ Using combined role+behavior_type grouping with {unique_combinations} unique combinations")
+            self.log(f"  Combinations: {sorted(df['role_behavior_type'].unique())}")
 
         # Filter out positive behaviors if cluster_positive is False and groupby_column is behavior_type
         positive_mask = None
@@ -314,6 +348,8 @@ class HDBSCANClusterer(BaseClusterer):
             
             # Check if we're using groupby and assign group-specific outlier labels
             group_col = getattr(self.config, "groupby_column", None)
+            if "role_behavior_type" in df.columns:
+                group_col = "role_behavior_type"
             if group_col is not None and group_col in df.columns:
                 # Assign group-specific outlier labels
                 for group_value in df.loc[mask, group_col].unique():
@@ -328,6 +364,8 @@ class HDBSCANClusterer(BaseClusterer):
 
         # 2️⃣  For stratified mode: ensure cluster IDs are unique across partitions
         group_col = getattr(self.config, "groupby_column", None)
+        if "role_behavior_type" in df.columns:
+            group_col = "role_behavior_type"
         if group_col is not None and group_col in df.columns:
             # Handle group-specific outlier labels
             outlier_mask = df[label_col].str.startswith("Outliers - ") if df[label_col].dtype == 'object' else df[label_col] == "Outliers"
@@ -369,12 +407,25 @@ class HDBSCANClusterer(BaseClusterer):
         clusters = super()._build_clusters_from_df(df, column_name)
 
         group_col = getattr(self.config, "groupby_column", None)
+
+        # Check if combined grouping was used (role_behavior_type column exists)
+        using_combined_grouping = False
+        if "role_behavior_type" in df.columns:
+            using_combined_grouping = True
+            group_col = "role_behavior_type"
+            self.log(f"Detected combined grouping column in DataFrame")
+
         if group_col is not None and group_col in df.columns:
             id_col = f"{column_name}_cluster_id"
 
             # Pandas may upcast cluster ids to floats if there are any NaNs in the column.
             # Normalize ids to integers before converting to string keys (Cluster.id is a str).
-            id_group_df = df.loc[df[id_col].notna(), [id_col, group_col]].dropna().copy()
+            # For combined grouping, also need to preserve role and behavior_type separately
+            cols_to_extract = [id_col, group_col]
+            if using_combined_grouping and "role" in df.columns and "behavior_type" in df.columns:
+                cols_to_extract.extend(["role", "behavior_type"])
+
+            id_group_df = df.loc[df[id_col].notna(), cols_to_extract].dropna().copy()
             if not id_group_df.empty:
                 # If ids are floats like 0.0, cast back to int safely.
                 id_group_df[id_col] = id_group_df[id_col].astype(float).astype(int)
@@ -385,7 +436,26 @@ class HDBSCANClusterer(BaseClusterer):
                 .to_dict()
             )
             id_to_group = {str(int(k)): v for k, v in id_to_group.items()}
-            
+
+            # For combined grouping, also create mappings for individual role and behavior_type
+            id_to_role = {}
+            id_to_behavior_type = {}
+            if using_combined_grouping and "role" in id_group_df.columns and "behavior_type" in id_group_df.columns:
+                id_group_df["role"] = id_group_df["role"].apply(self._normalize_role_bucket)
+                id_to_role = (
+                    id_group_df.groupby(id_col)["role"]
+                    .agg(lambda s: s.iloc[0])
+                    .to_dict()
+                )
+                id_to_role = {str(int(k)): v for k, v in id_to_role.items()}
+
+                id_to_behavior_type = (
+                    id_group_df.groupby(id_col)["behavior_type"]
+                    .agg(lambda s: s.iloc[0])
+                    .to_dict()
+                )
+                id_to_behavior_type = {str(int(k)): v for k, v in id_to_behavior_type.items()}
+
             for c in clusters:
                 cid = getattr(c, "id", None)
                 if cid in id_to_group:
@@ -396,6 +466,12 @@ class HDBSCANClusterer(BaseClusterer):
                     # Also store under the actual grouping column name (e.g. "behavior_type")
                     # for explicitness and easier debugging.
                     c.meta[group_col] = group_val
+
+                    # For combined grouping, also store individual role and behavior_type
+                    if cid in id_to_role:
+                        c.meta["role"] = id_to_role[cid]
+                    if cid in id_to_behavior_type:
+                        c.meta["behavior_type"] = id_to_behavior_type[cid]
 
         return clusters
 class LLMOnlyClusterer(HDBSCANClusterer):

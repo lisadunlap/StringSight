@@ -16,12 +16,12 @@ from ..expansion.trace_based import expand_task_description
 class TaskExpander:
     """Expands task descriptions using sampled conversation examples."""
 
-    def __init__(self, cache: UnifiedCache | None = None, max_tokens_per_sample: int = 512, seed: int = 42):
+    def __init__(self, cache: UnifiedCache | None = None, max_tokens_per_sample: int = 2048, seed: int = 42):
         """Initialize the TaskExpander.
 
         Args:
             cache: Cache instance for storing expansion results.
-            max_tokens_per_sample: Maximum tokens per conversation sample (default: 512).
+            max_tokens_per_sample: Maximum tokens per conversation sample (default: 2048).
             seed: Random seed for deterministic sampling (default: 42).
         """
         self.cache = cache or UnifiedCache()

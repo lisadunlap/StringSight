@@ -33,6 +33,8 @@ class ExtractBatchRequest(BaseModel):
     use_dynamic_prompts: Optional[bool] = True
     dynamic_prompt_samples: Optional[int] = 10
     custom_clustering_prompts: Optional[Dict[str, str]] = None  # {clustering, deduplication, outlier}
+    extract_by_role: Optional[List[str]] = None  # Role-bucket extraction request; normalized to user/non_user
+    use_dynamic_role_prompts: Optional[bool] = False  # Use dynamic prompts for role extraction
 
 class ExtractJobStartRequest(ExtractBatchRequest):
     pass
@@ -67,7 +69,7 @@ class PipelineJobRequest(BaseModel):
     sample_size: Optional[int] = None
     
     # Columns
-    groupby_column: Optional[str] = "behavior_type"
+    groupby_column: Optional[str] = "behavior_type"  # "behavior_type" or "role" for role+behavior stratification
     assign_outliers: Optional[bool] = False
     score_columns: Optional[List[str]] = None
 
@@ -77,7 +79,7 @@ class PipelineJobRequest(BaseModel):
 class ClusterParams(BaseModel):
     minClusterSize: Optional[int] = 5
     embeddingModel: str = "openai/text-embedding-3-large"
-    groupBy: Optional[str] = "none"  # none | category | behavior_type
+    groupBy: Optional[str] = "none"  # none | category | behavior_type | role
 
 class ClusterJobRequest(BaseModel):
     # Data
@@ -176,6 +178,8 @@ class ExtractSingleRequest(BaseModel):
     return_debug: Optional[bool] = False
     use_dynamic_prompts: Optional[bool] = True
     dynamic_prompt_samples: Optional[int] = 5
+    extract_by_role: Optional[List[str]] = None  # Role-bucket extraction request; normalized to user/non_user
+    use_dynamic_role_prompts: Optional[bool] = False  # Use dynamic prompts for role extraction
 
 
 class GeneratePromptsRequest(BaseModel):
@@ -210,7 +214,7 @@ class DFCustomRequest(DFRows):
 class ClusterRunParams(BaseModel):
     minClusterSize: Optional[int] = None
     embeddingModel: str = "openai/text-embedding-3-large"
-    groupBy: Optional[str] = "none"
+    groupBy: Optional[str] = "none"  # none | category | behavior_type | role
 
 
 class ClusterRunRequest(BaseModel):

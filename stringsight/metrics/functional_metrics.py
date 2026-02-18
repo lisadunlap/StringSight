@@ -638,6 +638,30 @@ class FunctionalMetrics(PipelineStage, LoggingMixin, TimingMixin):
         )
         return means_flat.reshape((n_rows, n_cols, values.shape[1]))
 
+    def _bootstrap_salience_from_proportions(
+        self, proportions: "Any", *, n_models: int
+    ) -> "Any":
+        """Compute per-model proportion deltas (salience) from proportions.
+
+        This is the bootstrap analogue of `_compute_salience()`, but operates on a dense
+        array instead of nested dicts.
+
+        Args:
+            proportions: Array of shape (n_models, n_clusters) with proportions in [0, 1].
+            n_models: Number of models (first dimension).
+
+        Returns:
+            Array of shape (n_models, n_clusters) with `proportion_delta`.
+        """
+        import numpy as np
+
+        if n_models <= 1:
+            return np.zeros_like(proportions, dtype=float)
+
+        totals = np.sum(proportions, axis=0, keepdims=True)
+        avg_others = (totals - proportions) / float(n_models - 1)
+        return proportions - avg_others
+
     def _compute_salience(self, model_cluster_scores: Dict[str, Dict[str, Dict[str, Any]]]) -> Dict[str, Dict[str, Dict[str, Any]]]:
         """Compute salience (proportion deviation from average of OTHER models) for each model-cluster combination."""
         df = pd.DataFrame(model_cluster_scores).reset_index().rename({"index": "cluster"}, axis=1)

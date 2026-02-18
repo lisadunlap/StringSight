@@ -204,9 +204,18 @@ dataset = extract_properties_only(
 - `evidence`: Specific quotes demonstrating the behavior
 - `unexpected_behavior`: Boolean indicating if this is problematic
 - `type`: Nature of the property (e.g., "content", "format", "style")
-- `behavior_type`: Classification like "Positive", "Negative (critical)", "Style"
+- `behavior_type`: Role-dependent behavior taxonomy
 - `cluster_id`: Cluster assignment
 - `cluster_label`: Human-readable cluster name
+
+### Role-Based Extraction and Clustering Contract
+
+- Role extraction uses exactly two buckets: `user` and `non_user`
+- Any non-user source role (assistant/tool/system/custom) is normalized to `non_user`
+- User behavior types are: `phrasing`, `domain`, `skills_required`
+- Non-user behavior types remain unchanged (for example: `Positive`, `Negative (critical)`, `Negative (non-critical)`, `Style`)
+- Stratified clustering groups by `role + behavior_type` when role extraction is enabled
+- Custom role buckets in the frontend role picker are intentionally disabled
 
 **Output files (when `output_dir` is specified):**
 - `clustered_results.parquet`: Main dataframe with cluster assignments
@@ -215,6 +224,7 @@ dataset = extract_properties_only(
 - `model_cluster_scores.json`: Per model-cluster metrics
 - `cluster_scores.json`: Aggregated metrics per cluster
 - `model_scores.json`: Overall metrics per model
+- `metrics_insights.json`: LLM-generated sectioned overview of potentially interesting metrics insights
 - `summary.txt`: Human-readable summary
 
 **Metrics in model_stats:**

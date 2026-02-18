@@ -200,6 +200,8 @@ def explain(
     max_tokens: int = 16000,
     max_workers: int = DEFAULT_MAX_WORKERS,
     include_scores_in_prompt: bool = False,
+    extract_by_role: list[str] | None = None,
+    use_dynamic_role_prompts: bool = False,
     # Prompt expansion parameters
     prompt_expansion: bool = False,
     expansion_num_traces: int = 5,
@@ -547,6 +549,8 @@ def explain(
             max_tokens=max_tokens,
             max_workers=max_workers,
             include_scores_in_prompt=include_scores_in_prompt,
+            extract_by_role=extract_by_role,
+            use_dynamic_prompts=use_dynamic_role_prompts,
             clusterer=clusterer,
             min_cluster_size=min_cluster_size,
             embedding_model=embedding_model,
