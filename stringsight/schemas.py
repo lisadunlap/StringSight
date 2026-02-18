@@ -211,6 +211,32 @@ class DFCustomRequest(DFRows):
     code: str
 
 
+class NL2PandasRequest(BaseModel):
+    """Request to generate a pandas expression from a natural language query.
+
+    Attributes:
+        query: Natural language description of the desired data view.
+        columns: List of column names in the DataFrame.
+        dtypes: Mapping of column name to dtype string (e.g. {"model": "object", "score_accuracy": "float64"}).
+        sample_values: Mapping of column name to a list of 3-5 representative sample values.
+    """
+    query: str
+    columns: List[str]
+    dtypes: Dict[str, str]
+    sample_values: Dict[str, List[Any]]
+
+
+class NL2PandasResponse(BaseModel):
+    """Response containing a generated pandas expression.
+
+    Attributes:
+        code: A pandas expression string using `df` and `pd` that evaluates to a DataFrame.
+        explanation: A short human-readable explanation of what the code does.
+    """
+    code: str
+    explanation: str
+
+
 class ClusterRunParams(BaseModel):
     minClusterSize: Optional[int] = None
     embeddingModel: str = "openai/text-embedding-3-large"

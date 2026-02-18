@@ -1,7 +1,8 @@
 """
 DataFrame manipulation endpoints.
 
-Utility endpoints for filtering, grouping, and transforming DataFrames.
+Utility endpoints for filtering, grouping, transforming DataFrames,
+and natural-language-to-pandas code generation.
 """
 
 from typing import Dict, List, Any
@@ -9,12 +10,59 @@ from typing import Dict, List, Any
 import pandas as pd
 from fastapi import APIRouter, HTTPException
 
-from stringsight.schemas import DFSelectRequest, DFGroupPreviewRequest, DFCustomRequest
+from stringsight.schemas import (
+    DFSelectRequest, DFGroupPreviewRequest, DFCustomRequest,
+    NL2PandasRequest, NL2PandasResponse,
+)
+from stringsight.core.llm_utils import single_completion
 from stringsight.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/df", tags=["dataframe"])
+
+
+NL2PANDAS_SYSTEM_PROMPT = """\
+You are a pandas code generation assistant. The user will describe a data view \
+they want in natural language. You must return a single valid Python pandas \
+expression that evaluates to a DataFrame.
+
+Rules:
+- The DataFrame variable is `df`. The pandas module is `pd`.
+- Your expression MUST evaluate to a pandas DataFrame (not a Series, scalar, etc.).
+- CRITICAL: Column names must be copied EXACTLY from the schema below, including \
+spaces, parentheses, and special characters. Do NOT abbreviate or simplify them.
+- Do NOT use exec(), import, open(), or any side-effectful operations.
+- Return ONLY the pandas expression on the first line, with NO markdown fencing.
+- On the second line, return a brief one-sentence explanation starting with "Explanation: ".
+
+AVAILABLE COLUMNS (use these names EXACTLY):
+{schema}
+
+Sample values:
+{samples}
+"""
+
+
+def _build_nl2pandas_prompt(req: NL2PandasRequest) -> str:
+    """Build the system prompt with schema and sample values injected.
+
+    Args:
+        req: The NL2PandasRequest containing columns, dtypes, and sample_values.
+
+    Returns:
+        Formatted system prompt string.
+    """
+    schema_lines = [f"  - \"{col}\" (dtype: {req.dtypes.get(col, 'unknown')})" for col in req.columns]
+    sample_lines = []
+    for col in req.columns:
+        vals = req.sample_values.get(col, [])
+        if vals:
+            sample_lines.append(f"  - {col}: {vals[:5]}")
+    return NL2PANDAS_SYSTEM_PROMPT.format(
+        schema="\n".join(schema_lines),
+        samples="\n".join(sample_lines),
+    )
 
 
 def _df_from_rows(rows: List[Dict[str, Any]]) -> pd.DataFrame:
@@ -116,5 +164,47 @@ def df_custom(req: DFCustomRequest) -> Dict[str, Any]:
             return {"rows": result.to_dict(orient="records")}
         else:
             return {"error": "Expression must return a pandas DataFrame."}
+    except KeyError as e:
+        return {"error": f"Column not found: {e}. Available columns: {list(df.columns)}"}
     except Exception as e:
         return {"error": str(e)}
+
+
+@router.post("/nl2pandas", response_model=NL2PandasResponse)
+def nl2pandas(req: NL2PandasRequest) -> NL2PandasResponse:
+    """Generate a pandas expression from a natural language query.
+
+    Calls an LLM with the DataFrame schema and sample values to produce
+    a pandas expression the user can review before executing.
+
+    Args:
+        req: NL2PandasRequest with query, columns, dtypes, and sample_values.
+
+    Returns:
+        NL2PandasResponse with the generated code and a short explanation.
+    """
+    system_prompt = _build_nl2pandas_prompt(req)
+    response = single_completion(req.query, system_prompt=system_prompt)
+
+    if not response:
+        raise HTTPException(status_code=502, detail="LLM returned an empty response.")
+
+    lines = response.strip().splitlines()
+    code = lines[0].strip()
+    # Strip markdown code fencing if the LLM wrapped it
+    if code.startswith("```"):
+        code = code.lstrip("`").removeprefix("python").strip()
+    if code.endswith("```"):
+        code = code.rstrip("`").strip()
+
+    explanation = ""
+    for line in lines[1:]:
+        stripped = line.strip()
+        if stripped.lower().startswith("explanation:"):
+            explanation = stripped[len("explanation:"):].strip()
+            break
+        elif stripped:
+            explanation = stripped
+            break
+
+    return NL2PandasResponse(code=code, explanation=explanation)
