@@ -108,3 +108,4 @@ frontend/dist/
 frontend/.env
 stringsight/frontend_dist/Caddyfile
 deploy-caddy-config.sh
+stringsight/frontend_dist/telecom_2026-01-02.zip

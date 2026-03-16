@@ -1,0 +1,252 @@
+#!/usr/bin/env python3
+"""
+Recompute metrics on existing StringSight pipeline results.
+
+This script loads existing pipeline results (conversation data, properties, clusters)
+and recomputes metrics, saving them to a new directory with '-new_metrics' appended.
+
+Usage:
+    python scripts/recompute_metrics.py results/my_results
+    python scripts/recompute_metrics.py results/my_results --method side_by_side
+    python scripts/recompute_metrics.py results/my_results --bootstrap_samples 500
+    python scripts/recompute_metrics.py results/my_results --no-bootstrap
+"""
+
+import argparse
+import os
+from pathlib import Path
+import sys
+import shutil
+
+from stringsight import compute_metrics_only
+
+
+def main():
+    """Main function for recomputing metrics on existing results."""
+    parser = argparse.ArgumentParser(
+        description="Recompute metrics on existing StringSight pipeline results",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Recompute metrics with default settings
+  python scripts/recompute_metrics.py results/webdev_20250101_120000
+  
+  # Recompute for side-by-side comparison
+  python scripts/recompute_metrics.py results/arena_sbs --method side_by_side
+  
+  # Use more bootstrap samples for tighter confidence intervals
+  python scripts/recompute_metrics.py results/my_results --bootstrap_samples 500
+  
+  # Disable bootstrap computation for faster processing
+  python scripts/recompute_metrics.py results/my_results --no-bootstrap
+  
+  # Custom output directory suffix
+  python scripts/recompute_metrics.py results/my_results --output_suffix "_updated"
+        """
+    )
+    
+    # Required argument
+    parser.add_argument(
+        "results_dir",
+        type=str,
+        help="Path to the results folder containing full_dataset.json or other dataset files"
+    )
+    
+    # Optional arguments
+    parser.add_argument(
+        "--method",
+        type=str,
+        default="single_model",
+        choices=["single_model", "side_by_side"],
+        help="Method used in the original pipeline (default: single_model)"
+    )
+    
+    parser.add_argument(
+        "--output_suffix",
+        type=str,
+        default="_new_metrics",
+        help="Suffix to append to the output directory name (default: _new_metrics)"
+    )
+    
+    parser.add_argument(
+        "--bootstrap_samples",
+        type=int,
+        default=100,
+        help="Number of bootstrap samples for confidence intervals (default: 100)"
+    )
+    
+    parser.add_argument(
+        "--no-bootstrap",
+        action="store_true",
+        help="Disable bootstrap confidence interval computation"
+    )
+    
+    parser.add_argument(
+        "--use_wandb",
+        action="store_true",
+        help="Enable wandb logging"
+    )
+    
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Disable verbose output"
+    )
+    
+    args = parser.parse_args()
+    
+    # Validate input directory
+    input_path = Path(args.results_dir)
+    if not input_path.exists():
+        print(f"❌ Error: Results directory not found: {args.results_dir}")
+        print("\nPlease provide a valid path to a results folder.")
+        sys.exit(1)
+    
+    # Check for dataset files
+    possible_files = [
+        input_path / "full_dataset.json",
+        input_path / "full_dataset.parquet",
+        input_path / "clustered_results.parquet",
+        input_path / "dataset.json",
+        input_path / "dataset.parquet"
+    ]
+    
+    dataset_file_found = any(f.exists() for f in possible_files)
+    if not dataset_file_found:
+        print(f"❌ Error: No recognizable dataset file found in {args.results_dir}")
+        print("\nExpected one of:")
+        for f in possible_files:
+            print(f"  - {f.name}")
+        print("\nPlease provide a path to a directory containing pipeline results.")
+        sys.exit(1)
+    
+    # Determine output directory
+    input_dir_name = input_path.name
+    output_dir_name = f"{input_dir_name}{args.output_suffix}"
+    output_dir = input_path.parent / output_dir_name
+    
+    # Print configuration
+    print("="*60)
+    print("RECOMPUTE METRICS")
+    print("="*60)
+    print(f"Input:  {args.results_dir}")
+    print(f"Output: {output_dir}")
+    print(f"Method: {args.method}")
+    if args.no_bootstrap:
+        print("Bootstrap: Disabled")
+    else:
+        print(f"Bootstrap samples: {args.bootstrap_samples}")
+    print("="*60)
+    print()
+    
+    # Prepare metrics configuration
+    metrics_kwargs = {
+        "compute_bootstrap": not args.no_bootstrap,
+        "bootstrap_samples": args.bootstrap_samples if not args.no_bootstrap else 0,
+    }
+    
+    try:
+        # Create output directory
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Copy all non-metrics files from the input directory
+        # These are files that won't be regenerated by compute_metrics_only
+        files_to_copy = [
+            "conversation.jsonl",
+            "properties.jsonl",
+            "clusters.jsonl",
+            "clustered_results.jsonl",
+            "clustered_results_lightweight.jsonl",
+            "parsed_properties.jsonl",
+            "validated_properties.jsonl",
+            "parsing_stats.json",
+            "validation_stats.json",
+            "summary.txt",
+            "summary_table.jsonl"
+        ]
+        
+        if not args.quiet:
+            print("Copying non-metrics files from original results...")
+        
+        for filename in files_to_copy:
+            src_file = input_path / filename
+            if src_file.exists():
+                dst_file = output_dir / filename
+                shutil.copy2(src_file, dst_file)
+                if not args.quiet:
+                    print(f"  ✓ Copied {filename}")
+        
+        # Run metrics computation
+        clustered_df, model_stats = compute_metrics_only(
+            input_path=str(input_path),
+            method=args.method,
+            output_dir=str(output_dir),
+            metrics_kwargs=metrics_kwargs,
+            use_wandb=args.use_wandb,
+            verbose=not args.quiet
+        )
+        
+        print()
+        print("="*60)
+        print("✓ METRICS COMPUTATION COMPLETE")
+        print("="*60)
+        print(f"Results saved to: {output_dir}")
+        print()
+        print("Output files:")
+        print()
+        print("Copied from original:")
+        copied_files = [
+            "conversation.jsonl",
+            "properties.jsonl", 
+            "clusters.jsonl",
+            "clustered_results.jsonl",
+            "summary.txt"
+        ]
+        for filename in copied_files:
+            filepath = output_dir / filename
+            if filepath.exists():
+                size_mb = filepath.stat().st_size / (1024 * 1024)
+                print(f"  ✓ {filename} ({size_mb:.2f} MB)")
+        
+        print()
+        print("Recomputed metrics:")
+        metrics_files = [
+            "model_cluster_scores.json",
+            "cluster_scores.json",
+            "model_scores.json",
+            "model_cluster_scores_df.jsonl",
+            "cluster_scores_df.jsonl",
+            "model_scores_df.jsonl",
+            "full_dataset.json"
+        ]
+        
+        for filename in metrics_files:
+            filepath = output_dir / filename
+            if filepath.exists():
+                size_mb = filepath.stat().st_size / (1024 * 1024)
+                print(f"  ✓ {filename} ({size_mb:.2f} MB)")
+        
+        print("="*60)
+        
+    except Exception as e:
+        print()
+        print("="*60)
+        print("❌ ERROR DURING METRICS COMPUTATION")
+        print("="*60)
+        print(f"Error: {e}")
+        print()
+        print("This could be because:")
+        print("1. The input directory doesn't contain valid pipeline results")
+        print("2. The results don't have the required clustering data")
+        print("3. The data format is incompatible")
+        print("4. The wrong method was specified (try --method side_by_side)")
+        print()
+        print("Please ensure you're providing a path to a complete pipeline output")
+        print("directory that contains extracted properties and clusters.")
+        print("="*60)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+

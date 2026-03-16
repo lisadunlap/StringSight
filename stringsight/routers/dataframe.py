@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException
 from stringsight.schemas import (
     DFSelectRequest, DFGroupPreviewRequest, DFCustomRequest,
     NL2PandasRequest, NL2PandasResponse,
+    DFCorrelationsRequest, DFCorrelationsResponse, DFCorrelationEntry,
 )
 from stringsight.core.llm_utils import single_completion
 from stringsight.logging_config import get_logger
@@ -208,3 +209,41 @@ def nl2pandas(req: NL2PandasRequest) -> NL2PandasResponse:
             break
 
     return NL2PandasResponse(code=code, explanation=explanation)
+
+
+@router.post("/correlations", response_model=DFCorrelationsResponse)
+def df_correlations(req: DFCorrelationsRequest) -> DFCorrelationsResponse:
+    """Compute Pearson correlations between numeric columns and score columns.
+
+    Args:
+        req: DFCorrelationsRequest with rows, score_columns, and numeric_columns.
+
+    Returns:
+        DFCorrelationsResponse with a list of pairwise correlation entries.
+    """
+    df = _df_from_rows(req.rows)
+
+    all_cols = list(set(req.score_columns + req.numeric_columns))
+    missing = [c for c in all_cols if c not in df.columns]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Columns not found: {missing}")
+
+    # Coerce to numeric, dropping non-parseable values
+    for col in all_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    results: list[DFCorrelationEntry] = []
+    for nc in req.numeric_columns:
+        for sc in req.score_columns:
+            if nc == sc:
+                continue
+            pair = df[[nc, sc]].dropna()
+            count = len(pair)
+            if count < 3:
+                continue
+            r = float(pair[nc].corr(pair[sc]))
+            results.append(DFCorrelationEntry(
+                column=nc, score_column=sc, pearson_r=round(r, 4), count=count
+            ))
+
+    return DFCorrelationsResponse(correlations=results)

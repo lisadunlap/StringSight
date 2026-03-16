@@ -211,6 +211,36 @@ class DFCustomRequest(DFRows):
     code: str
 
 
+class DFCorrelationsRequest(BaseModel):
+    """Request to compute Pearson correlations between numeric and score columns.
+
+    Attributes:
+        rows: List of row dicts (should be lightweight -- large text cols stripped).
+        score_columns: Column names to correlate against (y-axis).
+        numeric_columns: Column names to correlate (x-axis).
+    """
+    rows: List[Dict[str, Any]]
+    score_columns: List[str]
+    numeric_columns: List[str]
+
+
+class DFCorrelationEntry(BaseModel):
+    """A single correlation result between a numeric column and a score column."""
+    column: str
+    score_column: str
+    pearson_r: float
+    count: int
+
+
+class DFCorrelationsResponse(BaseModel):
+    """Response containing pairwise Pearson correlations.
+
+    Attributes:
+        correlations: List of correlation entries.
+    """
+    correlations: List[DFCorrelationEntry]
+
+
 class NL2PandasRequest(BaseModel):
     """Request to generate a pandas expression from a natural language query.
 

@@ -1,0 +1,29 @@
+StringSight Results Summary
+==================================================
+
+Total conversations: 200
+Total properties: 1116
+Models analyzed: 2
+
+Output files:
+  - raw_properties.jsonl: Raw LLM responses
+  - extraction_stats.json: Extraction statistics
+  - extraction_samples.jsonl: Sample inputs/outputs
+  - parsed_properties.jsonl: Parsed property objects
+  - parsing_stats.json: Parsing statistics
+  - parsing_failures.jsonl: Failed parsing attempts
+  - validated_properties.jsonl: Validated properties
+  - validation_stats.json: Validation statistics
+  - clustered_results.jsonl: Complete clustered data
+  - embeddings.parquet: Embeddings data
+  - clustered_results_lightweight.jsonl: Data without embeddings
+  - summary_table.jsonl: Clustering summary
+  - model_cluster_scores.json: Per model-cluster combination metrics
+  - cluster_scores.json: Per cluster metrics (aggregated across models)
+  - model_scores.json: Per model metrics (aggregated across clusters)
+  - full_dataset.json: Complete PropertyDataset (JSON format)
+  - full_dataset.parquet: Complete PropertyDataset (parquet format, or .jsonl if mixed data types)
+
+Model Rankings (by average quality score):
+  1. claude-sonnet-35: 0.450
+  2. gpt-4o: 0.417
